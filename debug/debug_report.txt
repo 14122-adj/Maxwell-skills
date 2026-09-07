@@ -1,0 +1,52 @@
+======================================================================
+DEBUG REPORT: Theory vs FEA Comparison
+Motor: 36-slot/28-bar Squirrel Cage Induction Motor
+======================================================================
+
+--- Model Structure ---
+  Stator: 210.0mm OD / 136.0mm ID, 36 slots
+  Rotor:  135.2mm OD / 48.0mm shaft, 28 bars
+  Airgap: 0.4000000000000057mm (each side)
+  Band:   135.6mm dia (center)
+  Stack:  143.0mm
+  Poles:  4
+  [OK] Model structure matches reference .aedt
+
+--- Electrical Parameters ---
+  Rated voltage: 537.401V peak (380.0V RMS)
+  Frequency: 50.0Hz
+  Phase R: 0.957355 ohm
+  Phase L: 3.8188 mH
+  Phase X: 1.1997 ohm @ 50.0Hz
+  Phase Z: 1.5349 ohm
+
+--- Speed ---
+  Synchronous: 1500 rpm
+  Rated:       1465.37 rpm
+  Slip:        2.31%
+
+--- FEA Torque Results ---
+  Average torque: 48.83 Nm
+  Max torque:     66.95 Nm
+  Min torque:     29.33 Nm
+  Torque ripple:  77.0%
+  Mechanical power: 7.49 kW
+
+--- FEA Current Results ---
+  Phase A RMS: 11.69 A
+  Phase B RMS: 11.69 A
+  Phase C RMS: 11.75 A
+  Average RMS: 11.71 A
+  Theory estimate: 247.58 A
+  Difference: 95.3% [WARNING]
+
+--- FEA Induced Voltage ---
+  Phase A RMS: 360.76 V
+  Phase B RMS: 361.84 V
+  Phase C RMS: 361.77 V
+
+======================================================================
+ISSUES FOUND: 1
+  [WARNING] Current mismatch: FEA=11.71A vs Theory=247.58A (95.3%)
+         FIX: This is expected for IM (theory is V/Z approximation, FEA includes saturation and rotor effects)
+======================================================================

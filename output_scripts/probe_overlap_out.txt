@@ -1,0 +1,4 @@
+StatorOuter vertices: 253
+Band max r: 67.90
+A_1 max r: 73.81
+B_7 max r: 73.81

@@ -1,0 +1,532 @@
+[
+  {
+    "name": "add_custom_material",
+    "params": [
+      "material_name:string='<no-default>'[REQ]",
+      "properties:object=None[opt]"
+    ]
+  },
+  {
+    "name": "add_turns_to_winding",
+    "params": [
+      "winding_name:string='<no-default>'[REQ]",
+      "objects:array='<no-default>'[REQ]",
+      "turns:integer=1[opt]"
+    ]
+  },
+  {
+    "name": "analyze",
+    "params": [
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "analyze_all",
+    "params": []
+  },
+  {
+    "name": "analyze_parametric_sweep",
+    "params": [
+      "sweep_name:string='Sweep1'[opt]"
+    ]
+  },
+  {
+    "name": "assign_balloon_boundary",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "boundary_name:string=''[opt]"
+    ]
+  },
+  {
+    "name": "assign_current_excitation",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "current:string='1A'[opt]",
+      "excitation_name:string=''[opt]",
+      "is_solid:boolean=True[opt]",
+      "is_positive:boolean=True[opt]"
+    ]
+  },
+  {
+    "name": "assign_force_parameter",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "param_name:string=''[opt]"
+    ]
+  },
+  {
+    "name": "assign_master_slave_boundary",
+    "params": [
+      "master_objects:array='<no-default>'[REQ]",
+      "slave_objects:array='<no-default>'[REQ]",
+      "boundary_name:string=''[opt]",
+      "angle:string='0deg'[opt]"
+    ]
+  },
+  {
+    "name": "assign_material",
+    "params": [
+      "object_name:string='<no-default>'[REQ]",
+      "material:string='vacuum'[opt]"
+    ]
+  },
+  {
+    "name": "assign_mesh_operation",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "mesh_type:string='InsideSelection'[opt]",
+      "element_size:string='1mm'[opt]",
+      "op_name:string=''[opt]"
+    ]
+  },
+  {
+    "name": "assign_motion_setup",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "motion_type:string='Rotation'[opt]",
+      "axis:string='Z'[opt]",
+      "positive:boolean=True[opt]",
+      "angular_velocity:string='1000rpm'[opt]"
+    ]
+  },
+  {
+    "name": "assign_skin_depth_mesh",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "skin_depth:string='0.5mm'[opt]",
+      "num_layers:integer=2[opt]",
+      "op_name:string=''[opt]"
+    ]
+  },
+  {
+    "name": "assign_torque_parameter",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "param_name:string=''[opt]",
+      "axis:string='Z'[opt]"
+    ]
+  },
+  {
+    "name": "assign_vector_potential",
+    "params": [
+      "object_name:string='<no-default>'[REQ]",
+      "boundary_name:string=''[opt]",
+      "value:string='0'[opt]",
+      "coordinate_system:string='Cartesian'[opt]"
+    ]
+  },
+  {
+    "name": "assign_voltage_excitation",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "voltage:string='1V'[opt]",
+      "excitation_name:string=''[opt]"
+    ]
+  },
+  {
+    "name": "assign_winding",
+    "params": [
+      "winding_name:string='Winding1'[opt]",
+      "excitation_type:string='Current'[opt]",
+      "current:string='1A'[opt]",
+      "resistance:string='0'[opt]",
+      "inductance:string='0'[opt]",
+      "voltage:string='0'[opt]",
+      "is_solid:boolean=True[opt]",
+      "parallel_branches:integer=1[opt]",
+      "phase:integer=0[opt]"
+    ]
+  },
+  {
+    "name": "close_project",
+    "params": [
+      "name:string=''[opt]"
+    ]
+  },
+  {
+    "name": "connect_to_maxwell",
+    "params": [
+      "version:string=''[opt]"
+    ]
+  },
+  {
+    "name": "create_analysis_setup",
+    "params": [
+      "setup_name:string='Setup1'[opt]",
+      "solution_type:string='Magnetostatic'[opt]",
+      "max_passes:integer=10[opt]",
+      "percent_error:number=1.0[opt]",
+      "percent_refinement:integer=30[opt]",
+      "frequency:string='0Hz'[opt]",
+      "max_delta_energy:number=0.1[opt]"
+    ]
+  },
+  {
+    "name": "create_design",
+    "params": [
+      "design_type:string='Maxwell 3D'[opt]",
+      "design_name:string=''[opt]",
+      "solution_type:string='Magnetostatic'[opt]"
+    ]
+  },
+  {
+    "name": "create_field_plot",
+    "params": [
+      "quantity_name:string='Mag_B'[opt]",
+      "plot_name:string=''[opt]",
+      "objects:array=None[opt]",
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "create_optimization",
+    "params": [
+      "setup_name:string='Setup1'[opt]",
+      "opt_name:string='Optimization1'[opt]",
+      "goals:array=None[opt]",
+      "variables:array=None[opt]"
+    ]
+  },
+  {
+    "name": "create_parametric_sweep",
+    "params": [
+      "setup_name:string='Setup1'[opt]",
+      "sweep_name:string='Sweep1'[opt]",
+      "variable:string='RotorAngle'[opt]",
+      "start:string='0deg'[opt]",
+      "end:string='90deg'[opt]",
+      "step:string='1deg'[opt]",
+      "sweep_type:string='LinearStep'[opt]"
+    ]
+  },
+  {
+    "name": "create_region",
+    "params": [
+      "pad_x:string='10mm'[opt]",
+      "pad_y:string='10mm'[opt]",
+      "pad_z:string='10mm'[opt]",
+      "pad_type:string='Absolute Offset'[opt]"
+    ]
+  },
+  {
+    "name": "create_report",
+    "params": [
+      "report_type:string='Rectangular Plot'[opt]",
+      "solution:string=''[opt]",
+      "category:string='Force'[opt]",
+      "quantity:string='Force1'[opt]",
+      "report_name:string=''[opt]",
+      "sweep_variable:string=''[opt]"
+    ]
+  },
+  {
+    "name": "delete_design",
+    "params": [
+      "design_name:string='<no-default>'[REQ]"
+    ]
+  },
+  {
+    "name": "disconnect_from_maxwell",
+    "params": []
+  },
+  {
+    "name": "draw_box",
+    "params": [
+      "x:string='0mm'[opt]",
+      "y:string='0mm'[opt]",
+      "z:string='0mm'[opt]",
+      "dx:string='10mm'[opt]",
+      "dy:string='10mm'[opt]",
+      "dz:string='10mm'[opt]",
+      "name:string=''[opt]",
+      "material:string='vacuum'[opt]",
+      "color:string='(143 175 143)'[opt]"
+    ]
+  },
+  {
+    "name": "draw_circle",
+    "params": [
+      "x:string='0mm'[opt]",
+      "y:string='0mm'[opt]",
+      "z:string='0mm'[opt]",
+      "radius:string='5mm'[opt]",
+      "axis:string='Z'[opt]",
+      "name:string=''[opt]",
+      "color:string='(0 0 255)'[opt]"
+    ]
+  },
+  {
+    "name": "draw_cylinder",
+    "params": [
+      "x:string='0mm'[opt]",
+      "y:string='0mm'[opt]",
+      "z:string='0mm'[opt]",
+      "radius:string='5mm'[opt]",
+      "height:string='10mm'[opt]",
+      "axis:string='Z'[opt]",
+      "name:string=''[opt]",
+      "material:string='vacuum'[opt]",
+      "color:string='(143 175 143)'[opt]"
+    ]
+  },
+  {
+    "name": "draw_line",
+    "params": [
+      "start:array=None[opt]",
+      "end:array=None[opt]",
+      "name:string=''[opt]",
+      "color:string='(255 255 0)'[opt]"
+    ]
+  },
+  {
+    "name": "draw_rectangle",
+    "params": [
+      "x:string='0mm'[opt]",
+      "y:string='0mm'[opt]",
+      "z:string='0mm'[opt]",
+      "width:string='10mm'[opt]",
+      "height:string='10mm'[opt]",
+      "axis:string='Z'[opt]",
+      "name:string=''[opt]",
+      "color:string='(255 0 0)'[opt]"
+    ]
+  },
+  {
+    "name": "duplicate_object",
+    "params": [
+      "object_name:string='<no-default>'[REQ]",
+      "dx:string='0mm'[opt]",
+      "dy:string='0mm'[opt]",
+      "dz:string='0mm'[opt]",
+      "count:integer=1[opt]"
+    ]
+  },
+  {
+    "name": "execute_console_command",
+    "params": [
+      "command:string='<no-default>'[REQ]"
+    ]
+  },
+  {
+    "name": "export_field_plot",
+    "params": [
+      "file_path:string='<no-default>'[REQ]",
+      "plot_name:string=''[opt]",
+      "file_format:string='jpg'[opt]"
+    ]
+  },
+  {
+    "name": "export_mesh",
+    "params": [
+      "file_path:string='<no-default>'[REQ]",
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "export_project_archive",
+    "params": [
+      "file_path:string='<no-default>'[REQ]",
+      "include_results:boolean=True[opt]",
+      "include_mesh:boolean=True[opt]"
+    ]
+  },
+  {
+    "name": "export_report_data",
+    "params": [
+      "report_name:string='<no-default>'[REQ]",
+      "file_path:string='<no-default>'[REQ]",
+      "file_format:string='csv'[opt]"
+    ]
+  },
+  {
+    "name": "fit_view",
+    "params": []
+  },
+  {
+    "name": "get_convergence_data",
+    "params": [
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "get_design_info",
+    "params": []
+  },
+  {
+    "name": "get_flux_linkage",
+    "params": [
+      "winding_name:string='Winding1'[opt]",
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "get_force",
+    "params": [
+      "force_name:string='Force1'[opt]",
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "get_inductance",
+    "params": [
+      "winding_name:string='Winding1'[opt]",
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "get_maxwell_status",
+    "params": []
+  },
+  {
+    "name": "get_solution_info",
+    "params": [
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "get_torque",
+    "params": [
+      "torque_name:string='Torque1'[opt]",
+      "setup_name:string='Setup1'[opt]"
+    ]
+  },
+  {
+    "name": "get_variables",
+    "params": []
+  },
+  {
+    "name": "hide_object",
+    "params": [
+      "object_name:string='<no-default>'[REQ]"
+    ]
+  },
+  {
+    "name": "intersect_objects",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "keep_originals:boolean=False[opt]"
+    ]
+  },
+  {
+    "name": "list_designs",
+    "params": []
+  },
+  {
+    "name": "list_objects",
+    "params": []
+  },
+  {
+    "name": "list_projects",
+    "params": []
+  },
+  {
+    "name": "move_object",
+    "params": [
+      "object_name:string='<no-default>'[REQ]",
+      "dx:string='0mm'[opt]",
+      "dy:string='0mm'[opt]",
+      "dz:string='0mm'[opt]"
+    ]
+  },
+  {
+    "name": "new_project",
+    "params": []
+  },
+  {
+    "name": "open_project",
+    "params": [
+      "file_path:string='<no-default>'[REQ]"
+    ]
+  },
+  {
+    "name": "rename_object",
+    "params": [
+      "old_name:string='<no-default>'[REQ]",
+      "new_name:string='<no-default>'[REQ]"
+    ]
+  },
+  {
+    "name": "run_script",
+    "params": [
+      "script_content:string='<no-default>'[REQ]",
+      "save_before:boolean=True[opt]"
+    ]
+  },
+  {
+    "name": "save_project",
+    "params": [
+      "file_path:string=''[opt]"
+    ]
+  },
+  {
+    "name": "scale_object",
+    "params": [
+      "object_name:string='<no-default>'[REQ]",
+      "sx:number=1.0[opt]",
+      "sy:number=1.0[opt]",
+      "sz:number=1.0[opt]"
+    ]
+  },
+  {
+    "name": "set_active_design",
+    "params": [
+      "design_name:string='<no-default>'[REQ]"
+    ]
+  },
+  {
+    "name": "set_object_color",
+    "params": [
+      "object_name:string='<no-default>'[REQ]",
+      "color:string='(255 0 0)'[opt]"
+    ]
+  },
+  {
+    "name": "set_object_solve_inside",
+    "params": [
+      "object_name:string='<no-default>'[REQ]",
+      "solve_inside:boolean=True[opt]"
+    ]
+  },
+  {
+    "name": "set_variable",
+    "params": [
+      "name:string='<no-default>'[REQ]",
+      "value:string='<no-default>'[REQ]"
+    ]
+  },
+  {
+    "name": "set_view",
+    "params": [
+      "view_name:string='iso'[opt]"
+    ]
+  },
+  {
+    "name": "show_all_objects",
+    "params": []
+  },
+  {
+    "name": "show_object",
+    "params": [
+      "object_name:string='<no-default>'[REQ]"
+    ]
+  },
+  {
+    "name": "subtract_objects",
+    "params": [
+      "blank_objects:array='<no-default>'[REQ]",
+      "tool_objects:array='<no-default>'[REQ]",
+      "keep_originals:boolean=False[opt]"
+    ]
+  },
+  {
+    "name": "unite_objects",
+    "params": [
+      "objects:array='<no-default>'[REQ]",
+      "keep_originals:boolean=False[opt]"
+    ]
+  },
+  {
+    "name": "validate_design",
+    "params": []
+  }
+]

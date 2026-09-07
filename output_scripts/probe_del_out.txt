@@ -1,0 +1,1 @@
+['AddCoilstoWinding', 'AddWindingCoils', 'AssignCoil', 'AssignCoilGroup', 'DeleteAllBoundaries', 'DeleteAllExcitations', 'DeleteBoundaries', 'EditCoil', 'GetExcitations', 'GetExcitationsOfType', 'GetNumExcitations', 'GetNumExcitationsOfType', 'RemoveCoilFromWinding']

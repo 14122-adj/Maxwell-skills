@@ -1,0 +1,1 @@
+['CreateCircle', 'CreatePolyline', 'CreateRegularPolygon', 'CreateRegularPolyhedron', 'DeletPolylinePoint', 'DeletePolylinePoint', 'EditPolyline', 'InsertPolylineSegment']

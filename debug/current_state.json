@@ -1,0 +1,93 @@
+{
+  "materials": {},
+  "geometry": [
+    {
+      "name": "Band",
+      "material": ""
+    },
+    {
+      "name": "Shaft",
+      "material": ""
+    },
+    {
+      "name": "OuterRegion",
+      "material": ""
+    },
+    {
+      "name": "Stator",
+      "material": ""
+    },
+    {
+      "name": "Coil_0",
+      "material": ""
+    },
+    {
+      "name": "Coil_1",
+      "material": ""
+    },
+    {
+      "name": "Coil_2",
+      "material": ""
+    },
+    {
+      "name": "Coil_3",
+      "material": ""
+    },
+    {
+      "name": "Coil_4",
+      "material": ""
+    },
+    {
+      "name": "Coil_5",
+      "material": ""
+    },
+    {
+      "name": "Coil_6",
+      "material": ""
+    },
+    {
+      "name": "Coil_7",
+      "material": ""
+    },
+    {
+      "name": "Coil_8",
+      "material": ""
+    },
+    {
+      "name": "Rotor",
+      "material": ""
+    },
+    {
+      "name": "Bar",
+      "material": ""
+    },
+    {
+      "name": "Bar_Separate1",
+      "material": ""
+    },
+    {
+      "name": "Bar_Separate2",
+      "material": ""
+    },
+    {
+      "name": "Bar_Separate3",
+      "material": ""
+    },
+    {
+      "name": "Bar_Separate4",
+      "material": ""
+    },
+    {
+      "name": "Bar_Separate5",
+      "material": ""
+    },
+    {
+      "name": "Bar_Separate6",
+      "material": ""
+    },
+    {
+      "name": "InnerRegion",
+      "material": ""
+    }
+  ]
+}

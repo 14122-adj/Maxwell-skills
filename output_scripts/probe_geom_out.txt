@@ -1,0 +1,7 @@
+PM_1 max corner r=78.78
+PM_2 max corner r=78.78
+PM_3 max corner r=78.78
+PM_4 max corner r=78.78
+A_1 max corner r=73.81
+A_2 max corner r=73.81
+C_12 max corner r=73.81

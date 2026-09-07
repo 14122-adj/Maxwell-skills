@@ -1,0 +1,4 @@
+Mag1: maxr=67.80 center_angle=0
+Mag2: maxr=67.80 center_angle=90
+Mag3: maxr=67.80 center_angle=180
+Mag4: maxr=67.80 center_angle=270
