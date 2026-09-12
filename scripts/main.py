@@ -347,18 +347,86 @@ print("Geometry done: {c.slots} slots, {c.poles} PMs, Band")
         return s
 
     def _gen_winding(self):
-        """生成绕组脚本"""
+        """生成绕组脚本 — v4 修复: 与 canonical 真值表对齐
+        + standard 极性约定 (A+→Positive, A-→Negative)
+
+        演化史:
+          v1 硬编码 A_1..A_12 / B_1..B_12 / C_1..C_12, 与 builder 算法脱节
+          v2 模板用 builder.coil_groups 输出, 但 builder 算法对 8p12s 集中绕组有 bug
+          v3 头部加"winding guide" + 槽位图 ASCII 示意
+          v4 builder 改为 lookup-first, 数据源 = references/winding_layouts.md
+             极性约定统一为 standard (A+→Positive, A-→Negative)
+        """
         c = self.config
         from pmsm_winding_builder import WindingBuilder
-        builder = WindingBuilder(slots=c.slots, poles=c.poles, phases=3)
+        builder = WindingBuilder(
+            slots=c.slots, poles=c.poles, phases=3,
+            polarity_convention="standard",   # ★ 新约定: A+→Positive, A-→Negative
+        )
         config = builder.compute_winding()
 
-        # 线圈命名映射
-        layer = LayerType.DOUBLE
-        coils_per_group = len(config.coil_groups[0].coil_indices) if config.coil_groups else 6
+        # ── 按 builder 实际输出的 coil_groups 渲染 AssignCoilGroup ──
+        # 每个 CoilGroup: phase, polarity ('+'|'-'), coil_indices, coil_names
+        coil_group_blocks = []
+        coil_name_blocks  = []
+        # 在主进程算好每相 +/- 线圈组数(供 print 报告用)
+        n_pos_neg = {p: {"+": 0, "-": 0} for p in ["A", "B", "C"]}
+        for group in config.coil_groups:
+            if not group.coil_indices:
+                continue
+            pol_str = builder.polarity_type(group.polarity)   # 走 builder 的标准约定
+            coil_name = f"{group.phase}{group.polarity}"  # 例: "A+", "B-"
+            coil_objs = ", ".join(f'"{n}"' for n in group.coil_names)
+            coil_group_blocks.append(
+                f'oModule.AssignCoilGroup(\n'
+                f'    ["NAME:{coil_name}",\n'
+                f'     "Objects:=", [{coil_objs}],\n'
+                f'     "Conductor number:=", "{c.conductors_per_slot}",\n'
+                f'     "PolarityType:=", "{pol_str}"])\n'
+            )
+            coil_name_blocks.append(f'    "{coil_name}"')
+            n_pos_neg[group.phase][group.polarity] += 1
+        coil_groups_py = "\n".join(coil_group_blocks)
+        n_A_pos, n_A_neg = n_pos_neg["A"]["+"], n_pos_neg["A"]["-"]
+        n_B_pos, n_B_neg = n_pos_neg["B"]["+"], n_pos_neg["B"]["-"]
+        n_C_pos, n_C_neg = n_pos_neg["C"]["+"], n_pos_neg["C"]["-"]
+
+        # ── AddWindingCoils: 把每相的 + / - 组连到 WindingX ──
+        add_winding_lines = []
+        for phase in ["A", "B", "C"]:
+            phase_groups = [g for g in config.coil_groups
+                            if g.phase == phase and g.coil_indices]
+            names = ", ".join(f'"{g.phase}{g.polarity}"' for g in phase_groups)
+            add_winding_lines.append(
+                f'oModule.AddWindingCoils("Winding{phase}", [{names}])'
+            )
+        add_winding_py = "\n".join(add_winding_lines)
+
+        # ── 相位带表(供人类/AI 阅读校对) ──
+        # 输出多行 print, 每槽一行, 一目了然
+        phase_belt_prints = []
+        phase_belt_prints.append('print("=" * 60)')
+        phase_belt_prints.append(f'print("  绕组位置分配表 (Phase-Belt Allocation)")')
+        phase_belt_prints.append(f'print("  slots={c.slots}  poles={c.poles}  q={c.slots/(c.poles/2)/3:.2f}  layers={builder.layer}")')
+        phase_belt_prints.append('print("=" * 60)')
+        phase_belt_prints.append('print("  槽号  相+/极性  拓扑示意  备注")')
+        # 极性星号: A+/B+/C+ → ★ (N 极下), A-/B-/C- → · (S 极下)
+        for slot in range(c.slots):
+            ph, pl = config.slot_map[slot]
+            star = "★" if pl == '+' else "·"
+            line_marker = f"[{ph}{pl}]"
+            note = "上 N 极下" if pl == '+' else "下 S 极下"
+            phase_belt_prints.append(
+                f'print(f"  Slot_{slot+1:>2}   {ph}{pl}    {line_marker} {star}   {note}")'
+            )
+        phase_belt_prints.append('print("=" * 60)')
+        phase_belt_prints.append('print("  说明: ★ = 电流方向 + (N 极下); · = 电流方向 - (S 极下)")')
+        phase_belt_prints.append('print("  同相/同极性的所有槽属于同一 AssignCoilGroup")')
+        phase_belt_prints.append('print("  按 A+/A-/B+/B-/C+/C- 的顺序连到 WindingA/B/C")')
+        phase_belt_py = "\n".join(phase_belt_prints)
 
         return f'''#!/usr/bin/env python3
-"""Step 4: 线圈组与绕组定义"""
+"""Step 4: 线圈组与绕组定义 — 修复 v2: 真正用 builder.compute_winding() 的输出"""
 import ScriptEnv
 ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
 oDesktop = ScriptEnv.GetDesktop()
@@ -366,7 +434,17 @@ oProject = oDesktop.GetActiveProject()
 oDesign = oProject.SetActiveDesign("Motor_Design")
 oModule = oDesign.GetModule("BoundarySetup")
 
-# 定义三相绕组
+# ── 相位带分配表(从 builder 算出, AI 友好: print 出每槽位置 + 拓扑示意) ──
+# slots={c.slots}, poles={c.poles}, q={c.slots/(c.poles/2)/3:.2f}, layers={builder.layer}
+# 绕组系数 kw = {config.winding_factor:.4f}
+#
+# 算法 (整数槽分布式 Pyrhonen 公式):
+#   相 = (slot_idx * pole_pairs) // (slots // 3)  mod 3
+#   极性 = '+' if (slot_idx // q) % 2 == 0 else '-'
+# 集中绕组 (q=0.5): 槽电角 120°/槽 → A+B-C+A-B+C- 循环
+{phase_belt_py}
+
+# ── Step 1: 定义三相绕组 ──
 for phase in ["A", "B", "C"]:
     oModule.AssignWindingGroup(
         ["NAME:Winding" + phase,
@@ -378,80 +456,17 @@ for phase in ["A", "B", "C"]:
          "Voltage:=", "0V",
          "ParallelBranchesNum:=", "1"])
 
-# 线圈组赋值（星形图自动分配）
-# 生成策略：每相12个线圈（{c.slots}槽/3相），分+/-两组
-# 每组{coils_per_group}个线圈
+# ── Step 2: 线圈组赋值(按 builder.coil_groups 逐组) ──
+{coil_groups_py}
 
-# A相
-a_pos = [i for i in range({c.slots}) if i % 3 == 0]
-a_neg = [i for i in range({c.slots}) if i % 3 == 1]
-
-# B相
-b_pos = [i for i in range({c.slots}) if i % 3 == 2]
-b_neg = [i for i in range({c.slots}) if i % 3 == 0]
-
-# C相
-c_pos = [i for i in range({c.slots}) if i % 3 == 1]
-c_neg = [i for i in range({c.slots}) if i % 3 == 2]
-
-# A+组
-oModule.AssignCoilGroup(
-    [f"A+_1", f"A+_2", f"A+_3", f"A+_4", f"A+_5", f"A+_6"],
-    ["NAME:A+",
-     "Objects:=", [f"A_1", f"A_2", f"A_3", f"A_4", f"A_5", f"A_6"],
-     "Conductor number:=", "{c.conductors_per_slot}",
-     "PolarityType:=", "Negative"])
-
-# A-组
-oModule.AssignCoilGroup(
-    [f"A-_1", f"A-_2", f"A-_3", f"A-_4", f"A-_5", f"A-_6"],
-    ["NAME:A-",
-     "Objects:=", [f"A_7", f"A_8", f"A_9", f"A_10", f"A_11", f"A_12"],
-     "Conductor number:=", "{c.conductors_per_slot}",
-     "PolarityType:=", "Positive"])
-
-# B+组
-oModule.AssignCoilGroup(
-    [f"B+_1", f"B+_2", f"B+_3", f"B+_4", f"B+_5", f"B+_6"],
-    ["NAME:B+",
-     "Objects:=", [f"B_1", f"B_2", f"B_3", f"B_4", f"B_5", f"B_6"],
-     "Conductor number:=", "{c.conductors_per_slot}",
-     "PolarityType:=", "Negative"])
-
-# B-组
-oModule.AssignCoilGroup(
-    [f"B-_1", f"B-_2", f"B-_3", f"B-_4", f"B-_5", f"B-_6"],
-    ["NAME:B-",
-     "Objects:=", [f"B_7", f"B_8", f"B_9", f"B_10", f"B_11", f"B_12"],
-     "Conductor number:=", "{c.conductors_per_slot}",
-     "PolarityType:=", "Positive"])
-
-# C+组
-oModule.AssignCoilGroup(
-    [f"C+_1", f"C+_2", f"C+_3", f"C+_4", f"C+_5", f"C+_6"],
-    ["NAME:C+",
-     "Objects:=", [f"C_1", f"C_2", f"C_3", f"C_4", f"C_5", f"C_6"],
-     "Conductor number:=", "{c.conductors_per_slot}",
-     "PolarityType:=", "Negative"])
-
-# C-组
-oModule.AssignCoilGroup(
-    [f"C-_1", f"C-_2", f"C-_3", f"C-_4", f"C-_5", f"C-_6"],
-    ["NAME:C-",
-     "Objects:=", [f"C_7", f"C_8", f"C_9", f"C_10", f"C_11", f"C_12"],
-     "Conductor number:=", "{c.conductors_per_slot}",
-     "PolarityType:=", "Positive"])
-
-# 连接线圈到绕组
-oModule.AddWindingCoils("WindingA", ["A+_1", "A+_2", "A+_3", "A+_4", "A+_5", "A+_6",
-                                       "A-_1", "A-_2", "A-_3", "A-_4", "A-_5", "A-_6"])
-oModule.AddWindingCoils("WindingB", ["B+_1", "B+_2", "B+_3", "B+_4", "B+_5", "B+_6",
-                                       "B-_1", "B-_2", "B-_3", "B-_4", "B-_5", "B-_6"])
-oModule.AddWindingCoils("WindingC", ["C+_1", "C+_2", "C+_3", "C+_4", "C+_5", "C+_6",
-                                       "C-_1", "C-_2", "C-_3", "C-_4", "C-_5", "C-_6"])
+# ── Step 3: 把线圈组连到对应相绕组 ──
+{add_winding_py}
 
 print("Winding assignment complete: {c.slots} slots, {c.poles} poles, 3 phases")
-print(f"  Winding factor: {config.winding_factor:.4f}")
+print(f"  Winding factor kw = {config.winding_factor:.4f}")
+print(f"  Coil groups: A+={n_A_pos} A-={n_A_neg} B+={n_B_pos} B-={n_B_neg} C+={n_C_pos} C-={n_C_neg}")
+print(f"  Layout source = {config.source}  ({'真值表 references/winding_layouts.md' if config.source=='canonical' else '⚠ fallback 算法, 请人工核对'})")
+print(f"  Polarity convention = {builder.polarity_convention}  (A+→Positive, A-→Negative)")
 '''
 
     def _gen_boundary(self, freq):

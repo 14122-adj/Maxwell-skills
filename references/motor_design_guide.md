@@ -428,6 +428,13 @@ $$A_{cu} = A_{slot} - A_{insulation} - A_{wedge} - A_{liner}$$
 
 ## §6 Winding Topology Reference
 
+> **📌 重要：本节内容已迁移至 `winding_layouts.md`**
+>
+> 本节只保留少量示例性内容，**完整真值表（19 种极槽配合 + 变体 + Maxwell 命名约定）** 在：
+> 📖 `references/winding_layouts.md` ← **唯一权威源**
+>
+> 如有冲突，以 `winding_layouts.md` 为准。本节中的 8p/12s 示例对应 `winding_layouts.md` §3.1（变体 A：Pyrhonen AABBCC）。
+
 ### Concentrated Winding (FSCW — Fractional Slot Concentrated Winding)
 
 | Poles/Slots | q (spp) | k_w1 | Coil Span (slots) | Periodicity | Torque Quality |

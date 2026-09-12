@@ -1,0 +1,261 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ansys-maxwell-motor"
+version = "4.4.0"
+description = "ANSYS Maxwell motor modeling + multiphysics MDAO orchestration skill — 19 canonical pole-slot winding layouts, Maxwell COM API bridge, 10 simulation types, NSGA-II optimization, IGBT reliability workflow"
+readme = "README.md"
+license = { text = "Unlicense" }
+license-files = ["LICENSE"]
+authors = [
+    { name = "Maxwell Skill Maintainers" },
+]
+keywords = [
+    "ansys",
+    "maxwell",
+    "motor",
+    "pmsm",
+    "fem",
+    "electromagnetic",
+    "winding",
+    "multiphysics",
+    "mdao",
+    "igbt",
+    "reliability",
+    "optimization",
+    "nsga2",
+    "automation",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Manufacturing",
+    "License :: Public Domain",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Topic :: Software Development :: Code Generators",
+]
+requires-python = ">=3.10"
+
+# Core runtime dependencies (all optional — most scripts work without them)
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Maxwell COM bridge (Windows + pywin32 only)
+mcp = [
+    "pywin32>=306; sys_platform == 'win32'",
+]
+# MDAO (sqlite + optional pyansys)
+mdao = [
+]
+# Visualization
+plot = [
+    "matplotlib>=3.7",
+]
+# All-in-one
+all = [
+    "pyyaml>=6.0",
+    "pywin32>=306; sys_platform == 'win32'",
+    "matplotlib>=3.7",
+]
+# Dev tooling
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.1.0",
+    "mypy>=1.7",
+    "types-PyYAML",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/Torry/ansys-maxwell-motor-skill"
+"Bug Tracker" = "https://github.com/Torry/ansys-maxwell-motor-skill/issues"
+"Documentation" = "https://github.com/Torry/ansys-maxwell-motor-skill/blob/main/SKILL.md"
+"Changelog" = "https://github.com/Torry/ansys-maxwell-motor-skill/blob/main/CHANGELOG.md"
+
+[project.scripts]
+# CLI entry points — install via `pip install -e .` to expose as commands
+maxwell-winding = "scripts.winding_layout:main"
+maxwell-build   = "scripts.main:main"
+maxwell-test    = "scripts.test_winding_layouts:main"
+
+# ───────────────────────────────────────────────────────────────────
+#  setuptools package config
+# ───────────────────────────────────────────────────────────────────
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scripts*", "scripts.motor_design*"]
+exclude = [
+    "tests*",
+    "examples*",
+    "docs*",
+    "archive*",
+    "debug*",
+    "mcp-maxwell*",
+    "output_scripts*",
+    "projects*",
+    "results*",
+    "build*",
+    "dist*",
+    ".git*",
+]
+namespaces = false
+
+[tool.setuptools.package-data]
+"scripts" = ["py.typed"]
+
+# ───────────────────────────────────────────────────────────────────
+#  Pytest
+# ───────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+    "--showlocals",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests that require ANSYS Maxwell installed",
+    "mdao: marks MDAO chain tests",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:win32com",
+    "ignore::PendingDeprecationWarning",
+]
+
+# ───────────────────────────────────────────────────────────────────
+#  Coverage
+# ───────────────────────────────────────────────────────────────────
+
+[tool.coverage.run]
+branch = true
+source = ["scripts"]
+omit = [
+    "scripts/archive/*",
+    "scripts/__pycache__/*",
+    "tests/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "def __repr__",
+    "\\.\\.\\.",
+]
+
+# ───────────────────────────────────────────────────────────────────
+#  Ruff (linter + formatter)
+# ───────────────────────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = [
+    "archive",
+    "build",
+    "dist",
+    "debug",
+    "mcp-maxwell",
+    "output_scripts",
+    "projects",
+    "results",
+    ".venv",
+    ".git",
+]
+
+[tool.ruff.lint]
+# Allow these rules to be configured per-line if needed
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "RET",  # flake8-return
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long (we use 110)
+    "B008",  # function call in default argument (used for forward refs)
+    "RUF012",  # mutable class attributes (forward refs)
+    "N803",  # argument name casing (math symbols like Dsi use uppercase)
+    "N806",  # variable in function should be lowercase (math symbols)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011", "N802", "N803"]   # assert statements, test naming
+"examples/*" = ["N802", "N803"]
+"scripts/maxwell_bridge.py" = ["N802", "N803"]   # backward compat with COM API
+
+[tool.ruff.lint.isort]
+known-first-party = ["scripts"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+# ───────────────────────────────────────────────────────────────────
+#  Mypy
+# ───────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+python_version = "3.10"
+mypy_path = "scripts"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+no_implicit_optional = true
+check_untyped_defs = false
+disallow_incomplete_defs = false
+exclude = [
+    "archive/",
+    "build/",
+    "debug/",
+    "mcp-maxwell/",
+    "output_scripts/",
+    "projects/",
+    "results/",
+    ".venv/",
+]
+
+[[tool.mypy.overrides]]
+module = "win32com.*"
+ignore_missing_imports = true

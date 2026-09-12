@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────────────
+#  mkdocs.yml — Documentation site config for ansys-maxwell-motor
+#
+#  Build:
+#    pip install mkdocs mkdocs-material mkdocstrings[python]
+#    mkdocs serve     # live preview at http://127.0.0.1:8000
+#    mkdocs build     # static site in ./site/
+# ─────────────────────────────────────────────────────────────────────
+
+site_name: ansys-maxwell-motor
+site_description: ANSYS Maxwell motor modeling + multiphysics MDAO orchestration
+site_url: https://github.com/Torry/ansys-maxwell-motor-skill
+
+repo_name: Torry/ansys-maxwell-motor-skill
+repo_url: https://github.com/Torry/ansys-maxwell-motor-skill
+edit_uri: edit/main/docs/
+
+docs_dir: .
+
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [../scripts]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_symbol_type_heading: true
+            members_order: source
+
+nav:
+  - Home: README.md
+  - Quick start: guides/quickstart.md
+  - Winding layouts: ../references/winding_layouts.md
+  - Examples: ../examples/README.md
+  - API reference:
+    - scripts (package): api/scripts.md
+    - pmsm_winding_builder: api/pmsm_winding_builder.md
+    - winding_layout (CLI): api/winding_layout.md
+  - Changelog: ../CHANGELOG.md
+  - Contributing: ../CONTRIBUTING.md

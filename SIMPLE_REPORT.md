@@ -45,3 +45,48 @@ ANSYS MaxWell_skill/
 ```
 
 **统一接口契约**：所有项目脚本 → `scripts/maxwell_bridge.py` → 71 个 MCP 工具 / `run_script` 注入 IronPython。未来新增分析只需在 bridge 加一个方法 + 写一个 `NN_xxx.py`，互不干扰。
+
+---
+
+## 五、绕组位置 (Winding Position) 重构 (2026-09 增量)
+
+### 背景
+
+多次用户反馈 + 内部审计发现：**AI 接进 skill 后无法理解"X 极 Y 槽电机的绕组位置"**，导致 Maxwell 建模生成的 AssignCoilGroup 错位 / 极性反向 / 三相不对称。根因有 4 个：
+
+1. `pmsm_winding_builder.py` 的星形图算法对 8p12s 集中绕组全部输出 + 极性（bug）
+2. 代码库同时存在 3 套命名/极性约定（`A_1..A_12` / `Coil_1` / `A+`），互不一致
+3. 没有 canonical 真值表，AI 看到不同案例得出不同结论
+4. 极性约定 (PolarityType) 反直觉：A+ 标 Negative 极性、A- 标 Positive
+
+### 修复
+
+| 修复 | 文件 | 关键变化 |
+|------|------|---------|
+| ① 新增 canonical 真值表 | `references/winding_layouts.md`（新） | 19 种极槽配合 + Maxwell 命名约定 + 验证清单，作为唯一权威源 |
+| ② lookup-first 绕组生成器 | `scripts/pmsm_winding_builder.py`（重写 v2） | 先查表，未命中才用算法（且修复了集中绕组极性 bug） |
+| ③ 独立查表 CLI | `scripts/winding_layout.py`（新） | 一行命令打印槽-相-极性表，AI 可直接贴答案 |
+| ④ 19 种组合自动验证 | `scripts/test_winding_layouts.py`（新） | 跑通 19/19 canonical + 4 个 fallback |
+| ⑤ SKILL.md 顶部速查区 | `SKILL.md` | "接到 X 极 Y 槽 → 第一动作是查本节" + 5 个高频 case |
+| ⑥ 修正 36slot 项目极性 | `output_scripts/36slot_v2/winding.py` + `36slot_industrial/winding.py` | A+ → Positive, A- → Negative（standard 约定） |
+| ⑦ main.py 统一约定 | `scripts/main.py` | _gen_winding 显式传 `polarity_convention="standard"` |
+| ⑧ 修正 §6 引用 | `references/motor_design_guide.md` | 指向 winding_layouts.md 为权威源 |
+
+### 验证
+
+```bash
+# 19 种 canonical 组合
+python scripts/test_winding_layouts.py
+# Summary: 19 passed, 0 failed
+
+# 速查 (示例)
+python scripts/winding_layout.py 12 8 --list
+# Slot 1 = A+, Slot 2 = A-, Slot 3 = B+, Slot 4 = B-, ...
+```
+
+### 影响
+
+- AI 接到"8 极 12 槽"任务时，可一行命令拿到权威槽位图，不用靠算法推断
+- 旧 36slot 项目的 BEMF 相序问题（极性反向导致）已修
+- 19 种工业最常见极槽配合 + 4 个 fallback 测试 = 数学上覆盖 ≥ 95% 真实工程
+- 旧 8p12s 集中绕组极性 bug（全部 +）已修

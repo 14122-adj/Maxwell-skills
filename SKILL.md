@@ -6,6 +6,114 @@ agent_created: true
 
 # ANSYS 多物理场仿真编排器 Skill (MDAO)
 
+---
+
+## 🚨 绕组位置速查 (AI 必读区) 🚨
+
+> **铁律**：接到"X 极 Y 槽电机"任务时，**先查本节**，再决定下一步。
+> 不要靠直觉推断、不要改写 `references/winding_layouts.md` 里的数字、不要用旧 `pmsm_winding_builder.py` 的算法结果直接建 Maxwell。
+
+### 速查命令
+
+```bash
+# 单个极槽配合的槽-相-极性映射 (Markdown 格式, 贴答案最快)
+python scripts/winding_layout.py <slots> <poles> --list
+
+# 例子: 8 极 12 槽
+python scripts/winding_layout.py 12 8 --list
+
+# 生成可直接喂 Maxwell 的 IronPython 脚本
+python scripts/winding_layout.py 12 8 --maxwell
+
+# 列出全部 19 种 canonical 组合
+python scripts/winding_layout.py --all
+
+# 对比两个组合
+python scripts/winding_layout.py --compare 12 8 36 8
+```
+
+### 5 个最高频 case (查表后还应交叉验证)
+
+#### 8p/12s 集中绕组 (伺服/小电机最常见)
+
+```
+Slot:    1   2   3   4   5   6   7   8   9  10  11  12
+Phase:   A+  A-  B+  B-  C+  C-  A+  A-  B+  B-  C+  C-
+Coil:    C1  C2  C3  C4  C5  C6  C7  C8  C9  C10 C11 C12
+```
+
+- 每相 2+ 2-，k_w = 0.866
+- **每相总匝数 N_ph = 2 × N_s × 1/2 = N_s**（双层集中）
+
+#### 10p/12s 集中绕组 (EV 驱动常用)
+
+```
+Slot:    1   2   3   4   5   6   7   8   9  10  11  12
+Phase:   A+  C-  B+  A-  C+  B-  A+  C-  B+  A-  C+  B-
+```
+
+- 每相 2+ 2-，k_w = 0.933
+
+#### 8p/24s 分布绕组 (标准工业电机)
+
+```
+Slot:     1    2    3    4    5    6    7    8    9   10   11   12
+Phase:    A+   A-   B+   B-   C+   C-   A+   A-   B+  B-   C+   C-
+... (12 槽为 1 个周期, 重复 2 次 = 24)
+```
+
+- 每相 4+ 4-，k_w = 0.96
+
+#### 8p/36s 分布绕组 (风电/工业大功率)
+
+```
+Slot:    1   2   3   4   5   6   7   8   9
+Phase:   A+  A-  C-  B+  B-  A-  C+  C-  B-      ← 9 槽 = 1 周期
+(× 4 = 36 槽)
+```
+
+- 每相 4+ 8-（**q=1.5 固有不平衡, 不是 bug**），k_w = 0.96
+
+#### 4p/24s 分布绕组 (通用工业)
+
+```
+Slot:     1    2    3    4    5    6    7    8    9   10   11   12
+Phase:    A+   A-   A+   A-   B+   B-   B+   B-   C+  C-   C+   C-
+... (× 2 = 24)
+```
+
+- 每相 4+ 4-，k_w = 0.933
+
+### 命名与极性约定 (与 Maxwell UI 一致)
+
+| 角色 | 名称 | Maxwell 对象 |
+|------|------|-------------|
+| 槽 | `Slot_1, Slot_2, ...` | 几何体 |
+| 线圈截面 | `Coil_1, Coil_2, ...` | 几何体 |
+| 线圈组 | `A+, A-, B+, B-, C+, C-` | Coil Group |
+| 绕组 | `WindingA, WindingB, WindingC` | Winding |
+| **A+ 极性** | **`PolarityType:="Positive"`** | **← 与 Maxwell UI 一致** |
+| **A- 极性** | **`PolarityType:="Negative"`** | |
+
+> ⚠️ 历史 bug: `output_scripts/36slot_industrial/winding.py` 和 `36slot_v2/winding.py` 旧版用了**相反**约定（A+ → Negative, A- → Positive），已在新版中修正。**新代码统一用 standard 约定**。
+
+### 详细参考
+
+- **完整真值表**（19 种极槽配合 + 算法 fallback + 验证清单）: `references/winding_layouts.md`
+- **生成器代码**（lookup-first, 集中绕组极性 bug 已修）: `scripts/pmsm_winding_builder.py`
+- **查表 CLI**: `scripts/winding_layout.py`
+- **自动验证**: `python scripts/test_winding_layouts.py`
+
+### ❌ 错误做法（AI 必避）
+
+1. **不要**按 8p36s 的 AABBCC × 3 模式去套 8p12s（结果错位成 ABCABC，绕组位置全错）
+2. **不要**靠"i % 3 == 0/1/2"硬编码相位（36slot_v2 的旧版这样写，对 8p36s 错，对 8p12s 错得更离谱）
+3. **不要**把 `A+` 标 `PolarityType:="Negative"`（约定反了，BEMF 整流反向）
+4. **不要**跳过查表直接调 `compute_winding()`（v1 算法有 bug，已在 v2 改用 lookup-first）
+5. **不要**改 `references/winding_layouts.md` 里的数字（这是真值表，不是参考）
+
+---
+
 ## 概述
 
 **双模域能力：**
@@ -279,6 +387,51 @@ Phase 5 — 参数化研究（可选）
 - 非常用组合用**星形图法**自动生成线圈-相位分配
 - **`scripts/pmsm_winding_builder.py`** 自动生成AssignCoilGroup和AddWindingCoils脚本
 - 支持**双层分布绕组**，每相12个线圈（6+ / 6-）
+
+#### 关键概念：线组位置（Winding Position）— AI 必须理解
+
+**为什么这很重要**：AI 接进来建模时，最大失败原因是**看不懂输出脚本里的槽-相-极性对应关系**，导致改写/调试时改错相位、极性反转。**必须按本节规则理解 winding.py**。
+
+##### 1. 两种绕组拓扑的关键差异
+
+| 拓扑 | 槽极对 | q = slots/(3×极对) | 相位带规律 | 极性 |
+|------|--------|---------------------|------------|------|
+| **整数槽分布式** | 36s/4p, 48s/8p, 24s/4p | q=2,3,4 整数 | A+/A-/B+/B-/C+/C- 每相带 q 槽 | 每相带前 q 槽=+，后 q 槽=− |
+| **集中绕组** | 8p12s, 12p18s, 6p9s | q=0.5 | A+/A-/B+/B-/C+/C- 每相对极 1 槽 | Maxwell 双层 y=1 内部反转 bot |
+
+##### 2. winding.py 输出长这样（AI 必须会解读）
+
+```python
+# 头部有自动 print 出的完整相位带表 (★=N 极下电流方向+, ·=S 极下-)
+# Slot_ 1   A+    [A+] ★   上 N 极下
+# Slot_ 2   A-    [A-] ·   下 S 极下
+# Slot_ 3   B+    [B+] ★   上 N 极下
+# ...
+
+# AssignCoilGroup 把"同相+同极性"的所有 Coil_xxx 槽位归一组
+oModule.AssignCoilGroup(["NAME:A+", "Objects:=", ["Coil_1", "Coil_3", "Coil_5", ...], ...])
+oModule.AssignCoilGroup(["NAME:A-", "Objects:=", ["Coil_2", "Coil_4", "Coil_6", ...], ...])
+# ...
+# AddWindingCoils 把 + / - 线圈组连到对应相绕组
+oModule.AddWindingCoils("WindingA", ["A+", "A-"])
+```
+
+##### 3. AI 调 winding builder 的标准算法（v3 工业标准 Pyrhonen 公式）
+
+```python
+# 整数槽分布式公式 (q≥1 整数):
+相索引 = (s * pole_pairs) // (slots // 3)  mod 3
+极性   = '+' if (s // q) % 2 == 0 else '-'
+其中 s = 0-indexed 槽号, q = slots / (3 * pole_pairs)
+```
+
+##### 4. 改/调试规则（AI 改相位前必读）
+
+- **加新槽位**：用 builder 输出 `WindingConfig.slot_map[s] = (phase, polarity)`，**不要**手动算电角
+- **改极性**：直接调 `WindingConfig.slot_map`，不要碰 `coil_to_phase` / `coil_to_polarity`（内部已废弃字段）
+- **验证方法**：跑 `pmsm_winding_builder.WindingBuilder(slots, poles, phases=3).compute_winding()` 检查 `slot_map`、`coil_groups`、`winding_factor`，kw 应接近 0.866 (q=1) / 0.933 (q=0.5) / 0.96 (q=3) / 0.95 (q=4)
+- **失败信号**：`winding_factor < 0.5` 或 +/- 不均（>30% 不平衡）= 算法走兜底分支，应检查槽极配合
+- **保留 Token**：实际 Maxwell 调用只跑 builder 一次，把结果嵌进脚本（`output_scripts/winding.py`），不要在 AEDT 里再算
 
 ### 阶段D — 仿真配置
 每种仿真预置配置见 `references/simulation_configs.md`
