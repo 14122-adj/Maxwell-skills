@@ -120,12 +120,17 @@ class TestCliSubprocess:
 
     def _run(self, *args: str) -> subprocess.CompletedProcess:
         cmd = [sys.executable, "-m", "winding_layout", *args]
-        # Add scripts/ to PYTHONPATH so the module can be imported as a script
-        env = {"PYTHONPATH": str(Path(__file__).resolve().parent.parent / "scripts")}
+        # Force UTF-8 in the subprocess so Chinese characters in output decode
+        # correctly on Windows (where default codec is GBK / cp1252).
+        env = {
+            "PYTHONPATH": str(Path(__file__).resolve().parent.parent / "scripts"),
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONUTF8": "1",
+        }
         import os
         env.update(os.environ)
         return subprocess.run(
-            cmd, capture_output=True, text=True, env=env, timeout=30,
+            cmd, capture_output=True, text=True, encoding="utf-8", env=env, timeout=30,
         )
 
     def test_help(self):
