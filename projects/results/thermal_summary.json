@@ -1,0 +1,163 @@
+{
+  "stage": "S7",
+  "method": "7-node LPTN (steady + implicit transient)",
+  "assumptions": {
+    "T_amb_C": 40.0,
+    "h_forced": 30.0,
+    "h_natural": 10.0,
+    "A_cooling_m2": 0.2882,
+    "fin_factor": 3.0,
+    "contact_factor": 0.45,
+    "end_loss_fraction": 0.4286,
+    "housing_od_mm": 170.0,
+    "cooling": "TEFC shaft fan"
+  },
+  "resistances_K_per_W": {
+    "R_WE": 0.26205,
+    "R_EH": 0.60609,
+    "R_WT": 0.07419,
+    "R_TY": 0.0159,
+    "R_YH": 0.00517,
+    "R_AG": 0.21707,
+    "R_MR": 0.00082,
+    "R_SH": 1.0
+  },
+  "losses_W": {
+    "EW": 59.39,
+    "WS": 79.19,
+    "TOOTH": 24.8,
+    "YOKE": 31.11,
+    "HOUSE": 41.23,
+    "ROTOR": 20.4,
+    "MAGNET": 0.4
+  },
+  "loss_total_W": 256.52,
+  "masses_kg": {
+    "copper": 2.014,
+    "stator": 6.953,
+    "rotor": 6.849,
+    "housing": 3.149,
+    "pm": 0.595
+  },
+  "thermal_capacity_J_per_K": {
+    "EW": 332.4,
+    "WS": 443.1,
+    "TOOTH": 1343.4,
+    "YOKE": 1855.1,
+    "HOUSE": 2833.8,
+    "ROTOR": 3150.6,
+    "MAGNET": 273.6
+  },
+  "C_total_J_per_K": 10232.0,
+  "tau_est_s": 1183.8,
+  "scenarios": {
+    "forced_air_pm4seg": {
+      "cooling": "h=30.0 W/m²K, A_eff=0.2882 m², T_amb=40.0°C",
+      "R_house_to_amb": 0.1157,
+      "t_end_s": 7200.0,
+      "nodes_C": {
+        "EW": 88.39,
+        "WS": 80.92,
+        "TOOTH": 72.93,
+        "YOKE": 70.59,
+        "HOUSE": 69.67,
+        "ROTOR": 76.06,
+        "MAGNET": 76.06
+      },
+      "hotspot_C": 89.47,
+      "hotspot_gradient_K": 1.08,
+      "rise_K": {
+        "EW": 48.39,
+        "WS": 40.92,
+        "TOOTH": 32.93,
+        "YOKE": 30.59,
+        "HOUSE": 29.67,
+        "ROTOR": 36.06,
+        "MAGNET": 36.06
+      },
+      "hotspot_rise_K": 49.47,
+      "p_injected_W": 256.52,
+      "p_rejected_W": 256.52,
+      "t95_s": 3610.0,
+      "transient_ss_delta_K": 0.258,
+      "checks": {
+        "winding_hotspot_le_155C": true,
+        "magnet_le_120C": true
+      },
+      "name": "forced_air_pm4seg"
+    },
+    "natural_conv_pm4seg": {
+      "cooling": "h=10.0 W/m²K, A_eff=0.2882 m², T_amb=40.0°C",
+      "R_house_to_amb": 0.347,
+      "t_end_s": 21305.0,
+      "nodes_C": {
+        "EW": 147.74,
+        "WS": 140.27,
+        "TOOTH": 132.28,
+        "YOKE": 129.94,
+        "HOUSE": 129.02,
+        "ROTOR": 135.4,
+        "MAGNET": 135.41
+      },
+      "hotspot_C": 148.82,
+      "hotspot_gradient_K": 1.08,
+      "rise_K": {
+        "EW": 107.74,
+        "WS": 100.27,
+        "TOOTH": 92.28,
+        "YOKE": 89.94,
+        "HOUSE": 89.02,
+        "ROTOR": 95.4,
+        "MAGNET": 95.41
+      },
+      "hotspot_rise_K": 108.82,
+      "p_injected_W": 256.52,
+      "p_rejected_W": 256.52,
+      "t95_s": 10570.0,
+      "transient_ss_delta_K": 0.351,
+      "checks": {
+        "winding_hotspot_le_155C": true,
+        "magnet_le_120C": false
+      },
+      "name": "natural_conv_pm4seg"
+    },
+    "forced_air_pm_noseg": {
+      "cooling": "h=30.0 W/m²K, A_eff=0.2882 m², T_amb=40.0°C",
+      "R_house_to_amb": 0.1157,
+      "t_end_s": 7200.0,
+      "nodes_C": {
+        "EW": 89.15,
+        "WS": 81.71,
+        "TOOTH": 73.73,
+        "YOKE": 71.32,
+        "HOUSE": 70.37,
+        "ROTOR": 77.92,
+        "MAGNET": 77.92
+      },
+      "hotspot_C": 90.23,
+      "hotspot_gradient_K": 1.08,
+      "rise_K": {
+        "EW": 49.15,
+        "WS": 41.71,
+        "TOOTH": 33.73,
+        "YOKE": 31.32,
+        "HOUSE": 30.37,
+        "ROTOR": 37.92,
+        "MAGNET": 37.92
+      },
+      "hotspot_rise_K": 50.23,
+      "p_injected_W": 262.56,
+      "p_rejected_W": 262.56,
+      "t95_s": 3640.0,
+      "transient_ss_delta_K": 0.267,
+      "checks": {
+        "winding_hotspot_le_155C": true,
+        "magnet_le_120C": true
+      },
+      "name": "forced_air_pm_noseg"
+    }
+  },
+  "verdict": "PASS — 强迫风冷下绕组热点 89.5°C ≤155°C、磁钢 76.1°C ≤120°C",
+  "cooling_requirement": "必须强迫风冷（TEFC 轴流风扇 h≥30 W/m²K）：自然对流时磁钢 135.4°C > 120°C、热点 148.8°C 逼近 155°C",
+  "pm_seg_sensitivity": "PM 不分段（6.44 W）仅使磁钢 +1.9 K，磁钢温度由定子侧热阻主导，分段对热校核非决定性"
+}
