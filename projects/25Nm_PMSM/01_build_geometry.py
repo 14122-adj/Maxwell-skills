@@ -85,7 +85,42 @@ def build_geometry():
     # --- Region (external air) ---
     bridge.create_region(padding=STATOR_OD_MM / 2 * 0.3)
 
-    print(f"Geometry built: {SLOTS} slots, {POLES} PMs, airgap={AIRGAP_MM}mm")
+    # --- 线圈截面（8p12s 槽内居中, Coil_1..Coil_12）---
+    # 修复: 原几何不建线圈, 导致后续 AssignCoilGroup 引用对象不存在、无法加激励。
+    # 槽位: 矩形槽从 0° 起, 每 360/SLOTS 一个; 线圈居中于槽中心线。
+    coil_script = f"""# 线圈截面创建（槽内居中, Coil_1..Coil_12）
+import ScriptEnv
+ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
+_oEd = oDesign.SetActiveEditor("3D Modeler")
+_slot_angle = 360.0 / {SLOTS}
+_r_in = {STATOR_ID_MM} / 2.0
+_r_mid = ({STATOR_ID_MM} / 2.0 + {STATOR_ID_MM} / 2.0 + {slot_depth:.2f}) / 2.0
+_r_thick = {slot_depth:.2f} * 0.50   # 径向厚(Width)
+_t_wide = {half_slot_width * 1.5:.2f}   # 周向宽(Height), 小于槽内宽
+for _k in range({SLOTS}):
+    _angle = _k * _slot_angle
+    _nm = "Coil_%d" % (_k + 1)
+    _oEd.CreateRectangle(
+        ["NAME:RectangleParameters", "IsCovered:=", True,
+         "XStart:=", str(_r_mid - _r_thick / 2.0) + "mm",
+         "YStart:=", str(-_t_wide / 2.0) + "mm",
+         "ZStart:=", "0mm",
+         "Width:=", str(_r_thick) + "mm",
+         "Height:=", str(_t_wide) + "mm",
+         "WhichAxis:=", "Z"],
+        ["NAME:Attributes", "Name:=", _nm, "Flags:=", "", "Color:=", "(255 128 0)",
+         "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
+         "MaterialValue:=", '"copper"', "SolveInside:=", True])
+    if _angle > 0:
+        _oEd.Rotate(
+            ["NAME:Selections", "Selections:=", _nm],
+            ["NAME:RotateParameters", "RotateAxis:=", "Z",
+             "RotateAngle:=", str(_angle) + "deg",
+             "DuplicateObjects:=", False])
+"""
+    bridge.run_script(coil_script)
+
+    print(f"Geometry built: {SLOTS} slots, {POLES} PMs, airgap={AIRGAP_MM}mm, {SLOTS} coils")
     return True
 
 

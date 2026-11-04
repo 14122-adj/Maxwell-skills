@@ -48,48 +48,47 @@ def assign_materials():
 
 
 def create_windings():
-    """Create 3-phase winding setup and assign current excitations."""
+    """Create 3-phase winding setup, coil groups (canonical 8p12s) and current excitations.
+
+    修复:
+      1. 原 phases 字典映射错误 (A- 组用了 B-/C+ 槽), 与 canonical 真值表
+         (references/winding_layouts.md) 不符 → 改为 WindingBuilder(12,8) 查表输出。
+      2. 原用 Slot_N (已经从定子 subtract 掉的槽腔) 作线圈对象 → 改为真实线圈
+         Coil_1..Coil_12 (01 步已创建), AssignCoilGroup 才能加到激励。
+    """
+
+    from pmsm_winding_builder import WindingBuilder
+    builder = WindingBuilder(slots=SLOTS, poles=POLES, phases=3,
+                             polarity_convention="standard")
+    wcfg = builder.compute_winding()
 
     # 三相绕组配置(电流型,后续步骤通过 EditCurrent 切换数值)
-    bridge.create_winding_setup("WindingA", winding_type="Current")
-    bridge.create_winding_setup("WindingB", winding_type="Current")
-    bridge.create_winding_setup("WindingC", winding_type="Current")
-
-    # 教程模式:每相 2 槽集中绕组(8p12s)
-    phases = {
-        "A+": (["Slot_1", "Slot_7"], "A"),
-        "A-": (["Slot_4", "Slot_10"], "A"),
-        "B+": (["Slot_3", "Slot_9"], "B"),
-        "B-": (["Slot_6", "Slot_12"], "B"),
-        "C+": (["Slot_5", "Slot_11"], "C"),
-        "C-": (["Slot_2", "Slot_8"], "C"),
-    }
+    for phase in ["A", "B", "C"]:
+        bridge.create_winding_setup(f"Winding{phase}", winding_type="Current")
 
     i_peak = RATED_CURRENT_PEAK_A
     freq = RATED_FREQUENCY_HZ
     omega = 2.0 * math.pi * freq
+    phase_offset = {"A": 0.0, "B": -2.0944, "C": +2.0944}
 
-    currents = {
-        "A+": f"{i_peak}*sin({omega:.4f}*time)",
-        "A-": f"-{i_peak}*sin({omega:.4f}*time)",
-        "B+": f"{i_peak}*sin({omega:.4f}*time-2.0944)",
-        "B-": f"-{i_peak}*sin({omega:.4f}*time-2.0944)",
-        "C+": f"{i_peak}*sin({omega:.4f}*time+2.0944)",
-        "C-": f"-{i_peak}*sin({omega:.4f}*time+2.0944)",
-    }
+    for group in wcfg.coil_groups:
+        if not group.coil_indices:
+            continue
+        gname = f"{group.phase}{group.polarity}"
+        polarity = "Positive" if group.polarity == "+" else "Negative"
+        sign = 1.0 if group.polarity == "+" else -1.0
+        current = (f"{sign * i_peak:.4f}*sin({omega:.4f}*time"
+                   f"{phase_offset[group.phase]:+.4f})")
+        bridge.assign_coil_group(name=gname, objects=group.coil_names,
+                                 conductor_number=CONDUCTORS_PER_SLOT,
+                                 polarity=polarity)
+        bridge.assign_current_excitation(group.coil_names, current=current)
+        bridge.add_winding_coils(f"Winding{group.phase}", [gname])
 
-    for group, (slots, phase) in phases.items():
-        polarity = "Positive" if group.endswith("+") else "Negative"
-        bridge.assign_coil_group(
-            name=group,
-            objects=slots,
-            conductor_number=CONDUCTORS_PER_SLOT,
-            polarity=polarity,
-        )
-        bridge.assign_current_excitation(slots, current=currents[group])
-        bridge.add_winding_coils(f"Winding{phase}", [group])
-
-    print(f"Windings: 3-phase, I_peak={i_peak}A, f={freq}Hz")
+    if wcfg.source != "canonical":
+        print(f"  [WARN] 8p12s 落在 fallback, 请人工核对槽位图")
+    print(f"Windings: 3-phase, I_peak={i_peak}A, f={freq}Hz, "
+          f"layout source={wcfg.source}")
 
 
 def assign_motion_band():
