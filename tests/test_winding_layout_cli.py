@@ -10,6 +10,7 @@ Covers:
 from __future__ import annotations
 
 import io
+import os
 import re
 import subprocess
 import sys
@@ -119,18 +120,18 @@ class TestCliSubprocess:
     """Test the CLI as a real subprocess (catches argparse errors, exit codes)."""
 
     def _run(self, *args: str) -> subprocess.CompletedProcess:
-        cmd = [sys.executable, "-m", "winding_layout", *args]
+        root = Path(__file__).resolve().parent.parent
+        # Invoke the package module (scripts/__init__.py exists); running a bare
+        # `winding_layout` only works when scripts/ happens to be on sys.path.
+        cmd = [sys.executable, "-m", "scripts.winding_layout", *args]
         # Force UTF-8 in the subprocess so Chinese characters in output decode
-        # correctly on Windows (where default codec is GBK / cp1252).
-        env = {
-            "PYTHONPATH": str(Path(__file__).resolve().parent.parent / "scripts"),
-            "PYTHONIOENCODING": "utf-8",
-            "PYTHONUTF8": "1",
-        }
-        import os
-        env.update(os.environ)
+        # correctly on Windows (where the default codec is GBK / cp1252).
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUTF8"] = "1"
         return subprocess.run(
-            cmd, capture_output=True, text=True, encoding="utf-8", env=env, timeout=30,
+            cmd, capture_output=True, text=True, encoding="utf-8", env=env,
+            timeout=30, cwd=str(root),
         )
 
     def test_help(self):
