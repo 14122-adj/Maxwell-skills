@@ -51,6 +51,26 @@
 
 **M0 当前事实**：`D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe` 存在，许可证 `localhost:1055` 可连；但 agent 沙箱是非交互会话，`ansysedt -ng` 约 4 s 即 `rc=1`、零日志/零工程。每日任务必须**每天尝试一次并记录结果**，不得默认跳过，也不得用解析结果替代。
 
+**M0 实机尝试记录（2026-11-07 22:15，本 agent 会话）**
+
+| 项 | 实测 |
+|---|---|
+| 探针脚本 | `D:\ANSYS_Run\m1_probe.py`（NewProject → Maxwell 2D → SaveAs） |
+| 命令 | `"D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" -ng -RunScriptAndExit "D:\ANSYS_Run\m1_probe.py"` |
+| 返回码 | **rc=1** |
+| 耗时 | **3.6 s** |
+| stdout / stderr | 均为空 |
+| `M1_min.aedt` | **未生成** |
+| 判定 | **M0 blocked（沙箱环境）**，非脚本错误 |
+
+桌面一键命令（在普通桌面会话执行，预期生成 `D:\ANSYS_Run\M1_min.aedt`）：
+
+```bat
+"D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" -ng -RunScriptAndExit "D:\ANSYS_Run\m1_probe.py"
+```
+
+**纪律**：在拿到 `.aedt` 之前，M0–M6 不得标完成；解析结果只能写在「交叉校验」栏，不能替代 Maxwell 实机证据。
+
 ## 本周目标（2026-11-07 起，G1–G3）进度
 
 | 目标 | 内容 | 状态 | 产物 |
