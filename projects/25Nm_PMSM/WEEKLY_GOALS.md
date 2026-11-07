@@ -63,10 +63,15 @@
 
 ## G5 —【blocker｜M2/M3】25 N·m 几何/材料/绕组在 Maxwell 中落地
 
-> **状态：⏳ 部分完成 2026-11-07**。验收①已达成：对象数确认为 **24**（Region + 定子 1 + 转子 1
-> （轴孔已挖，轴不单列）+ 磁钢 8 + 线圈 12 + Band 1），② 关键尺寸由面积反算全部吻合
-> （定子 9645.55 / 转子 5890.27 / Band 6694.66 / 磁钢 59.878 / 线圈 75.24 mm²）。
-> ③④⑤ 未达：材料定义已写入但未验证绑定、绕组 `AssignCoilGroup` 签名错误待修、`ModelDepth` 仍缺（G3）。
+> **状态：✅ 已关闭 2026-11-07**。`M4_25Nm.aedt` 实测：
+> ① 24 个 2D 图元（Region + 定子 1 + 转子 1 + 磁钢 8 + 线圈 12 + Band 1）；
+> ② 面积反算尺寸全部吻合（定子 9645.55 / 转子 5890.27 / Band 6694.66 / 磁钢 59.878 / 线圈 75.24 mm²）；
+> ③ `M270_35A`×2、`NdFe35_N/S`、`copper` 已绑定；
+> ④ `BoundType='Coil'`×12 + `Winding Group`×3 + Band + Mesh 操作存在；
+> ⑤ `ModelDepth='160mm'`。
+> 关键修正：AEDT 2021.1 的 `AssignCoilGroup` 参数类型极挑，改用逐个
+> `AssignCoil(["NAME:...", "Objects:=", ["Coil_x"], "Conductor number:=", "40",
+> "PolarityType:=", "...", "Winding:=", "WindingA"])` 一次成功。
 
 | 项 | 内容 |
 |---|---|
@@ -79,11 +84,11 @@
 
 | 日 | 动作 | 完成判据 |
 |---|---|---|
-| D1 | G3：`_gen_setup()` 注入 `ModelDepth` + `validate()` 断言 | 生成物 `grep -c ModelDepth ≥ 1`；`stack_length` 可配 |
-| D2 | G4/M1：`ansysedt -ng` 最小脚本 | rc=0、`M1_min.aedt` 存在；否则标 blocker + 桌面命令 |
-| D3 | G5/M2：25 N·m 几何在 Maxwell 中生成 | 对象数/关键尺寸校验通过 |
-| D4 | M3：材料/绕组/Band/Mesh | 4 种材料、6 线圈组、Band、Mesh 存在 |
-| D5 | M4：空载瞬态 | BEMF/齿槽 CSV 非空 |
+| D1 | G3 代码层：`_gen_setup()` 注入 `ModelDepth` + `validate()` 断言 | 生成物 `grep -c ModelDepth ≥ 1`；`stack_length` 可配 |
+| D2 | G4/M1：`ansysedt -RunScriptAndExit` 最小脚本 | ✅ 完成（`M1_min.aedt`） |
+| D3 | G5/M2：25 N·m 几何在 Maxwell 中生成 | ✅ 完成（`M2_25Nm.aedt`，24 图元） |
+| D4 | M3：材料/绕组/Band/边界/Setup | ✅ 完成（`M4_25Nm.aedt`：12×Coil、3×Winding、160mm、M270、VP、Setup1） |
+| D5 | **M4：空载瞬态** | **BEMF/齿槽 CSV 非空（下一步）** |
 | D6 | M5：负载瞬态 | `T_avg` 与解析 25 N·m 同量级（±20%） |
 | D7 | M6 + 周检复跑 | `fea_results.json` 回填；判定升级 |
 

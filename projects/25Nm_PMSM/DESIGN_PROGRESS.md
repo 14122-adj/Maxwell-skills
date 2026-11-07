@@ -4,6 +4,15 @@
 
 > 本周目标见 WEEKLY_GOALS.md
 
+## 昨日 / 今日 / 明日（2026-11-07）
+
+- **昨日（2026-11-06）**：S9-2 叠长×匝数扫描收尾；G1/G2 关闭；CI 基线修复（PEP 639 + ruff E/W/F/I）。
+- **今日（2026-11-07）**：**M0–M3 打通**。`M1_min.aedt`（Maxwell 2D）、`M2_25Nm.aedt`（281 KB，24 图元）、
+  `M4_25Nm.aedt`（12×Coil + 3×Winding + `ModelDepth='160mm'` + `M270_35A` + `VectorPotential1 Edges(7)` + `Setup1`）；
+  AEDT 默认工程目录改到 `D:\ANSYS_Run\projects`；新增 `docs/MAXWELL_INTERNALS.md`、`docs/WORKSPACE_MAP.md`。
+- **明日（2026-11-08）**：**M4 空载瞬态求解**（BEMF/齿槽）→ `fea_results.json`；若通过则进入 M5 负载转矩。
+  工作区迁移第一组 `design/`（一个完整子步骤，含路径/import 修正 + pytest/ruff）。
+
 ## 目标机型
 
 | 项 | 值 |
@@ -44,7 +53,7 @@
 | M0 | 环境探测：`ansysedt.exe`、许可证、`-ng` 可启动性 | ✅ **完成 2026-11-07** | 可启动，命令**不带 `-ng`**：`ansysedt.exe -RunScriptAndExit <脚本>` |
 | M1 | 最小 Maxwell 工程：NewProject + Maxwell 2D + SaveAs `.aedt` | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M1_min.aedt`（17,233 B，`Factory='Maxwell 2D'`） |
 | M2 | 25 N·m 几何在 Maxwell 中生成（定子/12 槽/转子/8 磁钢/气隙/band） | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M2_25Nm.aedt`（281,687 B，24 个 2D 图元，面积全项校验通过） |
-| M3 | 材料/绕组/边界/运动带/剖分落地 | ⏳ 进行中（材料已定义；绕组接口报错） | `AssignCoilGroup` 需 2 参：`AssignCoilGroup(name, data)` |
+| M3 | 材料/绕组/边界/运动带/剖分落地 | ✅ **完成 2026-11-07** | `M4_25Nm.aedt`：12×Coil、3×Winding、`ModelDepth='160mm'`、`M270_35A`×2、`VectorPotential1 Edges(7)`、`Setup1` |
 | M4 | 空载瞬态求解（BEMF/齿槽） | ⬜ 待执行 | Maxwell 结果非空，导出 CSV |
 | M5 | 负载瞬态求解（转矩/电流） | ⬜ 待执行 | 转矩与解析 25 N·m 同量级（±20%） |
 | M6 | 结果回填报告 | ⬜ 待执行 | `fea_results.json` + 报告更新 |
@@ -78,10 +87,30 @@ M2 尺寸校验（`m2_verify.py` 重开工程，用 `GetFaceIDs`+`GetFaceArea` �
 **G3 实证**：`GetModelBoundingBox()` 返回 `['-95','-95','0','95','95','0']` —— Z 向厚度为 **0**，
 2D 模型确实没有叠长，`ModelDepth` 缺失会使 FEA 转矩/损耗整体低估，G3 仍是 M4 的硬前置。
 
-**M3 当前卡点**：`AssignCoilGroup` 签名为 `(str nameArg, array dataArg)`，脚本只传了 1 个参数；
-下一小步按此签名改写 6 个线圈组即可。
+**M3 完成记录（2026-11-07 22:46，`M4_25Nm.aedt` 285,766 B）**
 
-**纪律**：M3–M6 未完成前不得标完成；解析结果只能写在「交叉校验」栏，不能替代 Maxwell 实机证据。
+| 项 | 实测 |
+|---|---|
+| `ModelDepth` | `'160mm'`（原默认 `1meter`，已修） |
+| 铁芯材料 | `MaterialValue='"M270_35A"'` ×2（StatorOuter / RotorOuter） |
+| 线圈 | `BoundType='Coil'` **×12**，`Winding=` **×12** |
+| 绕组组 | `BoundType='Winding Group'` ×3（WindingA/B/C） |
+| 边界 | `VectorPotential1` + `Edges(7)` |
+| 求解 | `Setup1`（Transient，0.02 s / 50 µs） |
+| 几何 | 12 槽 + 8 磁钢 + 12 线圈 + Band + Region（面积校验全通过） |
+
+**关键坑（2021.1 实测）**：`AssignCoilGroup` 在 AEDT 2021.1 的 COM 签名对参数类型极挑
+（字符串/单数组/双数组均报 `Output data type conversion error`）。**可用写法是逐个线圈 `AssignCoil`**：
+
+```python
+oBnd.AssignCoil(["NAME:A_1", "Objects:=", ["Coil_1"],
+                 "Conductor number:=", "40", "PolarityType:=", "Positive",
+                 "Winding:=", "WindingA"])
+```
+
+12 个线圈逐个挂接后，`.aedt` 中自然形成 12 个 `BoundType='Coil'` 边界与 `Winding` 关联。
+
+**纪律**：M4–M6 未完成前不得标完成；解析结果只能写在「交叉校验」栏，不能替代 Maxwell 实机证据。
 
 ## 本周目标（2026-11-07 起，G1–G3）进度
 
@@ -360,24 +389,29 @@ P_fe 36.824 W、I 10.6635 A、E 122.796 V、R 0.47227 Ω。
 
 ## 下一次应推进（Maxwell 优先）
 
-### 优先级 1 — M3 绕组/边界/运动带/剖分（一次改完，逐项验）
+### 优先级 1 — M4 空载瞬态求解（下一步，桌面会话）
 
-1. **绕组**：`AssignCoilGroup(str nameArg, array dataArg)` 签名修正（6 组：A±/B±/C±）。
-   同时校正匝数：设计为 81 匝/相，脚本现写 `Conductor number:=40`，二者需对齐（81/2 组串联 → 每组 40.5 不整，
-   须改为「半匝制上线圈 40 + 40 串」或按 81 匝重新分配，**这是 M3 的实质设计问题，先算再写**）。
-2. **材料落地校验**：`NdFe35_N`/`NdFe35_S` 已定义（`magnitude=-890000 A/m`、`mu_r=1.0998`），
-   但需确认 PM_1…8 实际绑定到这两个材料，而非 vacuum。
-3. **边界**：`AssignVectorPotential` 给 Region 外缘（`Edges` 而非 `Objects`，Region 是 2D 域）。
-4. **Band**：`AssignBand` 1500 rpm，Band 对象半径 46.1625 mm。
-5. **剖分**：`AssignLengthOp` 的 `RestrictLength` 键名需实测（M2 期间已见多处键名错误）。
-6. 验收：`.aedt` 内 `GetBoundaries()` 含 6 组线圈 + 1 个矢量势 + Band；`GetSetups()` 非空。
+1. 打开 `D:\ANSYS_Run\M4_25Nm.aedt`，先确认：`ModelDepth='160mm'`、`M270_35A`×2、
+   `BoundType='Coil'`×12 + `Winding Group`×3、`VectorPotential1 Edges(7)`、`Setup1`。
+2. `Setup1` 设为空载（绕组 `Current=0A`），Transient 运行 0.02 s / 50 µs。
+3. 导出 `Moving1.Torque`（齿槽）与 `WindingA/B/C.Voltage`（BEMF）到 `D:\ANSYS_Run\csv\`。
+4. `ingest_fea.py` 计算 BEMF RMS/THD、齿槽峰值 → `fea_results.json`。
+5. 验收：BEMF RMS 与解析 132.4 V 同量级；齿槽 ≤5% 额定；CSV 非空。
 
-### 优先级 2 — G3（沙箱可验证，M4 硬前置）
+### 已关闭：M3（2026-11-07）
 
-- 现象（**已实证**）：`GetModelBoundingBox()` 返回 Z 厚度 `0`，`stack_length=160` 未进入任何生成器。
-- 验收：① 生成物 `setup.py` 含 `ModelDepth:="160mm"`（随 `--params stack_length=` 变化）；
-  ② `solve_25Nm_SPMSM.py` 同步；③ `grep -c ModelDepth ≥ 1`；④ `MotorConfig.validate()` 断言 `stack_length > 0`。
-- 改动面：`scripts/main.py`（`_gen_setup`）、`maxwell_model/solve_25Nm_SPMSM.py`、`scripts/motor_config.py`。
+- `M4_25Nm.aedt`：`M270_35A`×2、`BoundType='Coil'`×12、`Winding Group`×3、
+  `VectorPotential1 Edges(7)`、`Setup1` 全部落地。
+- 关键坑：AEDT 2021.1 的 `AssignCoilGroup` 参数类型极挑；改用逐个
+  `AssignCoil(["NAME:...", "Objects:=", ["Coil_x"], "Conductor number:=", "40",
+  "PolarityType:=", "...", "Winding:=", "WindingA"])` 一次成功。
+
+### G3 状态（数据层已修，代码层待补）
+
+- **数据层**：`M4_25Nm.aedt` 的 `ModelDepth='160mm'`，不再是默认 `1meter`，M4 求解可直接用。
+- **代码层（代码债，不阻塞 M4）**：`scripts/main.py::_gen_setup` 与
+  `maxwell_model/solve_25Nm_SPMSM.py` 仍需注入 `ModelDepth`，避免下次重建又丢；
+  `MotorConfig.validate()` 断言 `stack_length > 0`。
 
 ### 优先级 3 — M4/M5/M6（求解与回填）
 
