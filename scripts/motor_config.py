@@ -91,6 +91,27 @@ DEFAULT_MATERIALS = {
 
 
 # ═══════════════════════════════════════════════════════════════
+#  几何派生（气隙 → 转子外径）
+# ═══════════════════════════════════════════════════════════════
+
+# SKILL.md §1 经验式：δ = 0.3 + Dso/400 [mm]，并夹在 [0.35, 2.0] mm 工程带内
+AIRGAP_OFFSET_MM = 0.3
+AIRGAP_PER_MM_OD = 1.0 / 400.0
+AIRGAP_MIN_MM = 0.35
+AIRGAP_MAX_MM = 2.0
+
+
+def derive_airgap(stator_od: float) -> float:
+    """按定子外径推导气隙长度 (mm)。
+
+    δ = clamp(0.3 + Dso/400, 0.35, 2.0)
+    Dso=150 mm → δ=0.675 mm；Dso=210 mm → δ=0.825 mm。
+    """
+    delta = AIRGAP_OFFSET_MM + AIRGAP_PER_MM_OD * stator_od
+    return min(max(delta, AIRGAP_MIN_MM), AIRGAP_MAX_MM)
+
+
+# ═══════════════════════════════════════════════════════════════
 #  电机配置类
 # ═══════════════════════════════════════════════════════════════
 
@@ -114,9 +135,9 @@ class MotorConfig:
     # --- 几何尺寸 (mm) ---
     stator_od: float = 210.0              # 定子外径
     stator_id: float = 136.0              # 定子内径（气隙面）
-    rotor_od: float = 135.6               # 转子外径
+    rotor_od: Optional[float] = None      # 转子外径；None → stator_id - 2·airgap 派生
     rotor_id: float = 48.0                # 转子内径（轴径）
-    airgap: float = 0.2                   # 气隙长度
+    airgap: Optional[float] = None        # 气隙长度；None → δ = 0.3 + Dso/400 推导
     stack_length: float = 143.0           # 叠片长度（轴向）
     
     # --- 槽型参数 (mm) ---
@@ -180,12 +201,34 @@ class MotorConfig:
     mesh_yoke: float = 3.0                # 轭部网格尺寸
     
     def __post_init__(self):
-        """初始化后自动计算派生参数"""
+        """初始化后自动补齐几何并计算派生参数"""
+        self._resolve_geometry()
         self.poles = self.pole_pairs * 2
         self.rated_frequency_hz = self.pole_pairs * self.rated_speed_rpm / 60.0
         self.tau_pole = math.pi * self.stator_id / self.poles  # 极距
         self.tau_slot = math.pi * self.stator_id / self.slots  # 槽距
         self.band_radius = (self.rotor_od + self.stator_id) / 2.0
+
+    def _resolve_geometry(self) -> None:
+        """几何自洽：airgap / rotor_od 缺省时由定子内径推导，显式输入优先。
+
+        优先级（保证「显式给的值不被覆盖」）：
+          1. 两者都缺省 → airgap 取 δ=0.3+Dso/400，rotor_od = Dsi − 2δ
+          2. 只给 airgap → rotor_od = Dsi − 2δ
+          3. 只给 rotor_od → airgap = (Dsi − Dro)/2
+          4. 两者都给 → 原样保留，冲突由 validate() 报 WARNING
+        """
+        auto = self.__dict__.get("_auto_geom")
+        if auto is None:
+            auto = {"airgap": self.airgap is None, "rotor_od": self.rotor_od is None}
+            self._auto_geom = auto
+
+        if auto["rotor_od"]:
+            if auto["airgap"]:
+                self.airgap = derive_airgap(self.stator_od)
+            self.rotor_od = self.stator_id - 2.0 * self.airgap
+        elif auto["airgap"]:
+            self.airgap = (self.stator_id - self.rotor_od) / 2.0
     
     def validate(self) -> list:
         """验证参数合理性，返回警告/错误列表"""
@@ -196,6 +239,8 @@ class MotorConfig:
             issues.append("ERROR: 定子外径必须大于内径")
         if self.rotor_od >= self.stator_id:
             issues.append("ERROR: 转子外径必须小于定子内径")
+        if self.rotor_od <= 0:
+            issues.append("ERROR: 转子外径非正，请检查 stator_id / airgap 组合")
         
         # 气隙检查
         airgap_actual = (self.stator_id - self.rotor_od) / 2.0
@@ -254,9 +299,9 @@ class MotorConfig:
         return self.pm_pole_arc * self.get_pole_pitch_angle()
     
     def to_dict(self) -> dict:
-        """导出为字典"""
+        """导出为字典（去掉内部标记字段）"""
         return {k: v.value if isinstance(v, (SlotType, PMTopology, MotorType)) else v
-                for k, v in self.__dict__.items()}
+                for k, v in self.__dict__.items() if not k.startswith('_')}
     
     @classmethod
     def from_dict(cls, data: dict) -> 'MotorConfig':
@@ -353,7 +398,14 @@ class MotorConfig:
                 setattr(self, key, value)
             else:
                 self.custom_params[key] = value
-        
+
+        # 显式改写的几何量不再视为"派生值"；置 None 则恢复派生
+        auto = self.__dict__.get("_auto_geom")
+        if auto is not None:
+            for key in ("airgap", "rotor_od"):
+                if key in kwargs:
+                    auto[key] = kwargs[key] is None
+
         # 重新计算派生参数
         self.__post_init__()
 

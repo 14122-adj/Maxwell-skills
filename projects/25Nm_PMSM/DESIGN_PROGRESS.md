@@ -28,12 +28,43 @@
 | S3 | 材料与损耗模型 | ✅ 完成 | `pmsm_config.py`、`sim_analytical.py` |
 | S4 | 解析电磁仿真（磁场/反电势/转矩/损耗/退磁） | ✅ 完成 | `sim_analytical.py`、`projects/results/sim_summary.json` |
 | S5 | Maxwell 2D 建模脚本（几何+材料+绕组+剖分） | ✅ 完成 | `maxwell_model/build_25Nm_SPMSM.py` |
-| S6 | Maxwell FEA 实跑与结果回填 | ⏳ 待桌面执行 | `maxwell_model/solve_25Nm_SPMSM.py`、`ingest_fea.py` |
+| S6 | Maxwell FEA 实跑与结果回填 | ⏳ 待桌面执行（G1 已修，`main.py` 可重建 Dsi=93 机型；G3 `ModelDepth` 待补） | `maxwell_model/solve_25Nm_SPMSM.py`、`ingest_fea.py` |
 | S7 | 热分析（损耗→绕组/磁钢温升） | ✅ 完成 | `thermal_analysis.py`、`projects/results/thermal_summary.json` |
 | S8 | NVH / 结构模态与力波避振 | ✅ 完成 | `nvh_analysis.py`、`projects/results/nvh_summary.json` |
 | S9 | 参数敏感性 / 多目标优化 | ✅ 完成（斜槽×极弧 → 叠长×匝数） | `sensitivity_design.py`、`sensitivity_stack_turns.py`、`projects/results/sensitivity_summary.json`、`sensitivity_stack_turns.json` |
 | S10 | 制造公差、BOM 与图纸 | ⬜ 未开始 | — |
 | S11 | 最终设计评审报告（汇总全链路） | ⬜ 未开始 | — |
+
+## 本周目标（2026-11-07 起，G1–G3）进度
+
+| 目标 | 内容 | 状态 | 产物 |
+|---|---|---|---|
+| G1 | 建模入口几何不自洽（`rotor_od` 写死 135.6） | ✅ 完成 2026-11-07 | `scripts/motor_config.py`、`tests/test_motor_config.py` |
+| G2 | 报告链路依赖未声明（matplotlib/numpy/pytest） | ⬜ 待做（下一步） | `pyproject.toml`、`SKILL.md` |
+| G3 | 2D 叠长丢失（无 `ModelDepth`） | ⬜ 待做 | `scripts/main.py::_gen_setup`、`maxwell_model/solve_25Nm_SPMSM.py` |
+
+## G1 完成记录（几何派生，2026-11-07）
+
+缺陷：`MotorConfig.rotor_od` / `airgap` 为 36 槽机型的硬编码默认值（135.6 / 0.2 mm），
+`__post_init__` 不做几何派生 ⇒ 凡 `stator_id < 135.6 mm` 的机型经 `scripts/main.py` 从零建模必 rc=1。
+
+修复：两字段改 `Optional[float] = None` 哨兵 + `_resolve_geometry()` 四分支（优先级：
+显式两者 > 只给 rotor_od > 只给 airgap > 都缺省），气隙按 `δ = clamp(0.3 + Dso/400, 0.35, 2.0)` 推导。
+
+| 校核项 | 判据 | 实测 |
+|---|---|---|
+| 干净 venv 建模 `slots=12 poles=8 stator_od=150 stator_id=93` | rc=0、校验通过 | ✅ rc=0（`pip install -e .` 后无需任何补装） |
+| 派生气隙 | δ=0.3+150/400 | ✅ 0.675 mm（与 S3–S9 冻结值一致） |
+| 派生转子外径 | Dro = 93 − 2δ | ✅ 91.65 mm |
+| 生成物 `RotorOuter` | 46.5 − δ | ✅ **45.825 mm**（气隙闭合 0.675 mm） |
+| `Region` 半径 | ≥1.25×Rso(=75) | ✅ 95.0 mm = 1.267× |
+| 四预设行为不变 | rotor_od 不被覆盖 | ✅ 135.6 / 50.8 / 118.4 / 135.2，气隙自洽 |
+| 单测 | 新增三例 + 全量回归 | ✅ 163 passed（147+16），ruff 全通过 |
+
+**口径偏差（须留痕）**：WEEKLY_GOALS 验收写 `RotorOuter = 46.125 mm`，该数 = 46.5 − 0.375，
+隐含 δ=Dso/400（丢了 0.3 mm 偏置），与同一条目内「δ=0.3+Dso/400=0.675」自相矛盾。
+本步取 **45.825 mm**（δ=0.675）：S4 解析、S7 热、S8 NVH、S9 敏感性全部以 0.675 mm 气隙为基准
+（g_eff=2.532 mm），若按 0.375 mm 建模则与既有设计链路脱钩；周检报告 §3 证据段亦记录 45.825 ✓。
 
 ## 当前基准数值（S4 解析结果）
 
@@ -251,10 +282,20 @@ P_fe 36.824 W、I 10.6635 A、E 122.796 V、R 0.47227 Ω。
 
 ## 下一次应推进
 
-**S10 第一小步：BOM 与关键公差链（制造可行性）**
+**G2（blocker，S11 前置）：报告链路依赖未声明**
 
-S9 已完成，设计自由度（斜槽/极弧/叠长/匝数）已扫描完，效率与转矩密度的权衡已量化。
-下一步转入制造：把「图纸上的数」变成「能加工的零件 + 公差预算」。
+G1 已关闭（建模入口可从零重建 25 N·m 机型）。下一步转 G2：
+- 现象：干净 venv `pip install -e .` 后 `python projects/25Nm_PMSM/make_report.py` → `ModuleNotFoundError: matplotlib`
+  （`numpy` 同理，`pytest` 缺）
+- 验收：新建 venv → `pip install -e .` → `make_report.py` rc=0，产出 >200 KB HTML 且 `data:image/png;base64` ≥5；
+  无需手工补装；`SKILL.md` 写明安装前置
+- 可选同类修复：`pyproject.toml` 依赖声明（`numpy`/`matplotlib` 进 `dependencies` 或 `[plot,dev]` 前置说明）、
+  `make_report.py` ImportError 中文提示 + P7 转义告警
+- 注意：只改 `pyproject.toml` / `SKILL.md` / `make_report.py`，不要碰工作区里已存在的其他未提交改动
+
+## 历史「下一次应推进」计划（S10，未启动）
+
+**S10 制造公差、BOM 与图纸**（本周不主动开新阶段，排 G1–G3 之后）
 - 脚本 `projects/25Nm_PMSM/manufacturing_bom.py`，输出
   `projects/results/bom.csv` + `manufacturing_summary.json`
 - ① **BOM**：定子铁芯（M270-35A，冲片+叠压）、转子铁芯、N35 磁钢（8 块，含 4 段分段）、
