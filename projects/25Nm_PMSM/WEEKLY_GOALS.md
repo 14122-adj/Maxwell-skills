@@ -47,17 +47,35 @@
 
 ---
 
-## 排期建议（明天起，每天一小步）
+## G4 —【blocker｜M0/M1】Maxwell 实机启动与最小工程（最高优先级）
+
+| 项 | 内容 |
+|---|---|
+| 问题 | 技能最终产出是 Maxwell 中的电机模型，但周检把 FEA 实跑标为「环境限制、不计入」，导致 G1–G3 都在解析/打包层打转。必须把「Maxwell 能否真正启动并生成 `.aedt`」作为可用性硬门槛。 |
+| 验收标准 | ① `ansysedt.exe -ng -RunScriptAndExit` 跑最小脚本，rc=0，生成 `D:\ANSYS_Run\M1_min.aedt`；② 记录 stdout/stderr/日志；③ 若沙箱 rc=1，报告必须标 blocker 并给出桌面一键命令，**不得判「可用」**。 |
+| 建议对应阶段 | M0/M1 |
+| 关联审计项 | 周检 §1 第 7 项、§4 结论 |
+
+## G5 —【blocker｜M2/M3】25 N·m 几何/材料/绕组在 Maxwell 中落地
+
+| 项 | 内容 |
+|---|---|
+| 问题 | 现有 `solve_25Nm_SPMSM.py` 只做了 `py_compile`，未在 Maxwell 中实际生成过工程；`ModelDepth` 未设置（G3），几何/材料/绕组/band 是否被 Maxwell 接受均未验证。 |
+| 验收标准 | ① 在 Maxwell 中生成 `.aedt`，对象数 = 定子 1 + 转子 1 + 轴 1 + 磁钢 8 + 线圈 12 + band 1 + region 1；② 关键尺寸 75.0 / 46.5 / 45.825 / 46.1625 mm；③ 材料 `M270_35A` / `NdFe35_N` / `NdFe35_S` / `copper` 存在；④ 6 个线圈组 + Band 1500 rpm + Mesh 操作存在；⑤ `ModelDepth = 160 mm`（G3 前置）。 |
+| 建议对应阶段 | M2/M3 |
+| 关联审计项 | P3（ModelDepth）、周检 §1 第 7 项 |
+
+## 排期建议（Maxwell 优先，明天起）
 
 | 日 | 动作 | 完成判据 |
 |---|---|---|
-| D1 | G1：`motor_config.py` 加几何派生 + 哨兵默认值 | `main.py --params "…stator_id=93"` rc=0，RotorOuter=46.125 |
-| D2 | G1：补 `tests/test_motor_config.py` 三例 + 跑 pytest/ruff | 147+3 全绿，ruff 无新增告警 |
-| D3 | G2：依赖声明 + SKILL.md 前置说明 | 干净 venv 一路 rc=0 出 HTML |
-| D4 | G2：`make_report.py` ImportError 中文提示 + P7 转义修复 | 缺包时报错可读，`-W error::SyntaxWarning` 无告警 |
-| D5 | G3：`_gen_setup()` 注入 `ModelDepth` | 生成物 grep 命中，`stack_length` 可配 |
-| D6 | G3：`solve_25Nm_SPMSM.py` 同步 + 校验脚本 | 两处 `ModelDepth` 落地，标注待桌面执行 |
-| D7 | 周检复跑（下周），确认 G1–G3 关闭 | 判定由「部分失败」升为「可用」 |
+| D1 | G3：`_gen_setup()` 注入 `ModelDepth` + `validate()` 断言 | 生成物 `grep -c ModelDepth ≥ 1`；`stack_length` 可配 |
+| D2 | G4/M1：`ansysedt -ng` 最小脚本 | rc=0、`M1_min.aedt` 存在；否则标 blocker + 桌面命令 |
+| D3 | G5/M2：25 N·m 几何在 Maxwell 中生成 | 对象数/关键尺寸校验通过 |
+| D4 | M3：材料/绕组/Band/Mesh | 4 种材料、6 线圈组、Band、Mesh 存在 |
+| D5 | M4：空载瞬态 | BEMF/齿槽 CSV 非空 |
+| D6 | M5：负载瞬态 | `T_avg` 与解析 25 N·m 同量级（±20%） |
+| D7 | M6 + 周检复跑 | `fea_results.json` 回填；判定升级 |
 
 ## 明确不在本周范围
 

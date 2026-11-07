@@ -35,6 +35,22 @@
 | S10 | 制造公差、BOM 与图纸 | ⬜ 未开始 | — |
 | S11 | 最终设计评审报告（汇总全链路） | ⬜ 未开始（前置 G2 已通：`pip install -e .` → `make_report.py` rc=0、255 KB / 6 图） | `make_report.py`、`REPORT_25Nm_SPMSM.html` |
 
+## Maxwell 实机执行轨（M0–M6，最高优先级）
+
+> 技能的意义是**在 ANSYS Maxwell 中把电机画出来**。解析仿真（S4/S7/S8/S9）只是前置校验，**不能替代** Maxwell 实机验证。每日任务优先推进本轨；只有 M4（Maxwell 求解）通过后，才考虑 S10/S11。
+
+| 阶段 | 内容 | 状态 | 产物 / 判据 |
+|---|---|---|---|
+| M0 | 环境探测：`ansysedt.exe`、许可证、`-ng` 可启动性 | ⏳ 沙箱 rc=1；需桌面会话 | 最小脚本 `ansysedt -ng -RunScriptAndExit`，记录 rc/stdout/stderr/日志 |
+| M1 | 最小 Maxwell 工程：NewProject + Maxwell 2D + SaveAs `.aedt` | ⬜ 待执行 | `.aedt` 文件存在，可在 Maxwell 打开 |
+| M2 | 25 N·m 几何在 Maxwell 中生成（定子/12 槽/转子/8 磁钢/气隙/band） | ⬜ 待执行（脚本已备） | `.aedt` 内对象数/尺寸校验 |
+| M3 | 材料/绕组/边界/运动带/剖分落地 | ⬜ 待执行 | 材料名、绕组组、Band、Mesh 操作存在 |
+| M4 | 空载瞬态求解（BEMF/齿槽） | ⬜ 待执行 | Maxwell 结果非空，导出 CSV |
+| M5 | 负载瞬态求解（转矩/电流） | ⬜ 待执行 | 转矩与解析 25 N·m 同量级（±20%） |
+| M6 | 结果回填报告 | ⬜ 待执行 | `fea_results.json` + 报告更新 |
+
+**M0 当前事实**：`D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe` 存在，许可证 `localhost:1055` 可连；但 agent 沙箱是非交互会话，`ansysedt -ng` 约 4 s 即 `rc=1`、零日志/零工程。每日任务必须**每天尝试一次并记录结果**，不得默认跳过，也不得用解析结果替代。
+
 ## 本周目标（2026-11-07 起，G1–G3）进度
 
 | 目标 | 内容 | 状态 | 产物 |
@@ -310,19 +326,42 @@ P_fe 36.824 W、I 10.6635 A、E 122.796 V、R 0.47227 Ω。
 产物：`projects/results/sensitivity_stack_turns.json`（锚点/假设/判据/9 工况/最优/所需叠长/自检）、
 `sensitivity_stack_turns.csv`。
 
-## 下一次应推进
+## 下一次应推进（Maxwell 优先）
 
-**G3（major，S6）：2D 叠长丢失，`ModelDepth` 未注入**
+### 优先级 1 — G3（沙箱可完成）：补 2D `ModelDepth`
 
-G2 已关闭（报告链路装完即跑）。下一步转 G3：
 - 现象：`stack_length=160` 未被任何生成器消费；`scripts/main.py` 生成的 `setup.py` 与
   `maxwell_model/solve_25Nm_SPMSM.py` 均无 `ModelDepth`，Maxwell 2D 默认模型深度 1 mm，
-  FEA 转矩/铁耗/反电势将整体低估 ≈160×
+  FEA 转矩/铁耗/反电势将整体低估 ≈160×。
 - 验收：① 生成物 `setup.py` 含 `ModelDepth:="160mm"`（随 `--params stack_length=` 变化，非硬编码）；
-  ② `solve_25Nm_SPMSM.py` 同步；③ `grep -c ModelDepth ≥ 1`；④ `MotorConfig.validate()` 断言 `stack_length > 0`；
-  ⑤ FEA 回填 `T_avg` 与解析 25 N·m 同量级（±20%）——需桌面会话，标注 blocked，不阻塞其他阶段
-- 改动面：`scripts/main.py`（`_gen_setup`）、`maxwell_model/solve_25Nm_SPMSM.py`、`scripts/motor_config.py`（validate）
-- 注意：`scripts/main.py` 工作区已有前序未提交改动，提交时只 add 本次修改的必要文件，勿 `git add -A`
+  ② `solve_25Nm_SPMSM.py` 同步；③ `grep -c ModelDepth ≥ 1`；④ `MotorConfig.validate()` 断言 `stack_length > 0`。
+- 改动面：`scripts/main.py`（`_gen_setup`）、`maxwell_model/solve_25Nm_SPMSM.py`、`scripts/motor_config.py`（validate）。
+- 注意：`scripts/main.py` 工作区已有前序未提交改动，提交时只 add 本次修改的必要文件，勿 `git add -A`。
+
+### 优先级 2 — M0/M1（Maxwell 实机启动，每天必须尝试）
+
+1. 用最小 IronPython 脚本 `D:\ANSYS_Run\m1_probe.py`：
+   `NewProject` → `InsertDesign("Maxwell 2D", ...)` → `SaveAs("D:/ANSYS_Run/M1_min.aedt")`。
+2. 执行并记录完整结果：
+   `"D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" -ng -RunScriptAndExit "D:\ANSYS_Run\m1_probe.py"`
+   记录 rc、stdout、stderr、`ansysedt` 日志、`.aedt` 是否生成。
+3. 判定：
+   - 若 rc=0 且 `.aedt` 存在 → M0/M1 通过，进入 M2。
+   - 若沙箱仍 rc=1 → **记 M0 blocked（环境）**，把上面的命令原样写进 `DESIGN_PROGRESS.md` 作为桌面一键命令；**不得**用解析结果替代，也不得把该阶段标为完成。
+
+### 优先级 3 — M2/M3（几何/材料/绕组在 Maxwell 中落地）
+
+- 以 `maxwell_model/solve_25Nm_SPMSM.py` 为准，逐步验证：
+  - M2：12 槽 / 8 磁钢 / 气隙带 / 12 线圈的对象数与关键尺寸（定子 75.0、内径 46.5、转子 45.825、band 46.1625）。
+  - M3：M270_35A / NdFe35_N / NdFe35_S / copper、6 个线圈组（A±/B±/C±）、Band 1500 rpm、Mesh 操作。
+- 每完成一项，在 `.aedt` 或 `solve.log` 中留证；没有 Maxwell 实跑证据不得标完成。
+
+### 之后 — M4/M5/M6（求解与回填）
+
+- M4 空载瞬态：BEMF + 齿槽，导出 `bemf.csv` / `tq_noload.csv`。
+- M5 负载瞬态：9.89 A 三相电流，导出 `tq_load.csv` / `ia_load.csv`。
+- M6：`ingest_fea.py` → `fea_results.json`，回填报告。
+- 判据：M5 的 `T_avg` 与解析 25 N·m 同量级（±20%），否则视为 Maxwell 模型/设置有问题，先修模型，不要改报告口径。
 
 ## 历史「下一次应推进」计划（G2，已关闭 2026-11-07）
 
@@ -356,13 +395,14 @@ G1 已关闭（建模入口可从零重建 25 N·m 机型）。下一步转 G2�
 ## 每日任务约定
 
 1. 先读本文件 + `git log --oneline -10`，确认进度，避免重复。
-2. 只推进「下一次应推进」所指阶段的一小步（建议 ≤120 行代码）。
+2. 只推进「下一次应推进」所指阶段的一小步（建议 ≤120 行代码）；**优先 M0–M6（Maxwell 实机）**，其次 G3，最后 S10/S11。
 3. 所有数值由脚本计算并落盘到 `projects/results/`，禁止编造。
 4. 完成后更新本文件的阶段状态、产物路径、关键结论与新的「下一次应推进」。
 5. 验证：运行本阶段脚本 + `python -m pytest -q`（原有失败不算本次引入）。
 6. 只 `git add` 本阶段相关文件；**不要 `git add -A`**；不提交 `.aedt`/`.asol`/`__pycache__`/大图。
 7. 验证通过后 `git push origin main`；失败或冲突则保留本地提交，禁止 `--force`。
-8. 依赖桌面 Maxwell 的步骤（S6）只维护脚本与回填管线，标注 blocked，不阻塞其他阶段。
+8. **Maxwell 优先**：每天至少尝试一次 Maxwell 实机启动/建模（M0–M6），记录 rc、日志、`.aedt` 是否生成；沙箱无法启动时标注 blocked 并给出桌面一键命令，**不得用解析仿真替代 Maxwell 验证**。
+9. 只有 M4（Maxwell 求解）通过后，才推进 S10/S11 等非 Maxwell 阶段。
 
 ## 备注
 
