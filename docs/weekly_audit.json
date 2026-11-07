@@ -1,0 +1,303 @@
+{
+  "audit": {
+    "date": "2026-11-07",
+    "kind": "weekly_from_zero_acceptance",
+    "trigger": "manual",
+    "verdict": "partial_fail",
+    "verdict_cn": "部分失败（条件可用）",
+    "ready_for": {
+      "from_zero_modeling": false,
+      "analytical_simulation": true,
+      "report_generation": false,
+      "fea_real_run": "environment_limited"
+    }
+  },
+  "baseline": {
+    "repo": "git@github.com:14122-adj/Maxwell-skills.git",
+    "branch": "main",
+    "head_commit": "b2a8c4c955c4d5405b5e07cf70cfd7f6bb7e0c8e",
+    "head_date": "2026-11-07T13:09:14+08:00",
+    "head_subject": "feat(motor): S9 敏感性第二小步 — 叠长x匝数扫描（P_cu 与匝数无关，94% 需 L=194mm）",
+    "dirty_worktree": true,
+    "dirty_files": [
+      "SKILL.md",
+      "mcp-maxwell/server.py",
+      "output_scripts/36slot_industrial/winding.py",
+      "output_scripts/36slot_v2/coils.py",
+      "output_scripts/36slot_v2/winding.py",
+      "references/motor_design_guide.md",
+      "scripts/main.py",
+      "scripts/maxwell_bridge.py",
+      "scripts/motor_param_calc.py",
+      "scripts/winding_layout.py",
+      "output_scripts/36slot_industrial/coils.py (untracked)"
+    ]
+  },
+  "environment": {
+    "os": "win32",
+    "python_requested": "C:/Users/ASUS/.workbuddy/binaries/python/versions/3.13.12/python.exe",
+    "python_actual": "3.13.14",
+    "sandbox_dir": "D:/ANSYS_Run/audit_20261107",
+    "venv": "D:/ANSYS_Run/audit_20261107/venv",
+    "reused_artifacts": false,
+    "ansysedt_present": true,
+    "ansysedt_path": "D:/Program Files/AnsysEM/AnsysEM21.1/Win64/ansysedt.exe",
+    "fea_run_status": "environment_limited"
+  },
+  "checks": [
+    {
+      "id": 1,
+      "name": "repo_integrity",
+      "result": "pass",
+      "severity": null,
+      "duration_ms": 120,
+      "evidence": "SKILL.md 44300B; scripts/main.py 40857B; scripts/motor_config.py 19746B; pyproject.toml 8517B; tests/ 4 files; references/winding_layouts.md present"
+    },
+    {
+      "id": 2,
+      "name": "install_and_deps",
+      "result": "partial",
+      "severity": "blocker",
+      "duration_ms": 11398,
+      "evidence": "pip install -e . rc=0 (pyyaml only). pytest missing -> 'No module named pytest'. matplotlib/numpy missing -> make_report rc=1.",
+      "related_issues": ["P2"]
+    },
+    {
+      "id": 3,
+      "name": "unit_tests",
+      "result": "pass",
+      "severity": null,
+      "duration_ms": 3290,
+      "evidence": "147 passed, 0 failed, 0 skipped, 2.31s",
+      "related_issues": ["P12"]
+    },
+    {
+      "id": 4,
+      "name": "from_zero_modeling",
+      "result": "fail",
+      "severity": "blocker",
+      "duration_ms": 1005,
+      "evidence": "run1 rc=1 'ERROR: 转子外径必须小于定子内径' (rotor_od kept at 135.6 for Dsi=93). run2 with explicit rotor_od=91.65 airgap=0.675 rc=0, 7 scripts exported, py_compile rc=0, 0 hardcoded absolute paths. stack_length=160 not reflected in output.",
+      "related_issues": ["P1", "P3", "P4"]
+    },
+    {
+      "id": 5,
+      "name": "from_zero_simulation",
+      "result": "pass",
+      "severity": "major",
+      "duration_ms": 380,
+      "evidence": "sim_analytical.py rc=0, sim_summary.json generated from empty results dir. Bg=0.776T in[0.7,0.9]; eta=93.87% in[90,96]; B_min=0.627T>0.2; T_avg=25.0 but equals input (T_calc=22.53, -9.9%).",
+      "related_issues": ["P5", "P6"]
+    },
+    {
+      "id": 6,
+      "name": "report_chain",
+      "result": "partial",
+      "severity": "blocker",
+      "duration_ms": 3059,
+      "evidence": "bare env rc=1 ModuleNotFoundError matplotlib; after pip install matplotlib numpy rc=0 2647ms; REPORT_25Nm_SPMSM.html 230384B, 5 base64 imgs, 12 tables.",
+      "related_issues": ["P2", "P7", "P10"]
+    },
+    {
+      "id": 7,
+      "name": "fea_capability",
+      "result": "fail",
+      "severity": "major",
+      "duration_ms": 640,
+      "evidence": "solve_25Nm_SPMSM.py / ingest_fea.py py_compile rc=0; no ModelDepth in either -> 2D depth defaults to 1mm vs 160mm stack. ingest_fea expects header 'Moving1.Torque' but Maxwell ExportToFile emits unit-suffixed headers (desktop verification required). Hardcoded D:\\ANSYS_Run paths.",
+      "related_issues": ["P3"]
+    },
+    {
+      "id": 8,
+      "name": "doc_consistency",
+      "result": "fail",
+      "severity": "major",
+      "duration_ms": 980,
+      "evidence": "SKILL.md mentions sim_analytical/make_report/ingest_fea/solve_25Nm 0 times; '2-parameter auto completion' not honored by main.py (P4); run_all_simulations.py logs EXPORT_DIR outside repo; documented dry-run command rc=0 but 13/13 PASS are mock.",
+      "related_issues": ["P4", "P8"]
+    }
+  ],
+  "issues": [
+    {
+      "id": "P1",
+      "severity": "blocker",
+      "title": "rotor_od hardcoded to 135.6; from-zero modeling fails for stator_id < 135.6",
+      "file": "scripts/motor_config.py",
+      "line": 117,
+      "function": "MotorConfig.__post_init__ / from_dict",
+      "repro": "venv/Scripts/python.exe scripts/main.py --params \"slots=12 poles=8 stator_od=150 stator_id=93 slot_type=pear\" --output_dir D:/ANSYS_Run/audit_20261107/gen",
+      "returncode": 1,
+      "stderr_summary": "(empty stderr) stdout: '转子: 135.6mm / 48.0mm' then 'ERROR: 转子外径必须小于定子内径'",
+      "root_cause": "Dataclass default rotor_od=135.6/airgap=0.2 are 36slot preset constants; no geometric derivation from stator_id/airgap in __post_init__ or from_dict.",
+      "fix": "Derive rotor_od = stator_id - 2*airgap when not explicitly supplied; airgap = clamp(0.3 + stator_od/400, 0.35, 2.0); add tests for Dsi<135.6, Dsi>135.6, explicit rotor_od."
+    },
+    {
+      "id": "P2",
+      "severity": "blocker",
+      "title": "Report pipeline dependencies undeclared (matplotlib/numpy/pytest), clean env fails at import",
+      "file": "pyproject.toml",
+      "line": 49,
+      "function": "dependencies / optional-dependencies.plot",
+      "repro": "venv/Scripts/python.exe -m pip install -e . && venv/Scripts/python.exe projects/25Nm_PMSM/make_report.py",
+      "returncode": 1,
+      "stderr_summary": "make_report.py:411 SyntaxWarning invalid escape '\\P'; line 17 import matplotlib -> ModuleNotFoundError: No module named 'matplotlib'",
+      "root_cause": "matplotlib/numpy only in [plot] extra, pytest only in [dev]; neither SKILL.md nor project README states the prerequisite.",
+      "fix": "Either move numpy>=1.26/matplotlib>=3.7 into dependencies, or document 'pip install -e \".[plot,dev]\"' as a hard prerequisite and raise a readable Chinese ImportError hint."
+    },
+    {
+      "id": "P3",
+      "severity": "major",
+      "title": "stack_length never consumed; Maxwell 2D ModelDepth unset (160x torque/loss error)",
+      "file": "scripts/main.py",
+      "line": 903,
+      "function": "_gen_setup / solve_25Nm_SPMSM.py setup section",
+      "repro": "venv/Scripts/python.exe scripts/main.py --params \"... stack_length=160\" --output_dir gen && grep -c ModelDepth gen/setup.py",
+      "returncode": 0,
+      "stderr_summary": "n/a (silent) - generated setup.py contains only PreserveTransientSolution/ComputeTransientInductance",
+      "root_cause": "config.stack_length is only assigned in interactive mode and is never emitted as 2D ModelDepth; repo-wide grep finds ModelDepth only in debug/ readers (aedt_parser, com_extractor, run_debug). Archived project output_scripts/36slot_industrial_motor.aedt:248 shows ModelDepth='1meter' default leakage.",
+      "fix": "Emit ModelDepth in SetDesignSettings for both main.py-generated setup.py and solve_25Nm_SPMSM.py; add regression check grep -c ModelDepth >= 1 and assert stack_length > 0 in validate()."
+    },
+    {
+      "id": "P4",
+      "severity": "major",
+      "title": "Unknown params silently dropped; power/speed input yields default machine with rc=0",
+      "file": "scripts/motor_config.py",
+      "line": 0,
+      "line_hint": "MotorConfig.from_dict: filtered_data = {k: v for k, v in data.items() if k in valid_fields}",
+      "function": "from_dict",
+      "repro": "venv/Scripts/python.exe scripts/main.py --params \"power=500 speed=3000\" --output_dir gen_power",
+      "returncode": 0,
+      "stderr_summary": "none - prints '[DONE] 脚本生成成功'",
+      "root_cause": "from_dict filters unknown keys without warning; auto-derivation lives in scripts/motor_param_calc.py which main.py never calls, contradicting SKILL.md section 1.",
+      "fix": "Raise ValueError listing valid keys for unknown fields; or route power/speed through motor_param_calc before building; align SKILL.md wording with the actual entry point."
+    },
+    {
+      "id": "P5",
+      "severity": "major",
+      "title": "WINDING_KW=0.933 contradicts truth table 0.866 for 8p12s; tooth flux density underestimated 7.7%",
+      "file": "projects/25Nm_PMSM/pmsm_config.py",
+      "line": 66,
+      "function": "module constant WINDING_KW",
+      "repro": "venv/Scripts/python.exe scripts/winding_layout.py 12 8 --list  (reports k_w=0.866)",
+      "returncode": 0,
+      "stderr_summary": "n/a - value mismatch; 0.933 is the 10p/12s winding factor",
+      "root_cause": "Copy-paste from the 10p/12s case; propagates into sim_analytical (phi = E/(4.44 f N kw)) and all S4 baselines / reports.",
+      "fix": "Set 0.866, rerun S4, update DESIGN_PROGRESS baseline; add validate() assertion abs(kw - canonical_kw(12,8)) < 1e-3. Effect: Bg 0.776->0.836 T (still in band), B_tooth 1.651->1.779 T (8% above Bsat 1.65 T)."
+    },
+    {
+      "id": "P6",
+      "severity": "major",
+      "title": "Rated torque self-check is circular: T_avg echoed from input",
+      "file": "projects/25Nm_PMSM/sim_analytical.py",
+      "line": 130,
+      "function": "compute() -> rated_load",
+      "repro": "venv/Scripts/python.exe projects/25Nm_PMSM/sim_analytical.py",
+      "returncode": 0,
+      "stderr_summary": "n/a - sim_summary.json shows T_avg=25.0 (input) vs T_calc=22.53 (-9.9%)",
+      "root_cause": "res['rated_load']['T_avg'] = T_rated instead of the computed torque.",
+      "fix": "Use T_calc (or 0.95*T_calc with end/harmonic allowance) as T_avg, keep T_rated as target, and close the 10% gap by design action (turns 81->88 or stack 160->176) instead of echoing."
+    },
+    {
+      "id": "P7",
+      "severity": "minor",
+      "title": "Invalid escape sequence in make_report.py (future SyntaxError)",
+      "file": "projects/25Nm_PMSM/make_report.py",
+      "line": 411,
+      "function": "build_html string literal",
+      "repro": "venv/Scripts/python.exe -W error::SyntaxWarning projects/25Nm_PMSM/make_report.py",
+      "returncode": 0,
+      "stderr_summary": "SyntaxWarning: invalid escape sequence '\\P'",
+      "root_cause": "Non-raw string containing 'D:\\Program Files\\AnsysEM\\...'.",
+      "fix": "Prefix with r or double the backslashes; replace the hardcoded 'Maxwell installed / license localhost:1055' claim with runtime detection."
+    },
+    {
+      "id": "P8",
+      "severity": "minor",
+      "title": "Orchestrator logs non-existent out-of-repo output dir; dry_run reports 13/13 PASS with no artifacts",
+      "file": "projects/25Nm_PMSM/run_all_simulations.py",
+      "line": 113,
+      "function": "main() summary logging",
+      "repro": "MAXWELL_DRY_RUN=1 venv/Scripts/python.exe run_all_simulations.py",
+      "returncode": 0,
+      "stderr_summary": "n/a - final line 'Output: D:/桌面/maxwell-motor-25Nm/results/' (directory does not exist); 0.1s, 13 PASS, 0 files",
+      "root_cause": "EXPORT_DIR hardcoded to a legacy path outside the workspace; dry_run mock steps share the PASS label.",
+      "fix": "Resolve EXPORT_DIR relative to projects/results; label mock steps MOCK instead of PASS."
+    },
+    {
+      "id": "P9",
+      "severity": "minor",
+      "title": "Generated winding.py header prints q=1.00 while actual q=0.50",
+      "file": "scripts/main.py",
+      "line": 0,
+      "line_hint": "_gen_winding template (generated winding.py:12)",
+      "function": "_gen_winding",
+      "repro": "grep -n 'q=' D:/ANSYS_Run/audit_20261107/gen/winding.py",
+      "returncode": 0,
+      "stderr_summary": "n/a - header 'q=1.00' vs winding_report.txt 'q: 0.50'",
+      "root_cause": "q printed from a fixed literal / wrong formula instead of the builder's q attribute.",
+      "fix": "Interpolate {c.q:.2f}; fix the 'integer-slot distributed Pyrhonen' comment in the concentrated-winding branch."
+    },
+    {
+      "id": "P10",
+      "severity": "minor",
+      "title": "CJK glyphs missing in report figures",
+      "file": "projects/25Nm_PMSM/make_report.py",
+      "line": 48,
+      "function": "fig_to_b64",
+      "repro": "venv/Scripts/python.exe projects/25Nm_PMSM/make_report.py",
+      "returncode": 0,
+      "stderr_summary": "UserWarning: Glyph 38408 (CJK U+9608) / Glyph 20540 (CJK U+503C) missing from font(s) DejaVu Sans",
+      "root_cause": "No CJK font configured for matplotlib.",
+      "fix": "rcParams['font.sans-serif']=['Microsoft YaHei']; rcParams['axes.unicode_minus']=False."
+    },
+    {
+      "id": "P11",
+      "severity": "minor",
+      "title": "Audit baseline contains 10 uncommitted modifications",
+      "file": "SKILL.md",
+      "line": 0,
+      "function": "n/a",
+      "repro": "git status --short",
+      "returncode": 0,
+      "stderr_summary": "n/a - 10 modified + 1 untracked files",
+      "root_cause": "Working tree not clean before the audit.",
+      "fix": "Commit or stash before the weekly audit so results are reproducible from a commit hash."
+    },
+    {
+      "id": "P12",
+      "severity": "minor",
+      "title": "Test suite covers winding only; no regression guard for config/geometry/report",
+      "file": "tests/",
+      "line": 0,
+      "function": "n/a",
+      "repro": "venv/Scripts/python.exe -m pytest -q --collect-only",
+      "returncode": 0,
+      "stderr_summary": "n/a - 147 tests in test_winding_layouts / test_pmsm_winding_builder / test_winding_layout_cli only",
+      "root_cause": "Coverage scope limited to winding truth tables.",
+      "fix": "Add test_motor_config.py (geometry derivation, unknown keys) and a smoke test that generates scripts into tmp_path and asserts py_compile + ModelDepth presence."
+    }
+  ],
+  "timings_ms": {
+    "venv_create": 0,
+    "pip_install_editable": 11398,
+    "pip_install_pytest": 9501,
+    "pip_install_matplotlib_numpy": 34471,
+    "pytest": 3290,
+    "main_py_fail_run": 508,
+    "main_py_success_run": 497,
+    "main_py_power_speed_run": 494,
+    "winding_layout_query": 320,
+    "sim_analytical": 380,
+    "make_report_missing_dep": 412,
+    "make_report_ok": 2647,
+    "run_all_simulations_dry": 498,
+    "py_compile_batch": 610,
+    "total_measured": 70026
+  },
+  "artifacts": {
+    "report_md": "docs/WEEKLY_AUDIT_2026-11-07.md",
+    "weekly_goals": "projects/25Nm_PMSM/WEEKLY_GOALS.md",
+    "sandbox": "D:/ANSYS_Run/audit_20261107",
+    "sandbox_generated": ["gen/ (7 scripts + winding_report.txt)", "gen_power/ (7 scripts)", "proj/ (sandbox copy with fresh results)"]
+  }
+}
