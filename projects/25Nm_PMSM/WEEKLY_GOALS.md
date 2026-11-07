@@ -23,6 +23,10 @@
 
 ## G2 —【blocker｜阶段 S11】报告链路依赖未声明，干净环境装完包仍跑不通
 
+> **状态：✅ 已关闭 2026-11-07**（`pyproject.toml` 依赖提升为 core + `make_report.py` 缺包守卫与 P7 修复
+> + `SKILL.md` 安装前置 + `tests/test_report_deps.py` 4 例）。
+> 新建 venv `pip install -e .` 后 `make_report.py` **rc=0**，产出 **255,102 B** HTML、内嵌 **6** 图 / **12** 表。
+
 | 项 | 内容 |
 |---|---|
 | 问题 | `pyproject.toml:49-51` 的 `dependencies` 只有 `pyyaml`；`matplotlib`/`numpy` 仅在 `[plot]` extra，`pytest` 仅在 `[dev]`。干净 venv 执行 `pip install -e .` 成功后，`projects/25Nm_PMSM/make_report.py:17` 直接 `ModuleNotFoundError: No module named 'matplotlib'`（rc=1），报告链路断在第一行 import。 |

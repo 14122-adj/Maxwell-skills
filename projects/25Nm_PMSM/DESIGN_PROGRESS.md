@@ -33,15 +33,15 @@
 | S8 | NVH / 结构模态与力波避振 | ✅ 完成 | `nvh_analysis.py`、`projects/results/nvh_summary.json` |
 | S9 | 参数敏感性 / 多目标优化 | ✅ 完成（斜槽×极弧 → 叠长×匝数） | `sensitivity_design.py`、`sensitivity_stack_turns.py`、`projects/results/sensitivity_summary.json`、`sensitivity_stack_turns.json` |
 | S10 | 制造公差、BOM 与图纸 | ⬜ 未开始 | — |
-| S11 | 最终设计评审报告（汇总全链路） | ⬜ 未开始 | — |
+| S11 | 最终设计评审报告（汇总全链路） | ⬜ 未开始（前置 G2 已通：`pip install -e .` → `make_report.py` rc=0、255 KB / 6 图） | `make_report.py`、`REPORT_25Nm_SPMSM.html` |
 
 ## 本周目标（2026-11-07 起，G1–G3）进度
 
 | 目标 | 内容 | 状态 | 产物 |
 |---|---|---|---|
 | G1 | 建模入口几何不自洽（`rotor_od` 写死 135.6） | ✅ 完成 2026-11-07 | `scripts/motor_config.py`、`tests/test_motor_config.py` |
-| G2 | 报告链路依赖未声明（matplotlib/numpy/pytest） | ⬜ 待做（下一步） | `pyproject.toml`、`SKILL.md` |
-| G3 | 2D 叠长丢失（无 `ModelDepth`） | ⬜ 待做 | `scripts/main.py::_gen_setup`、`maxwell_model/solve_25Nm_SPMSM.py` |
+| G2 | 报告链路依赖未声明（matplotlib/numpy/pytest） | ✅ 完成 2026-11-07 | `pyproject.toml`、`SKILL.md`、`make_report.py`、`tests/test_report_deps.py` |
+| G3 | 2D 叠长丢失（无 `ModelDepth`） | ⬜ 待做（下一步） | `scripts/main.py::_gen_setup`、`maxwell_model/solve_25Nm_SPMSM.py` |
 
 ## G1 完成记录（几何派生，2026-11-07）
 
@@ -65,6 +65,36 @@
 隐含 δ=Dso/400（丢了 0.3 mm 偏置），与同一条目内「δ=0.3+Dso/400=0.675」自相矛盾。
 本步取 **45.825 mm**（δ=0.675）：S4 解析、S7 热、S8 NVH、S9 敏感性全部以 0.675 mm 气隙为基准
 （g_eff=2.532 mm），若按 0.375 mm 建模则与既有设计链路脱钩；周检报告 §3 证据段亦记录 45.825 ✓。
+
+## G2 完成记录（报告链路依赖声明，2026-11-07）
+
+缺陷：`pyproject.toml` 的 `dependencies` 只声明 `pyyaml`，`matplotlib`/`numpy` 仅存在于 `[plot]` extra。
+干净 venv `pip install -e .` 成功后，`projects/25Nm_PMSM/make_report.py:17` 直接
+`ModuleNotFoundError: No module named 'matplotlib'`（rc=1），S11 交付链断在第一条 import；
+同文件 line 411 的 `D:\Program` 构成无效转义序列 `\P`（P7，`-W error::SyntaxWarning` 即报 SyntaxError）。
+
+修复（6 处，均为声明/入口层，不触碰电磁模型）：
+1. `pyproject.toml`：`numpy>=1.24`、`matplotlib>=3.7` 提升为**核心依赖**，`[plot]` 保留为向后兼容别名；
+2. `make_report.py`：绘图 import 包进 `try/except ModuleNotFoundError`，打印中文安装提示并 `sys.exit(2)`；
+3. `make_report.py`：line 411 路径改 `D:\\Program ...`，**P7 关闭**；
+4. `make_report.py`：第 9 节补入「已算但未内嵌」的退磁柱状图（内嵌图 5→6），`阈值 0.2T` 改 ASCII，消除 DejaVu CJK 缺字形告警；
+5. `SKILL.md`：新增「📦 安装（报告链路前置）」小节（`pip install -e .` / `-e ".[dev]"` / 只装绘图栈）；
+6. 新增 `tests/test_report_deps.py`（4 例）：numpy/matplotlib 必须在核心 deps、`make_report.py` 的第三方 import 必须已声明、缺包必须 rc=2。
+
+| 校核项 | 判据 | 实测 |
+|---|---|---|
+| 新建 venv（py3.13）→ `pip install -e .` | 无需手工补装 | ✅ 单条命令即装到 numpy 2.5.4 / matplotlib 3.11.2 |
+| `python projects/25Nm_PMSM/make_report.py` | rc=0 | ✅ rc=0 |
+| HTML 体积 | >200 KB | ✅ **255,102 B**（255.1 KB，原 230,384 B） |
+| `data:image/png;base64` 计数 | ≥5 | ✅ **6**（截面/反电势/气隙/转矩/损耗/退磁） |
+| `<table>` 计数 | ≥10 | ✅ **12** |
+| 缺包路径 | 中文提示、不抛裸栈 | ✅ rc=2（用无 numpy 的 ci_venv 复现） |
+| `-W error::SyntaxWarning` 编译 | 无告警 | ✅ 通过（P7） |
+| 自检回归 | pytest / ruff | ✅ **167 passed**（163+4）、ruff 全通过 |
+
+结论：报告链路由「依赖本机残留环境」改为「声明式依赖 + 装完即跑」，`pip install -e .` 是唯一前置；
+S11 最终评审报告的可复现性有了硬保证。附带效果：`make_report.py` 的失败模式从「裸栈 rc=1」变为
+「可读诊断 rc=2」，CI/脚本可据退出码区分「环境未装」与「代码错误」。
 
 ## 当前基准数值（S4 解析结果）
 
@@ -282,7 +312,19 @@ P_fe 36.824 W、I 10.6635 A、E 122.796 V、R 0.47227 Ω。
 
 ## 下一次应推进
 
-**G2（blocker，S11 前置）：报告链路依赖未声明**
+**G3（major，S6）：2D 叠长丢失，`ModelDepth` 未注入**
+
+G2 已关闭（报告链路装完即跑）。下一步转 G3：
+- 现象：`stack_length=160` 未被任何生成器消费；`scripts/main.py` 生成的 `setup.py` 与
+  `maxwell_model/solve_25Nm_SPMSM.py` 均无 `ModelDepth`，Maxwell 2D 默认模型深度 1 mm，
+  FEA 转矩/铁耗/反电势将整体低估 ≈160×
+- 验收：① 生成物 `setup.py` 含 `ModelDepth:="160mm"`（随 `--params stack_length=` 变化，非硬编码）；
+  ② `solve_25Nm_SPMSM.py` 同步；③ `grep -c ModelDepth ≥ 1`；④ `MotorConfig.validate()` 断言 `stack_length > 0`；
+  ⑤ FEA 回填 `T_avg` 与解析 25 N·m 同量级（±20%）——需桌面会话，标注 blocked，不阻塞其他阶段
+- 改动面：`scripts/main.py`（`_gen_setup`）、`maxwell_model/solve_25Nm_SPMSM.py`、`scripts/motor_config.py`（validate）
+- 注意：`scripts/main.py` 工作区已有前序未提交改动，提交时只 add 本次修改的必要文件，勿 `git add -A`
+
+## 历史「下一次应推进」计划（G2，已关闭 2026-11-07）
 
 G1 已关闭（建模入口可从零重建 25 N·m 机型）。下一步转 G2：
 - 现象：干净 venv `pip install -e .` 后 `python projects/25Nm_PMSM/make_report.py` → `ModuleNotFoundError: matplotlib`

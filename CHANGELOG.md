@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PyVista / Matplotlib 3D winding visualization
 - Direct PyAEDT integration (no manual IronPython paste step)
 
+### Fixed — 2026-11-07（审计 G2 / P2 / P7）
+
+- **报告链路开箱可用**：`numpy>=1.24`、`matplotlib>=3.7` 由 `[plot]` extra 提升为
+  `[project].dependencies` 核心依赖；干净 venv 只需 `pip install -e .` 即可让
+  `projects/25Nm_PMSM/make_report.py` 跑通（rc=0、HTML 255 KB、内嵌 6 图）。
+  `[plot]` 保留为向后兼容别名。
+- `make_report.py` 捕获 `ModuleNotFoundError`，打印中文安装提示并以 **rc=2** 退出，不再抛裸栈。
+- `make_report.py` 附录路径中的无效转义 `\P` 修复（P7，`-W error::SyntaxWarning` 通过）；
+  退磁柱状图改为真正内嵌（5 → 6 张图），`阈值 0.2T` 改 ASCII 消除 DejaVu 缺字形告警。
+- 新增 `tests/test_report_deps.py`（4 例）锁定「核心依赖必须声明」「缺包必须 rc=2」两条契约。
+
 ---
 
 ## [4.4.0] — 2026-09-12 — "GitHub-ready release"

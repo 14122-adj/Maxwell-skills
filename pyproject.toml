@@ -45,9 +45,16 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 
-# Core runtime dependencies (all optional — most scripts work without them)
+# Core runtime dependencies.
+# numpy + matplotlib are required by the 25 N·m SPMSM design chain shipped in
+# projects/25Nm_PMSM/ (sim_analytical.py, thermal_analysis.py, nvh_analysis.py,
+# sensitivity_*.py, make_report.py). They MUST live here rather than in an extra:
+# `pip install -e .` alone has to be enough to regenerate REPORT_25Nm_SPMSM.html,
+# otherwise a clean venv dies at `import matplotlib` (audit item P2 / G2).
 dependencies = [
     "pyyaml>=6.0",
+    "numpy>=1.24",
+    "matplotlib>=3.7",
 ]
 
 [project.optional-dependencies]
@@ -58,15 +65,18 @@ mcp = [
 # MDAO (sqlite + optional pyansys)
 mdao = [
 ]
-# Visualization
+# Visualization — kept as a backward-compatible alias; matplotlib/numpy are now
+# core dependencies, so `pip install -e ".[plot]"` is equivalent to `-e .`
 plot = [
     "matplotlib>=3.7",
+    "numpy>=1.24",
 ]
 # All-in-one
 all = [
     "pyyaml>=6.0",
-    "pywin32>=306; sys_platform == 'win32'",
+    "numpy>=1.24",
     "matplotlib>=3.7",
+    "pywin32>=306; sys_platform == 'win32'",
 ]
 # Dev tooling
 dev = [

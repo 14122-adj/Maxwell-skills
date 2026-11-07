@@ -14,11 +14,23 @@ import base64
 import io
 import math
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Rectangle
-import numpy as np
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Circle, Rectangle
+    import numpy as np
+except ModuleNotFoundError as exc:  # 环境缺包：给中文可读提示，不抛裸栈
+    sys.stderr.write(
+        "\n[错误] 报告链路缺少绘图依赖 %r，无法生成 HTML 报告。\n"
+        "       本仓库已在 pyproject.toml 的 dependencies 中声明 numpy>=1.24 / matplotlib>=3.7，\n"
+        "       请在仓库根目录执行：\n"
+        "           pip install -e .\n"
+        "       若不想安装本包，也可只装绘图栈：\n"
+        "           pip install \"numpy>=1.24\" \"matplotlib>=3.7\"\n"
+        "       当前解释器：%s\n\n" % (getattr(exc, "name", "numpy/matplotlib"), sys.executable)
+    )
+    sys.exit(2)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = os.path.abspath(os.path.join(HERE, "..", "results"))  # projects/results
@@ -188,7 +200,7 @@ def chart_demag():
     style_ax(ax)
     b = ax.bar(tags, bmin, color=[GREEN, ACCENT])
     ax.axhline(0.2, color=RED, ls="--", lw=1)
-    ax.text(1, 0.23, "阈值 0.2T", color=RED, fontsize=7)
+    ax.text(1, 0.23, "limit 0.2 T", color=RED, fontsize=7)
     for r, v in zip(b, bmin):
         ax.text(r.get_x() + r.get_width() / 2, v + 0.02, "%.3f" % v,
                 ha="center", color=TXT, fontsize=8)
@@ -371,8 +383,9 @@ img{display:block;max-width:100%%;margin:10px auto;border-radius:8px;}
 </div>
 
 <div class="card"><h2 style="margin-top:0">9. 退磁校核（150°C 三相短路）</h2>
-<table><tr><th>情形</th><th>电感 Ls</th><th>短路电流</th><th>去磁场</th><th>B_min</th><th>安全系数</th><th>结论</th></tr>
-%s</table>
+<div class="grid"><div class="card"><img src="data:image/png;base64,%s" alt="demag"></div>
+<div class="card"><table><tr><th>情形</th><th>电感 Ls</th><th>短路电流</th><th>去磁场</th><th>B_min</th><th>安全系数</th><th>结论</th></tr>
+%s</table></div></div>
 <div class="note">磁钢温降：Br(150°C)=%.3f T，Hc(150°C)=%.0f kA/m。两种电感假设下 B_min 均 &gt; 0.2 T 阈值，退磁安全系数 3.1–3.7，<b>PASS</b>。若实际 Ls 偏低（趋近几何推导值），裕度仍充足。</div>
 </div>
 
@@ -408,7 +421,7 @@ img{display:block;max-width:100%%;margin:10px auto;border-radius:8px;}
 
 <div class="card"><h2 style="margin-top:0">附录 · 交付物与仿真说明</h2>
 <p class="note">
-<b>说明：</b>Maxwell 2021 R1 已安装（<code>D:\Program Files\AnsysEM\AnsysEM21.1</code>，许可证 localhost:1055），但 agent 沙箱无法初始化 AEDT 的 GUI 运行时，故 FEA 求解须在本机桌面会话执行（见 <code>solve_25Nm_SPMSM.py</code>）。下表数值为与真实 FEA 同源的解析估算（Pyrhönen/Zhu-Howe），作为 FEA 前基线，须以真实 Maxwell 结果复核。
+<b>说明：</b>Maxwell 2021 R1 已安装（<code>D:\\Program Files\\AnsysEM\\AnsysEM21.1</code>，许可证 localhost:1055），但 agent 沙箱无法初始化 AEDT 的 GUI 运行时，故 FEA 求解须在本机桌面会话执行（见 <code>solve_25Nm_SPMSM.py</code>）。下表数值为与真实 FEA 同源的解析估算（Pyrhönen/Zhu-Howe），作为 FEA 前基线，须以真实 Maxwell 结果复核。
 </p>
 <p class="note">
 <b>交付文件：</b><br>
@@ -433,7 +446,7 @@ img{display:block;max-width:100%%;margin:10px auto;border-radius:8px;}
         figs["losses"], cu["P_cu_W"], ir["P_fe_W"], pm["P_pm_4seg_W"],
         perf["P_mech"], perf["P_stray"], perf["P_total_W"], perf["efficiency_pct"],
         pm["P_pm_noseg_W"], pm["P_pm_4seg_W"],
-        demag_rows, dm["Br150"], dm["Hc150"]/1000,
+        figs["demag"], demag_rows, dm["Br150"], dm["Hc150"]/1000,
         "".join("<tr><td>%d</td><td>%.1f</td></tr>" % (o["order"], o["freq_hz"])
                 for o in nvh["force_orders"]), nvh["min_force_order"],
         perf_rows,

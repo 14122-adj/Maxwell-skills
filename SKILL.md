@@ -8,6 +8,32 @@ agent_created: true
 
 ---
 
+## 📦 安装（报告链路前置，AI 必读）
+
+```bash
+# ① 最小可用：含 25 N·m SPMSM 设计链路所需的 numpy / matplotlib
+pip install -e .
+
+# ② 需要跑测试 / lint / 类型检查
+pip install -e ".[dev]"
+
+# ③ 不装本包、只要绘图栈
+pip install "numpy>=1.24" "matplotlib>=3.7"
+```
+
+`projects/25Nm_PMSM/` 全链路（`sim_analytical.py` → `thermal_analysis.py` → `nvh_analysis.py` →
+`sensitivity_*.py` → `make_report.py`）都依赖 **numpy + matplotlib**；二者自 4.4.0 起已写入
+`pyproject.toml` 的 `dependencies`，**不需要再手工补装**。装完后可直接复算整份交付物：
+
+```bash
+python projects/25Nm_PMSM/sim_analytical.py     # 解析仿真，写 projects/results/*.csv|json
+python projects/25Nm_PMSM/make_report.py        # 自包含 HTML 报告（base64 内嵌图）
+```
+
+缺包时 `make_report.py` 会打印中文安装提示并以 **rc=2** 退出，不再抛裸 `ModuleNotFoundError` 栈。
+
+---
+
 ## 🚨 绕组位置速查 (AI 必读区) 🚨
 
 > **铁律**：接到"X 极 Y 槽电机"任务时，**先查本节**，再决定下一步。
