@@ -61,6 +61,66 @@ oDesign.SetDesignSettings(
 print("Setup done: 12 slots, 8 poles, rectangular, SPM")
 
 
+# ============ MATERIALS ============
+#!/usr/bin/env python3
+"""Step 2: 自定义材料定义（N/S极磁钢）"""
+import ScriptEnv
+ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
+oDesktop = ScriptEnv.GetDesktop()
+oProject = oDesktop.GetActiveProject()
+oDefinitionManager = oProject.GetDefinitionManager()
+
+# N极磁钢（磁化方向径向向外）
+oDefinitionManager.EditMaterial("NdFe35_N",
+    [
+        "NAME:NdFe35_N",
+        "CoordinateSystemType:=", "Cylindrical",
+        "BulkOrSurfaceType:=", 1,
+        ["NAME:PhysicsTypes", "set:=", ["Electromagnetic","Thermal","Structural"]],
+        "permittivity:=", "1",
+        "permeability:=", "1.0997785406",
+        "conductivity:=", "625000",
+        "dielectric_loss_tangent:=", "0",
+        "magnetic_loss_tangent:=", "0",
+        [
+            "NAME:magnetic_coercivity",
+            "property_type:=", "VectorProperty",
+            "Magnitude:=", "-890000.0A_per_meter",
+            "DirComp1:=", "1",
+            "DirComp2:=", "0",
+            "DirComp3:=", "0"
+        ],
+        "mass_density:=", "7400",
+        "youngs_modulus:=", "147000000000",
+    ])
+
+# S极磁钢（磁化方向径向向内）
+oDefinitionManager.EditMaterial("NdFe35_S",
+    [
+        "NAME:NdFe35_S",
+        "CoordinateSystemType:=", "Cylindrical",
+        "BulkOrSurfaceType:=", 1,
+        ["NAME:PhysicsTypes", "set:=", ["Electromagnetic","Thermal","Structural"]],
+        "permittivity:=", "1",
+        "permeability:=", "1.0997785406",
+        "conductivity:=", "625000",
+        "dielectric_loss_tangent:=", "0",
+        "magnetic_loss_tangent:=", "0",
+        [
+            "NAME:magnetic_coercivity",
+            "property_type:=", "VectorProperty",
+            "Magnitude:=", "-890000.0A_per_meter",
+            "DirComp1:=", "-1",
+            "DirComp2:=", "0",
+            "DirComp3:=", "0"
+        ],
+        "mass_density:=", "7400",
+        "youngs_modulus:=", "147000000000",
+    ])
+
+print("Materials defined: NdFe35_N, NdFe35_S")
+
+
 # ============ GEOMETRY ============
 #!/usr/bin/env python3
 """Step 3: 几何建模"""
@@ -70,7 +130,7 @@ oDesktop = ScriptEnv.GetDesktop()
 oProject = oDesktop.GetActiveProject()
 oDesign = oProject.SetActiveDesign("Motor_Design")
 oEditor = oDesign.SetActiveEditor("3D Modeler")
-oEditor.SetModelUnits(["NAME:UnitsSettings", "Length:=", "mm"])
+oEditor.SetModelUnits(["NAME:UnitsSettings", "Units:=", "mm"])
 
 # Region（外部边界）
 oEditor.CreateCircle(
@@ -107,23 +167,23 @@ x2 = x0 + 18.0
 b0 = 2.5
 b2 = 9.5
 oEditor.CreatePolyline(
-    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True],
-    ["NAME:PolylinePoints",
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-b2/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(b2/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"]],
-    ["NAME:PolylineSegments",
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 3, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 4, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2]],
+    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,
+     ["NAME:PolylinePoints",
+      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-b2/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(b2/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"]],
+     ["NAME:PolylineSegments",
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 3, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 4, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2]]],
     ["NAME:Attributes", "Name:=", "Slot_1", "Flags:=", "", "Color:=", "(0 200 0)",
      "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
      "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
@@ -132,12 +192,15 @@ oEditor.CreatePolyline(
 oEditor.DuplicateAroundAxis(
     ["NAME:Selections", "Selections:=", "Slot_1", "NewPartsModelFlag:=", "Model"],
     ["NAME:DuplicateAroundAxisParameters", "CreateNewObjects:=", True,
-     "WhichAxis:=", "Z", "AngleStr:=", "30.0deg", "Numclones:=", "12"])
+     "WhichAxis:=", "Z", "AngleStr:=", "30.0deg", "Numclones:=", "12"],
+    ["NAME:Options", "DuplicateAssignments:=", False])
 
 # Subtract slots from stator
+# 注意: DuplicateAroundAxis 的克隆名为 Slot_1_1..Slot_1_11, 不是 Slot_2..Slot_12
+slot_names = ["Slot_1"] + ["Slot_1_" + str(i) for i in range(1, 12)]
 oEditor.Subtract(
     ["NAME:Selections", "Blank Parts:=", "StatorOuter",
-     "Tool Parts:=", "Slot_1, Slot_2, Slot_3, Slot_4, Slot_5, Slot_6, Slot_7, Slot_8, Slot_9, Slot_10, Slot_11, Slot_12"],
+     "Tool Parts:=", ", ".join(slot_names)],
     ["NAME:SubtractParameters", "KeepOriginals:=", False])
 
 # Rotor outer
@@ -232,66 +295,6 @@ for k in range(12):
              "DuplicateObjects:=", False])
 
 print("Geometry done: 12 slots, 8 PMs, Band, 12 coils")
-
-
-# ============ MATERIALS ============
-#!/usr/bin/env python3
-"""Step 2: 自定义材料定义（N/S极磁钢）"""
-import ScriptEnv
-ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
-oDesktop = ScriptEnv.GetDesktop()
-oProject = oDesktop.GetActiveProject()
-oDefinitionManager = oProject.GetDefinitionManager()
-
-# N极磁钢（磁化方向径向向外）
-oDefinitionManager.EditMaterial("NdFe35_N",
-    [
-        "NAME:NdFe35_N",
-        "CoordinateSystemType:=", "Cylindrical",
-        "BulkOrSurfaceType:=", 1,
-        ["NAME:PhysicsTypes", "set:=", ["Electromagnetic","Thermal","Structural"]],
-        "permittivity:=", "1",
-        "permeability:=", "1.0997785406",
-        "conductivity:=", "625000",
-        "dielectric_loss_tangent:=", "0",
-        "magnetic_loss_tangent:=", "0",
-        [
-            "NAME:magnetic_coercivity",
-            "property_type:=", "VectorProperty",
-            "Magnitude:=", "-890000.0A_per_meter",
-            "DirComp1:=", "1",
-            "DirComp2:=", "0",
-            "DirComp3:=", "0"
-        ],
-        "mass_density:=", "7400",
-        "youngs_modulus:=", "147000000000",
-    ])
-
-# S极磁钢（磁化方向径向向内）
-oDefinitionManager.EditMaterial("NdFe35_S",
-    [
-        "NAME:NdFe35_S",
-        "CoordinateSystemType:=", "Cylindrical",
-        "BulkOrSurfaceType:=", 1,
-        ["NAME:PhysicsTypes", "set:=", ["Electromagnetic","Thermal","Structural"]],
-        "permittivity:=", "1",
-        "permeability:=", "1.0997785406",
-        "conductivity:=", "625000",
-        "dielectric_loss_tangent:=", "0",
-        "magnetic_loss_tangent:=", "0",
-        [
-            "NAME:magnetic_coercivity",
-            "property_type:=", "VectorProperty",
-            "Magnitude:=", "-890000.0A_per_meter",
-            "DirComp1:=", "-1",
-            "DirComp2:=", "0",
-            "DirComp3:=", "0"
-        ],
-        "mass_density:=", "7400",
-        "youngs_modulus:=", "147000000000",
-    ])
-
-print("Materials defined: NdFe35_N, NdFe35_S")
 
 
 # ============ WINDING ============

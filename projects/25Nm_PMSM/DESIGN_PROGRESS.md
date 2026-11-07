@@ -41,35 +41,47 @@
 
 | 阶段 | 内容 | 状态 | 产物 / 判据 |
 |---|---|---|---|
-| M0 | 环境探测：`ansysedt.exe`、许可证、`-ng` 可启动性 | ⏳ 沙箱 rc=1；需桌面会话 | 最小脚本 `ansysedt -ng -RunScriptAndExit`，记录 rc/stdout/stderr/日志 |
-| M1 | 最小 Maxwell 工程：NewProject + Maxwell 2D + SaveAs `.aedt` | ⬜ 待执行 | `.aedt` 文件存在，可在 Maxwell 打开 |
-| M2 | 25 N·m 几何在 Maxwell 中生成（定子/12 槽/转子/8 磁钢/气隙/band） | ⬜ 待执行（脚本已备） | `.aedt` 内对象数/尺寸校验 |
-| M3 | 材料/绕组/边界/运动带/剖分落地 | ⬜ 待执行 | 材料名、绕组组、Band、Mesh 操作存在 |
+| M0 | 环境探测：`ansysedt.exe`、许可证、`-ng` 可启动性 | ✅ **完成 2026-11-07** | 可启动，命令**不带 `-ng`**：`ansysedt.exe -RunScriptAndExit <脚本>` |
+| M1 | 最小 Maxwell 工程：NewProject + Maxwell 2D + SaveAs `.aedt` | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M1_min.aedt`（17,233 B，`Factory='Maxwell 2D'`） |
+| M2 | 25 N·m 几何在 Maxwell 中生成（定子/12 槽/转子/8 磁钢/气隙/band） | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M2_25Nm.aedt`（281,687 B，24 个 2D 图元，面积全项校验通过） |
+| M3 | 材料/绕组/边界/运动带/剖分落地 | ⏳ 进行中（材料已定义；绕组接口报错） | `AssignCoilGroup` 需 2 参：`AssignCoilGroup(name, data)` |
 | M4 | 空载瞬态求解（BEMF/齿槽） | ⬜ 待执行 | Maxwell 结果非空，导出 CSV |
 | M5 | 负载瞬态求解（转矩/电流） | ⬜ 待执行 | 转矩与解析 25 N·m 同量级（±20%） |
 | M6 | 结果回填报告 | ⬜ 待执行 | `fea_results.json` + 报告更新 |
 
-**M0 当前事实**：`D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe` 存在，许可证 `localhost:1055` 可连；但 agent 沙箱是非交互会话，`ansysedt -ng` 约 4 s 即 `rc=1`、零日志/零工程。每日任务必须**每天尝试一次并记录结果**，不得默认跳过，也不得用解析结果替代。
+**M0/M1/M2 实测记录（2026-11-07 22:16–22:26，本 agent 会话，真机执行）**
 
-**M0 实机尝试记录（2026-11-07 22:15，本 agent 会话）**
+> 结论先行：此前连续多日记录的「M0 blocked（沙箱环境）」是**误判**。真实原因是命令行用法错误，
+> 与沙箱/许可证无关。Maxwell 21.1 在本机可被 agent 正常驱动。
 
 | 项 | 实测 |
 |---|---|
-| 探针脚本 | `D:\ANSYS_Run\m1_probe.py`（NewProject → Maxwell 2D → SaveAs） |
-| 命令 | `"D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" -ng -RunScriptAndExit "D:\ANSYS_Run\m1_probe.py"` |
-| 返回码 | **rc=1** |
-| 耗时 | **3.6 s** |
-| stdout / stderr | 均为空 |
-| `M1_min.aedt` | **未生成** |
-| 判定 | **M0 blocked（沙箱环境）**，非脚本错误 |
+| 失败根因 1 | `-ng` 必须与 `-batchsolve/-batchsave/-batchextract` 组合；脚本模式应**去掉 `-ng`** |
+| 失败根因 2 | `-RunScriptAndExit` 模式由 AEDT **预注入 `oDesktop`**，脚本内 `ScriptEnv.GetDesktop()` 直接 AttributeError |
+| 失败根因 3 | 内嵌 IronPython 为 **2.7**，f-string 是语法错误 |
+| 正确命令 | `ansysedt.exe -RunScriptAndExit "D:\ANSYS_Run\m2_run.py"` |
+| M1 结果 | rc=0、`M1_min.aedt` 17,233 B、`DesignName='M1_Min'`、`Factory='Maxwell 2D'` |
+| M2 结果 | rc=0、`M2_25Nm.aedt` 281,687 B、`n_sheets=24`、`units=mm`、重开工程成功 |
+| M2 对象 | Region、StatorOuter（12 槽）、RotorOuter（含 φ15 轴孔）、PM_1…PM_8、Band、Coil_1…Coil_12 |
 
-桌面一键命令（在普通桌面会话执行，预期生成 `D:\ANSYS_Run\M1_min.aedt`）：
+M2 尺寸校验（`m2_verify.py` 重开工程，用 `GetFaceIDs`+`GetFaceArea` 取面积，与解析值比对）：
 
-```bat
-"D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" -ng -RunScriptAndExit "D:\ANSYS_Run\m1_probe.py"
-```
+| 对象 | 期望（mm²） | 实测（mm²） | 判据 |
+|---|---|---|---|
+| Region | π·95² = 28352.874 | 28352.87370 | ✅ 外边界 R=95 |
+| StatorOuter | π(75²−46.5²) − 12×102.75 = 9645.5 | 9645.54996 | ✅ 12 槽已挖除、槽型面积正确 |
+| RotorOuter | π(45.825²−15²) = 5890.27 | 5890.26828 | ✅ 转子 OD 45.825、轴孔 φ15 |
+| Band | π·46.1625² = 6694.66 | 6694.65982 | ✅ 气隙中心带 |
+| PM_1…8 | 1.95×30.707 = 59.88 | 59.87760 | ✅ 厚 1.95、极弧 0.87 |
+| Coil_1…12 | 13.2×5.7 = 75.24 | 75.24000 | ✅ 槽内居中 |
 
-**纪律**：在拿到 `.aedt` 之前，M0–M6 不得标完成；解析结果只能写在「交叉校验」栏，不能替代 Maxwell 实机证据。
+**G3 实证**：`GetModelBoundingBox()` 返回 `['-95','-95','0','95','95','0']` —— Z 向厚度为 **0**，
+2D 模型确实没有叠长，`ModelDepth` 缺失会使 FEA 转矩/损耗整体低估，G3 仍是 M4 的硬前置。
+
+**M3 当前卡点**：`AssignCoilGroup` 签名为 `(str nameArg, array dataArg)`，脚本只传了 1 个参数；
+下一小步按此签名改写 6 个线圈组即可。
+
+**纪律**：M3–M6 未完成前不得标完成；解析结果只能写在「交叉校验」栏，不能替代 Maxwell 实机证据。
 
 ## 本周目标（2026-11-07 起，G1–G3）进度
 
@@ -348,40 +360,40 @@ P_fe 36.824 W、I 10.6635 A、E 122.796 V、R 0.47227 Ω。
 
 ## 下一次应推进（Maxwell 优先）
 
-### 优先级 1 — G3（沙箱可完成）：补 2D `ModelDepth`
+### 优先级 1 — M3 绕组/边界/运动带/剖分（一次改完，逐项验）
 
-- 现象：`stack_length=160` 未被任何生成器消费；`scripts/main.py` 生成的 `setup.py` 与
-  `maxwell_model/solve_25Nm_SPMSM.py` 均无 `ModelDepth`，Maxwell 2D 默认模型深度 1 mm，
-  FEA 转矩/铁耗/反电势将整体低估 ≈160×。
-- 验收：① 生成物 `setup.py` 含 `ModelDepth:="160mm"`（随 `--params stack_length=` 变化，非硬编码）；
+1. **绕组**：`AssignCoilGroup(str nameArg, array dataArg)` 签名修正（6 组：A±/B±/C±）。
+   同时校正匝数：设计为 81 匝/相，脚本现写 `Conductor number:=40`，二者需对齐（81/2 组串联 → 每组 40.5 不整，
+   须改为「半匝制上线圈 40 + 40 串」或按 81 匝重新分配，**这是 M3 的实质设计问题，先算再写**）。
+2. **材料落地校验**：`NdFe35_N`/`NdFe35_S` 已定义（`magnitude=-890000 A/m`、`mu_r=1.0998`），
+   但需确认 PM_1…8 实际绑定到这两个材料，而非 vacuum。
+3. **边界**：`AssignVectorPotential` 给 Region 外缘（`Edges` 而非 `Objects`，Region 是 2D 域）。
+4. **Band**：`AssignBand` 1500 rpm，Band 对象半径 46.1625 mm。
+5. **剖分**：`AssignLengthOp` 的 `RestrictLength` 键名需实测（M2 期间已见多处键名错误）。
+6. 验收：`.aedt` 内 `GetBoundaries()` 含 6 组线圈 + 1 个矢量势 + Band；`GetSetups()` 非空。
+
+### 优先级 2 — G3（沙箱可验证，M4 硬前置）
+
+- 现象（**已实证**）：`GetModelBoundingBox()` 返回 Z 厚度 `0`，`stack_length=160` 未进入任何生成器。
+- 验收：① 生成物 `setup.py` 含 `ModelDepth:="160mm"`（随 `--params stack_length=` 变化）；
   ② `solve_25Nm_SPMSM.py` 同步；③ `grep -c ModelDepth ≥ 1`；④ `MotorConfig.validate()` 断言 `stack_length > 0`。
-- 改动面：`scripts/main.py`（`_gen_setup`）、`maxwell_model/solve_25Nm_SPMSM.py`、`scripts/motor_config.py`（validate）。
-- 注意：`scripts/main.py` 工作区已有前序未提交改动，提交时只 add 本次修改的必要文件，勿 `git add -A`。
+- 改动面：`scripts/main.py`（`_gen_setup`）、`maxwell_model/solve_25Nm_SPMSM.py`、`scripts/motor_config.py`。
 
-### 优先级 2 — M0/M1（Maxwell 实机启动，每天必须尝试）
-
-1. 用最小 IronPython 脚本 `D:\ANSYS_Run\m1_probe.py`：
-   `NewProject` → `InsertDesign("Maxwell 2D", ...)` → `SaveAs("D:/ANSYS_Run/M1_min.aedt")`。
-2. 执行并记录完整结果：
-   `"D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" -ng -RunScriptAndExit "D:\ANSYS_Run\m1_probe.py"`
-   记录 rc、stdout、stderr、`ansysedt` 日志、`.aedt` 是否生成。
-3. 判定：
-   - 若 rc=0 且 `.aedt` 存在 → M0/M1 通过，进入 M2。
-   - 若沙箱仍 rc=1 → **记 M0 blocked（环境）**，把上面的命令原样写进 `DESIGN_PROGRESS.md` 作为桌面一键命令；**不得**用解析结果替代，也不得把该阶段标为完成。
-
-### 优先级 3 — M2/M3（几何/材料/绕组在 Maxwell 中落地）
-
-- 以 `maxwell_model/solve_25Nm_SPMSM.py` 为准，逐步验证：
-  - M2：12 槽 / 8 磁钢 / 气隙带 / 12 线圈的对象数与关键尺寸（定子 75.0、内径 46.5、转子 45.825、band 46.1625）。
-  - M3：M270_35A / NdFe35_N / NdFe35_S / copper、6 个线圈组（A±/B±/C±）、Band 1500 rpm、Mesh 操作。
-- 每完成一项，在 `.aedt` 或 `solve.log` 中留证；没有 Maxwell 实跑证据不得标完成。
-
-### 之后 — M4/M5/M6（求解与回填）
+### 优先级 3 — M4/M5/M6（求解与回填）
 
 - M4 空载瞬态：BEMF + 齿槽，导出 `bemf.csv` / `tq_noload.csv`。
-- M5 负载瞬态：9.89 A 三相电流，导出 `tq_load.csv` / `ia_load.csv`。
+- M5 负载瞬态：三相电流，导出 `tq_load.csv` / `ia_load.csv`。
 - M6：`ingest_fea.py` → `fea_results.json`，回填报告。
-- 判据：M5 的 `T_avg` 与解析 25 N·m 同量级（±20%），否则视为 Maxwell 模型/设置有问题，先修模型，不要改报告口径。
+- 判据：M5 的 `T_avg` 与解析 25 N·m 同量级（±20%），否则先修模型，不要改报告口径。
+
+### 已关闭：M0/M1/M2（2026-11-07）
+
+- 复现命令（本机可直接跑，约 25 s/轮）：
+  ```bat
+  python projects\25Nm_PMSM\maxwell_model\prepare_batch.py --workdir D:\ANSYS_Run
+  "D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" -RunScriptAndExit "D:\ANSYS_Run\m2_run.py"
+  ```
+  产物：`D:\ANSYS_Run\M2_25Nm.aedt` + `m2_report.txt`（对象清单）+ `m2_run.log`（AEDT 日志）。
 
 ## 历史「下一次应推进」计划（G2，已关闭 2026-11-07）
 
@@ -426,7 +438,10 @@ G1 已关闭（建模入口可从零重建 25 N·m 机型）。下一步转 G2�
 
 ## 备注
 
-- 沙箱无法启动 ANSYS Maxwell（`ansysedt.exe -ng` 在非交互会话中 rc=1），FEA 实跑须在本机桌面执行；仓库内脚本为权威源，`D:\ANSYS_Run\` 下为 ASCII 路径运行副本。
+- **Maxwell 可由 agent 直接驱动（2026-11-07 更正）**：此前「沙箱无法启动 Maxwell」的结论**作废**。
+  真机实测 rc=0，限制只来自命令行用法：脚本模式**不能带 `-ng`**，且 `oDesktop` 由 AEDT 预注入、
+  IronPython 为 2.7。仓库内脚本为权威源，`D:\ANSYS_Run\` 下为 ASCII 路径的批跑副本（由
+  `prepare_batch.py` 自动生成）。
 - 8p12s 集中绕组、非斜槽，谐波（BEMF 线 THD 15.8%、THD_Bg 32.8%）偏高；S9 已确认
   斜槽 0.5 槽距 + 极弧 0.80 可把线 THD 降到 1.59%，代价 0.45 pt 效率——**效率瓶颈只在叠长，
   与匝数严格无关**（S9-2 已验证）；达 94% 需 L≈194 mm，超出 150 mm 机座常规长径比。

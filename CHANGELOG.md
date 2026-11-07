@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-11-07（Maxwell 批跑通道）
+
+- `projects/25Nm_PMSM/maxwell_model/prepare_batch.py`：把「控制台粘贴式」建模脚本转换为
+  `ansysedt.exe -RunScriptAndExit` 可直接执行的脚本（剥离 `ScriptEnv` 依赖、f-string 降级为
+  IronPython 2.7 写法），并生成带 `SaveAs` + 对象清单的驱动脚本。
+  一条命令即可复现 M2 几何：`python prepare_batch.py --workdir D:\ANSYS_Run`。
+- `tests/test_prepare_batch.py`（12 例）：锁定「ScriptEnv 必须剥离」「f-string 必须降级」
+  以及三处 Modeler API 误用的回归（`Units:="mm"`、`DuplicateAroundAxis` 三参、槽名 `Slot_1_i`）。
+
+### Fixed — 2026-11-07（Maxwell M0–M2 打通）
+
+- **M0 误判纠正**：`ansysedt.exe -ng` 不能单独用于脚本模式，`-ng` 仅与
+  `-batchsolve/-batchsave/-batchextract` 组合。脚本模式正确命令为
+  `ansysedt.exe -RunScriptAndExit <脚本>`。此前连续多日记录的「沙箱环境 blocked」作废，
+  真机实测 rc=0，`M1_min.aedt` 与 `M2_25Nm.aedt` 均已生成。
+- `build_25Nm_SPMSM.py` 四处真机暴露的 API 缺陷：
+  1. `SetModelUnits` 键名 `Length:=` → `Units:=`；
+  2. `CreatePolyline` 误传 4 参 → 点/段嵌入 `PolylineParameters` 字典（2 参）；
+  3. `DuplicateAroundAxis` 缺第 3 个 `NAME:Options` 参数；
+  4. 槽克隆实名为 `Slot_1_1..Slot_1_11`，`Subtract` 却写死 `Slot_2..Slot_12` → 改按实际名生成。
+- 段落顺序：`MATERIALS` 提前到 `GEOMETRY` 之前，否则 PM 引用未定义材料导致 `CreateRectangle` 失败。
+
 ### Planned
 
 - More canonical pole-slot combinations (currently 19; target 30+)
