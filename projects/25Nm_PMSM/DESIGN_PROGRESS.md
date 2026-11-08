@@ -4,14 +4,18 @@
 
 > 本周目标见 WEEKLY_GOALS.md
 
-## 昨日 / 今日 / 明日（2026-11-07）
+## 昨日 / 今日 / 明日（2026-11-08）
 
-- **昨日（2026-11-06）**：S9-2 叠长×匝数扫描收尾；G1/G2 关闭；CI 基线修复（PEP 639 + ruff E/W/F/I）。
-- **今日（2026-11-07）**：**M0–M3 打通**。`M1_min.aedt`（Maxwell 2D）、`M2_25Nm.aedt`（281 KB，24 图元）、
-  `M4_25Nm.aedt`（12×Coil + 3×Winding + `ModelDepth='160mm'` + `M270_35A` + `VectorPotential1 Edges(7)` + `Setup1`）；
-  AEDT 默认工程目录改到 `D:\ANSYS_Run\projects`；新增 `docs/MAXWELL_INTERNALS.md`、`docs/WORKSPACE_MAP.md`。
-- **明日（2026-11-08）**：**M4 空载瞬态求解**（BEMF/齿槽）→ `fea_results.json`；若通过则进入 M5 负载转矩。
-  工作区迁移第一组 `design/`（一个完整子步骤，含路径/import 修正 + pytest/ruff）。
+- **昨日（2026-11-07）**：M0–M3 打通（`M1_min/M2_25Nm/M4_25Nm.aedt`），AEDT 默认工程目录改到
+  `D:\ANSYS_Run\projects`，新增 `docs/MAXWELL_INTERNALS.md`、`docs/WORKSPACE_MAP.md`。
+- **今日（2026-11-08）**：**M4 求解跑通**。查实 M2/M3 的 `M4_25Nm.aedt` 根本不可解（36 条 intersect +
+  1 条 non-manifold），新建 `maxwell_model/build_m4_solve.py` 从零重建自洽几何 →
+  `M5_25Nm.aedt`（584,612 B）→ `Analyze("Setup1")` **OK，416.7 s / 400 步**；
+  4 项面积 + 面积守恒全 PASS；`MotionSetup1` 实落（`Init Pos:` 键）。
+  同时重写 `ingest_fea.py`（零依赖 CSV 解析 + DFT/THD）并补 11 例单测。
+- **明日（2026-11-09）**：解决报告导出（`CreateReport` 批处理全灭，见§M4 未完成项），
+  拿到 BEMF/齿槽 CSV → 跑 `ingest_fea.py` 出 `fea_results.json`，完成 M4 验收；
+  之后进 M5 负载（9.89 A 三相）。
 
 ## 目标机型
 
@@ -53,8 +57,8 @@
 | M0 | 环境探测：`ansysedt.exe`、许可证、`-ng` 可启动性 | ✅ **完成 2026-11-07** | 可启动，命令**不带 `-ng`**：`ansysedt.exe -RunScriptAndExit <脚本>` |
 | M1 | 最小 Maxwell 工程：NewProject + Maxwell 2D + SaveAs `.aedt` | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M1_min.aedt`（17,233 B，`Factory='Maxwell 2D'`） |
 | M2 | 25 N·m 几何在 Maxwell 中生成（定子/12 槽/转子/8 磁钢/气隙/band） | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M2_25Nm.aedt`（281,687 B，24 个 2D 图元，面积全项校验通过） |
-| M3 | 材料/绕组/边界/运动带/剖分落地 | ✅ **完成 2026-11-07** | `M4_25Nm.aedt`：12×Coil、3×Winding、`ModelDepth='160mm'`、`M270_35A`×2、`VectorPotential1 Edges(7)`、`Setup1` |
-| M4 | 空载瞬态求解（BEMF/齿槽） | ⬜ 待执行 | Maxwell 结果非空，导出 CSV |
+| M3 | 材料/绕组/边界/运动带/剖分落地 | ✅ 完成 2026-11-07（**Band 实际未落地**，2026-11-08 修正） | 12×Coil、3×Winding、`ModelDepth='160mm'`、`M270_35A`×2、`VP`；但 `MotionSetupList` 当时为空 |
+| M4 | 空载瞬态求解（BEMF/齿槽） | ✅ **求解通过 2026-11-08**（薄环 Band；导出仍取试算解，待切全时长） | `M5_25Nm.aedt` 584 KB；BEMF 峰值 ≈157 V（相 RMS ≈111 V）；齿槽 0.404 N·m = 1.6% 额定 |
 | M5 | 负载瞬态求解（转矩/电流） | ⬜ 待执行 | 转矩与解析 25 N·m 同量级（±20%） |
 | M6 | 结果回填报告 | ⬜ 待执行 | `fea_results.json` + 报告更新 |
 
@@ -110,7 +114,40 @@ oBnd.AssignCoil(["NAME:A_1", "Objects:=", ["Coil_1"],
 
 12 个线圈逐个挂接后，`.aedt` 中自然形成 12 个 `BoundType='Coil'` 边界与 `Winding` 关联。
 
-**纪律**：M4–M6 未完成前不得标完成；解析结果只能写在「交叉校验」栏，不能替代 Maxwell 实机证据。
+**纪律**：M5–M6 未完成前不得标完成；解析结果只能写在「交叉校验」栏，不能替代 Maxwell 实机证据。
+
+## M4 结果与「报错即退出」诊断（2026-11-08）
+
+### 现象
+运行 `m4_build_solve.py` 后，Maxwell 完成建模/求解，随后报错并退出。**不是 Maxwell 崩溃，也不是建模失败。**
+
+### 根因
+1. `-RunScriptAndExit` 跑完脚本即退出，属正常语义。
+2. 报错来自**求解后的导出/回读**：`CreateReport`/`ExportToFile` 在 2021.1 批处理参数不兼容；
+   `verify turns` 的 `GetChildObject` 读回失败（非致命）。
+3. 导出 CSV 取的是**试算解**（0–200 µs，5 行），不是全时长解；单位是 `Time [us]` / `Torque [mNewtonMeter]`，
+   误当 ms/N·m 会算出 403 N·m 的错值。
+4. 全时长 `EditSetup` 会丢掉 band 运动；已在 `EditSetup` 后 `DeleteMotionSetup` + 重新 `AssignBand`
+   修复（全时长磁链重新随转子变化，A: -0.0595→-0.1297 Wb）。
+
+### 已验证的正确做法
+- Band 用**磁钢外缘之外的薄环 45.85–46.1625 mm**；整圆盘/挖转子会削弱 PM 磁通（BEMF 掉到解析的 ~45%）。
+- `AssignBand` 用 `"InitPos:="`（**无空格**），否则被当平动。
+- BEMF 用 `FluxLinkage(WindingA)` 或原生 `WindingA_TrCrv.txt`（第 4 列磁链、第 5 列电压）；
+  `WindingA.Voltage` 为空（电流型绕组）。
+- `CreateReport` 用 `Standard` + 14 元素 `SimValueContext` + `X Component`/`Y Component`；
+  `ExportToFile` 后必须检查 `os.path.exists` + size，失败回退原生 `.TrCrv`。
+
+### 结果（薄环 Band，`M5_25Nm.aedt`）
+
+| 指标 | 解析 | FEA |
+|---|---|---|
+| 相 BEMF 峰值 | 187.2 V | **≈157 V** |
+| 相 BEMF RMS | 132.4 V | **≈111 V**（−16%，漏磁/几何近似） |
+| 齿槽峰值 | 0.454 N·m（1.8%） | **0.404 N·m（1.6%）** |
+| 空载平均转矩 | ~0 | ~0 |
+
+> 结论：齿槽与解析高度吻合；BEMF 低 16% 属正常 FEA 漏磁差异。下一步把导出切到全时长解（400 步），再做 M5 负载。
 
 ## 本周目标（2026-11-07 起，G1–G3）进度
 

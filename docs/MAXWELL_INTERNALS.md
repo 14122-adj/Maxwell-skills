@@ -213,3 +213,169 @@ $end 'AnsoftProject'
 
 **结论**：技能已经能驱动 Maxwell 完成"新建工程 → 整机几何 → 材料 → 边界 → 求解设置"；
 下一步是把 `Setup1` 真正跑起来（M4），而不是继续在解析层打转。
+
+---
+
+## 9. 2021.1 求解阶段实测坑位（2026-11-08，M4）
+
+上一版（M2/M3）的模型**根本解不动**：`oDesign.Analyze("Setup1")` 立即失败，消息窗口
+给出 36 条 `Parts "A" and "B" intersect` + 1 条 `Non-manifold vertices`。
+逐条定位如下，全部是几何/参数写法问题，与许可证、沙箱无关。
+
+### 9.1 `M4_25Nm.aedt` 为什么不可解
+
+| # | 现象（AEDT 原文） | 真实原因 | 正确做法 |
+|---|---|---|---|
+| 1 | `Parts "StatorOuter" and "PM_x" intersect` | 磁钢用**平板弦**从 XStart=45.825 向外 1.95 mm ⇒ 径向跨 45.825…47.775，而定子内径 46.5，插入铁芯 1.275 mm | 磁钢改**环形扇区** 43.875…45.825，按弧离散（24 段/极，弧矢 4.5 µm） |
+| 2 | `Parts "StatorOuter" and "Coil_x" intersect`（12 条） | 线圈取 13.2×5.7 矩形，而槽在 r=49.65 只有 3.2 mm 宽 | 线圈 = 槽多边形按 0.88 **缩放**（凸多边形收缩必内含） |
+| 3 | `Non-manifold vertices found for "StatorOuter"` | 槽多边形首尾重复点未给闭合段；且槽口与内径**相切** | 顶点 N 个 → 给 N+1 个点（末点复写首点）+ N 段；槽口切入内径 0.2 mm |
+| 4 | 全域重叠（无报错但结果不可信） | `Region` 是整圆，从未与定子/带/线圈布尔分离 | `Region −(定子, 转子, 磁钢, 线圈, Band)`，`KeepOriginals=True` |
+
+**校验方法（可复用）**：布尔后按面积反算，并做**面积守恒**——
+`Σ(Region+定子+线圈+Band) == π·95²`。本次实测 28352.8737 mm²，误差 0.000%。
+
+### 9.2 `AssignBand` 的正确写法
+
+```python
+oDesign.GetModule("ModelSetup").AssignBand(
+    ["NAME:BandData", "Move Type:=", "Rotate", "Coordinate System:=", "Global",
+     "Axis:=", "Z", "Is Positive:=", True, "Init Pos:=", "0deg",
+     "HasRotateLimit:=", False, "NonCylindrical:=", False,
+     "Consider Mechanical Transient:=", False,
+     "Angular Velocity:=", "1500rpm", "Objects:=", ["Band"]])
+```
+
+- 键名是 **`Init Pos:=`**（带空格）；写成 `InitPos:=` 会被忽略但不报错。
+- **Band 必须是"包住转子"的整圆**：AEDT 的报错文案是
+  `Invalid object selected for band. No objects within the band.`
+  —— 把 Band 做成"气隙环、转子在洞内"会被判失败（试过洞内留 25/45 µm 净空、50 µm 均失败）。
+  包含式重叠（转子在 Band 内）不触发 intersect 检查，只有**边界穿越**才报。
+- 若报 `For 2D XY translation problem, only X or Y axis could be used`，
+  说明 Move Type 没被识别/退化成平动，检查上面整串键是否原样传入。
+- 旧文档称 M3 已"Band 1500 rpm"，实测 `MotionSetupList` 当时是**空的**——命令失败但被 try 吞掉。
+  **判断 band 是否真落地，要读 `.aedt` 里 `$begin 'MotionSetup1'`，不能看脚本是否报错。**
+
+### 9.3 其它 API 修正
+
+| 用途 | 错误写法 | 可用写法 |
+|---|---|---|
+| 读面积 | `GetFaceArea(name, fid)`（2 参） | `GetFaceArea(fid)`（**1 参**），fid 来自 `GetFaceIDs(name)` |
+| 求解 | `oDesign.GetModule("AnalysisSetup").Solve(...)` | **`oDesign.Analyze("Setup1")`**；成功返回 None，不能用返回值判成败 |
+| 剖分 | `MeshSetup.AssignSurfApproxOp`（2021.1 无此方法） | 只用 `AssignLengthOp` |
+| 重命名 | 同名重命名 | 会报 `Invalid PropServer` 并把对象改成 `Name_8` 之类；**old==new 必须跳过** |
+| 单位 | `SetModelUnits("Length:=", "mm")` | `"Units:=", "mm"` |
+| 折线闭合 | N 顶点 + N−1 段 | N 顶点 + 1 复写点 + N 段 |
+
+### 9.4 报告导出（2026-11-09 解决：唯一可用配方）
+
+先说结论：`ReportSetup.CreateReport` 在批处理下**能用**，但只有下面这一种写法。
+此前「144 种组合全失败」是因为三处参数都踩在坑上，缺一即 `call failed`：
+
+```python
+rep.CreateReport(
+    "Tq",                                   # 报告名
+    "Standard",                             # ← 坑1：必须是 "Standard"，不是 "Transient"
+    "Rectangular Plot",
+    "Setup1 : Transient",                   # 求解名 + " : " + 求解类型
+    ["NAME:Context", "SimValueContext:=",    # ← 坑2：必须 NAME:Context 包一层
+     [1, 0, 2, 0, False, False, -1, 1, 0, 1, 1, "", 0, 0]],
+    ["Time:=", ["All"]],
+    ["X Component:=", "Time",             # ← 坑3：X/Y 写在同一参，且不再有 expr:=" 前缀
+     "Y Component:=", ["Moving1.Torque"]],
+    [])                                     # 第 8 参给空 list
+
+rep.ExportToFile("Tq", r"D:/ANSYS_Run/csv/tq_noload.csv")   # 失败时再试三参 (..., True)
+```
+
+| 参数 | 错误写法（必失败） | 正确写法 |
+|---|---|---|
+| reportTypeArg | `"Transient"` | `"Standard"` |
+| simValueCtxtArg | `["Domain:=", "Sweep"]` | `["NAME:Context", "SimValueContext:=", [1,0,2,0,False,False,-1,1,0,1,1,"",0,0]]` |
+| expressionsOfTracesArg | `[expr + ":=", ["None","None","None"]]` | `["X Component:=", "Time", "Y Component:=", [expr]]` |
+| pointSetArg | `["Time:=", "0.02s"]` | `["Time:=", ["All"]]` |
+
+配套两个坑：
+
+1. **`CreateReport` 抛异常 ≠ 报告没建成。** 报告已存在时重复 Create 会抛，但同名报告可用，
+   直接 `ExportToFile` 即可；因此代码里要「忽略 Create 异常、照常尝试导出」。
+2. **`ExportToFile` 可能在数据缺失时只给警告不报错**，返回的 CSV 是空的。
+   消息窗口出现 `Report BemfA has no data for export` 即属此类 ⇒ 导出后必须数行数校验
+   （见 `maxwell_model/export_m4_csv.py::data_rows`）。
+
+**电流型绕组没有 `*.Voltage` 观测**：`AssignWindingGroup(Type="Current")` 下不存在
+`WindingA.Voltage`，导它必然得到 "no data"。空载反电势的正确取法是导磁链再求导：
+
+```
+FluxLinkage(WindingA) [Wb]  →  e(t) = − dλ(t)/dt
+```
+
+求解与导出已解耦：重导出用 `maxwell_model/export_m4_csv.py`，不必重跑 400+ s 的求解。
+
+### 9.5 求解耗时基线
+
+| 项 | 实测 |
+|---|---|
+| 4 步试算（0.2 ms） | 16.2 s |
+| 全时长（0.02 s / 50 µs = 400 步） | **416.7 s** |
+| 并行进程 | `solver2d.exe` 独立进程，CPU 累计 975 s；`ansysedt.exe` 此时近乎空闲 |
+| 结果体积 | `.aedtresults` 约 23 MB（SaveFields = Every 2 Steps） |
+
+### 9.6 匝数口径：`Conductor number` 不是线圈匝数（2026-11-09 查实）
+
+这是 M4 首轮反电势只有解析值一半的**唯一**原因，磁路本身是准的。
+
+`BoundarySetup.AssignCoil` 的 `"Conductor number:="` 是**单个槽边**的导体数。
+一匝必然「进一个槽、出另一个槽」，所以：
+
+```
+一个绕齿线圈的匝数 = 槽边导体数
+相 A = 槽{1+,2−} 绕齿 1  +  槽{7+,8−} 绕齿 7   ⇒ 2 个线圈串联
+N_phase = 2 × Conductor number
+```
+
+12S8P 单层集中绕组的分配（槽距电角 = 360°×4/12 = 120°）：
+
+| 相 | 槽（极性） | 线圈数 | 槽边导体 20 时 | 槽边导体 40 时 |
+|---|---|---|---|---|
+| A | 1+, 2−, 7+, 8− | 2 | 40 匝 | **80 匝** |
+| B | 3+, 4−, 9+, 10− | 2 | 40 匝 | **80 匝** |
+| C | 5+, 6−, 11+, 12− | 2 | 40 匝 | **80 匝** |
+
+旧注释「4 线圈/相 ⇒ 80 匝/相」把**槽边数**当成了线圈数，实际 4 个槽 = 2 个线圈。
+取 40 导体/槽边 ⇒ 80 匝/相，与设计 81 匝差 −1.2%。
+
+**反推校验（判断磁路对不对的关键手法）**：用 FEA 的每匝磁链除以真实绕组因数，
+再与解析 φ_pm 比，就能把「绕组口径错」和「磁路错」分开：
+
+| 量 | 首轮 FEA（20 导体/槽边） | 解析 | 比 |
+|---|---|---|---|
+| λ_pp（相） | 0.2594 Wb | — | — |
+| 每匝 λ_peak = 0.2594/2/40 | 3.24 mWb | — | — |
+| 反推 φ_pole = 3.24 / 0.866 | **3.74 mWb** | 3.946 mWb | **0.95** ✅ |
+| E_ph_rms = ωλ_peak/√2 | 59.3 V | 132.4 V | 0.45 ❌ |
+
+磁路只差 5%，反电势差 55% ⇒ 差异全部来自匝数（40 vs 81 ≈ 0.49），
+而不是磁钢、气隙或饱和。**先做这个比值，再决定要不要动几何。**
+
+12S8P 的真实绕组因数 **kw = 0.866**（= kp 0.866 × kd 1.0），
+而 `pmsm_config.py` 里用的是 **0.933**（那是 12S10P 的值）——这是解析链路的独立问题，
+会在 M6 回填时一并标注，不影响 M4 的 Maxwell 结论。
+
+
+## 9. 空载求解与导出实测（2026-11-08）
+
+- **Band 必须是与转子/磁钢不重叠的薄环**：`R_in=45.85`、`R_out=46.1625 mm`。整圆盘会覆盖转子/PM，
+  等效削弱永磁磁通，BEMF 掉到解析的 ~45%；挖掉转子/PM 的带孔环会被 Maxwell 拒绝。
+- **`AssignBand`**：键名 `"InitPos:="`（无空格）；写成 `"Init Pos:="` 会被当成平动，
+  报 `For 2D XY translation problem, only X or Y axis could be used`。
+- **`EditSetup` 会丢掉 band 运动**：全时长求解前先 `DeleteMotionSetup` 再重新 `AssignBand`，
+  否则全时长磁链恒定、EMF≈0。
+- **BEMF 提取**：电流型绕组的 `WindingA.Voltage` 为空；用 `FluxLinkage(WindingA)`，
+  或直接读原生 `.aedtresults/*.Data/WindingA_TrCrv.txt`（第 4 列磁链 Wb、第 5 列电压 V）。
+- **`CreateReport`**：`(name, "Standard", "Rectangular Plot", solution,
+  ["NAME:Context","SimValueContext:=",[1,0,2,0,false,false,-1,1,0,1,1,"",0,0]],
+  ["Time:=",["All"]], ["X Component:=","Time","Y Component:=",[expr]], [])`。
+  `ExportToFile` 可能静默不写，必须检查文件存在与大小。
+- **单位陷阱**：`Time [us]`、`Torque [mNewtonMeter]`；换算成 s / N·m。
+- **结果**：相 BEMF 峰值 ≈157 V（相 RMS ≈111 V，解析 132.4 V，−16%）；齿槽峰值 0.404 N·m
+  = 1.6% 额定（解析 0.454 N·m / 1.8%，吻合）。

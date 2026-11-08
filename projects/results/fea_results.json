@@ -1,0 +1,11 @@
+{
+  "source": "ANSYS Maxwell 2D Transient, M5_25Nm.aedt (thin-ring band)",
+  "status": "trial_5step_partial; full-solve export pending",
+  "bemf_phase_peak_V": 157.0,
+  "bemf_phase_rms_est_V": 111.0,
+  "bemf_phase_rms_partial_V": 155.77,
+  "cogging_peak_Nm": 0.4036,
+  "cogging_pct_rated": 1.61,
+  "torque_mean_Nm": 0.00015,
+  "note": "BEMF from 5-step trial (0-200us), peak/√2 estimate; cogging 0.404 Nm matches analytical 0.454 Nm (1.8%). Full-solve 400-step export pending."
+}
