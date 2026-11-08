@@ -206,6 +206,10 @@ ci_venv/Scripts/python.exe projects/25Nm_PMSM/ingest_fea.py --csvdir D:/ANSYS_Ru
 
 ## M4 结果与「报错即退出」诊断（2026-11-08）
 
+> **⚠️ 本节是当晚第一轮的诊断记录，其中 3 条已被晚间复算推翻**（`CreateReport` 其实可用、
+> `EditSetup` 不丢运动、齿槽 0.404 N·m 是试算段末点）。**以本文档上方的「M4 完成记录」为准**，
+> 本节仅保留排查过程与「`-RunScriptAndExit` 跑完即退出属正常语义」这一条有效结论。
+
 ### 现象
 运行 `m4_build_solve.py` 后，Maxwell 完成建模/求解，随后报错并退出。**不是 Maxwell 崩溃，也不是建模失败。**
 
@@ -219,12 +223,23 @@ ci_venv/Scripts/python.exe projects/25Nm_PMSM/ingest_fea.py --csvdir D:/ANSYS_Ru
    修复（全时长磁链重新随转子变化，A: -0.0595→-0.1297 Wb）。
 
 ### 已验证的正确做法
-- Band 用**磁钢外缘之外的薄环 45.85–46.1625 mm**；整圆盘/挖转子会削弱 PM 磁通（BEMF 掉到解析的 ~45%）。
-- `AssignBand` 用 `"InitPos:="`（**无空格**），否则被当平动。
-- BEMF 用 `FluxLinkage(WindingA)` 或原生 `WindingA_TrCrv.txt`（第 4 列磁链、第 5 列电压）；
-  `WindingA.Voltage` 为空（电流型绕组）。
+
+> 以下三条在晚间复算中被推翻/修正，以本节为准；原判断保留在行内以便追溯。
+
+- Band **取整圆包住转子**（`R=46.1625 mm`，面积 π·46.1625² = 6694.66 mm²，实测 6694.6598 ✅）。
+  「必须是三不沾的薄环」是误判：整圆 Band 不参与 intersect 检查，且 `AssignBand` 找的是
+  band **内部**对象，做成气隙环（洞内放转子）反而报 `No objects within the band`。
+  原先「整圆盘会让 BEMF 掉到 45%」的说法也不成立 —— 那 45% 的真因是匝数少了一半（见下）。
+- `AssignBand` 键名 `"InitPos:="` 与 `"Init Pos:="` 在删干净 motion 后**都能成功**；
+  稳妥做法仍是按变体链逐个试（`BAND_VARIANTS`），不要押单一写法。
+- **`EditSetup` 不会丢 band 运动**（日志 `motion setups before full solve: ['MotionSetup1']`）。
+  多余地 `DeleteMotionSetup()` + 重挂会重建求解列表，让报告绑到残留试算解 ⇒ 400 步跑完只导出 5 行。
+  正确做法是 `ensure_band()`：读回有就保留、没有才补挂。
+- BEMF 用 `FluxLinkage(WindingA)`；`WindingA.Voltage` 对电流型绕组为空。
 - `CreateReport` 用 `Standard` + 14 元素 `SimValueContext` + `X Component`/`Y Component`；
-  `ExportToFile` 后必须检查 `os.path.exists` + size，失败回退原生 `.TrCrv`。
+  `ExportToFile` 后必须**数数据行**（401 行才是全时长解，5 行是试算段）。
+- 单位换算必须做：试算段导出会给 `Time [us]` / `Torque [mNewtonMeter]`，
+  误当 ms/N·m 会算出 403 N·m 的错值。
 
 ### 结果（`M5_25Nm.aedt`，401 点全时长解，2026-11-08 实测）
 

@@ -207,12 +207,13 @@ $end 'AnsoftProject'
 | M1 打开 Maxwell + 新建工程 | ✅ | `M1_min.aedt`（Maxwell 2D / Magnetostatic） |
 | M2 整机几何 | ✅ | `M2_25Nm.aedt` 281 KB：12 槽 + 8 磁钢 + 12 线圈 + Band + Region |
 | M3 材料/边界/求解设置 | ✅ | `M3_25Nm.aedt`：`ModelDepth='160mm'`、`M270_35A`×2、`VectorPotential1 Edges(7)`、`Setup1` |
-| M4 空载求解 | ⬜ 下一步 | 需在桌面会话跑 Transient，导出 BEMF/齿槽 |
-| M5 负载求解 | ⬜ | 9.89 A 三相电流，导出转矩 |
-| M6 结果回填 | ⬜ | `ingest_fea.py` → `fea_results.json` |
+| M4 空载求解 | 🟡 **已跑通，BEMF 过 / 齿槽不过** | `M5_25Nm.aedt` 776 KB，401 点全时长解；相 BEMF RMS 118.88 V（折 81 匝 120.37 V，−9.09%）；齿槽 6.843 N·m = 27.37% 额定 |
+| M5 负载求解 | ⬜ 下一步 | 9.89 A 三相电流，导出转矩 |
+| M6 结果回填 | ⬜ | `ingest_fea.py` → `projects/results/fea_results.json`（已可用，待 M5 后重跑） |
 
-**结论**：技能已经能驱动 Maxwell 完成"新建工程 → 整机几何 → 材料 → 边界 → 求解设置"；
-下一步是把 `Setup1` 真正跑起来（M4），而不是继续在解析层打转。
+**结论**：建模 → 材料 → 边界 → 求解 → 导出的**全链路已在 Maxwell 中打通**（不再需要 GUI 手建报告）。
+当前不是「能不能跑」的问题，而是「跑出来的齿槽转矩是设计问题」——槽口/气隙比 3.7、无斜槽，
+解析模型（1.82%）严重低估（FEA 27.37%），留给下一轮优化。
 
 ---
 
@@ -393,15 +394,23 @@ N_phase = 2 × Conductor number
 反之若比值不是整数倍，才需要往几何或材料上查。
 
 
-## 9. 空载求解与导出实测（2026-11-08）
+## 10. 早期「空载求解与导出」排查记录（2026-11-08，多数已被推翻）
 
-- **Band 必须是与转子/磁钢不重叠的薄环**：`R_in=45.85`、`R_out=46.1625 mm`。整圆盘会覆盖转子/PM，
-  等效削弱永磁磁通，BEMF 掉到解析的 ~45%；挖掉转子/PM 的带孔环会被 Maxwell 拒绝。
-- **`AssignBand`**：键名 `"InitPos:="`（无空格）；写成 `"Init Pos:="` 会被当成平动，
-  报 `For 2D XY translation problem, only X or Y axis could be used`。
-- **`EditSetup` 会丢掉 band 运动**：全时长求解前先 `DeleteMotionSetup` 再重新 `AssignBand`，
-  否则全时长磁链恒定、EMF≈0。
-- **BEMF 提取**：电流型绕组的 `WindingA.Voltage` 为空；用 `FluxLinkage(WindingA)`，
+> **⚠️ 本节前三条已被同日晚间复算推翻**，权威版本见上方 §9.2 / §9.4 / §9.6 / §9.7。
+> 保留原文仅为追溯当时的排查路径，**不要照着做**。
+
+- ~~**Band 必须是与转子/磁钢不重叠的薄环**：`R_in=45.85`、`R_out=46.1625 mm`。整圆盘会覆盖转子/PM，
+  等效削弱永磁磁通，BEMF 掉到解析的 ~45%；挖掉转子/PM 的带孔环会被 Maxwell 拒绝。~~
+  → **实建模型是整圆 Band `R=46.1625` 包住转子**（面积 6694.6598 = π·46.1625² 实测通过）。
+  「BEMF 掉到 45%」的真因是匝数被算成一半，与 Band 无关。
+- ~~**`AssignBand`**：键名 `"InitPos:="`（无空格）；写成 `"Init Pos:="` 会被当成平动，
+  报 `For 2D XY translation problem, only X or Y axis could be used`。~~
+  → 两种键名在 motion 清干净后**都能成功**；失败与键名无必然关系，稳妥做法是变体链逐个试（§9.2）。
+- ~~**`EditSetup` 会丢掉 band 运动**：全时长求解前先 `DeleteMotionSetup` 再重新 `AssignBand`，
+  否则全时长磁链恒定、EMF≈0。~~
+  → **`EditSetup` 保留运动**（`motion setups before full solve: ['MotionSetup1']`）；
+  多余的 `DeleteMotionSetup` 会让报告绑到残留试算解，导出只剩 5 行（§9.7 陷阱一）。
+- **BEMF 提取**（此条仍然有效）：电流型绕组的 `WindingA.Voltage` 为空；用 `FluxLinkage(WindingA)`，
   或直接读原生 `.aedtresults/*.Data/WindingA_TrCrv.txt`（第 4 列磁链 Wb、第 5 列电压 V）。
 - **`CreateReport`**：`(name, "Standard", "Rectangular Plot", solution,
   ["NAME:Context","SimValueContext:=",[1,0,2,0,false,false,-1,1,0,1,1,"",0,0]],
