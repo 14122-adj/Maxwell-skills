@@ -4,13 +4,17 @@
 
 > 本周目标见 WEEKLY_GOALS.md
 
-## 昨日 / 今日 / 明日（2026-11-09）
+## 昨日 / 今日 / 明日（2026-11-08，晚间续推）
 
-- **昨日（2026-11-08）**：**M4 求解跑通**。查实 M2/M3 的 `M4_25Nm.aedt` 根本不可解（36 条 intersect +
-  1 条 non-manifold），新建 `maxwell/m4_build_solve.py` 从零重建自洽几何 →
+> 同一天推进了两轮：白天（下午）把 M4 求解打通，晚间（19:45–20:10）完成 M4 验收。
+
+- **昨日（2026-11-07）**：M0–M3 打通（`M1_min/M2_25Nm/M4_25Nm.aedt`），AEDT 默认工程目录改到
+  `D:\ANSYS_Run\projects`，新增 `docs/MAXWELL_INTERNALS.md`、`docs/WORKSPACE_MAP.md`。
+- **今日第一轮（2026-11-08 白天）**：**M4 求解跑通**。查实 M2/M3 的 `M4_25Nm.aedt` 根本不可解
+  （36 条 intersect + 1 条 non-manifold），新建 `maxwell/m4_build_solve.py` 从零重建自洽几何 →
   `M5_25Nm.aedt` → `Analyze("Setup1")` OK，416.7 s / 400 步；4 项面积 + 面积守恒全 PASS；
   `MotionSetup1` 实落。同时重写 `ingest_fea.py`（零依赖 CSV 解析 + DFT/THD）并补单测。
-- **今日（2026-11-09）**：**M4 验收完成（BEMF 通过、齿槽不达标）**。三件事：
+- **今日第二轮（2026-11-08 晚间）**：**M4 验收完成（BEMF 通过、齿槽不达标）**。三件事：
   1. **导出通道破解**：`CreateReport` 在批处理下是可用的，唯一正确配方是
      `reportType="Standard"` + `NAME:Context/SimValueContext` + `["X Component:=",…]`；
      此前「144 种组合全失败」是三处参数同时踩坑。已固化进
@@ -23,10 +27,10 @@
      折算 81 匝 **120.37 V** vs 解析 132.4 V = **−9.1%，判据通过**；
      齿槽 **6.84 N·m ptp = 额定 27.4%**，解析只给 1.8% ⇒ **判据不通过，且是真实物理结论**
      （主频 600 Hz = LCM(12,8)×25 Hz，正是理论齿槽基频）。
-- **明日（2026-11-10）**：进 M5 负载瞬态（三相 9.89 A，`T_avg` 判 25±20%）；同时把 M6 回填做掉，
+- **明日（2026-11-09）**：进 M5 负载瞬态（三相 9.89 A，`T_avg` 判 25±20%）；同时把 M6 回填做掉，
   并把「齿槽被解析低估 15 倍」写成设计改进项（极弧/槽口/斜槽三选一，用现成 `sensitivity_*` 链路扫）。
 
-**Maxwell 状态（2026-11-09）**：实机运行 ✅ 3 次（19:45 / 19:50 / 20:00），有效结果取第 3 次
+**Maxwell 状态（2026-11-08 晚间）**：实机运行 ✅ 3 次（19:45 / 19:50 / 20:00），有效结果取第 3 次
 rc=0；日志 `D:\ANSYS_Run\m4_build_solve_progress.log`（`trial 17.6 s` / `full 377.3 s` /
 `4×export … 401 rows`）；工程 `D:\ANSYS_Run\M5_25Nm.aedt` **776,049 B** 已存盘（求解后存 1 次 + 收尾 1 次，
 存解前为 583,669 B）；
@@ -75,7 +79,7 @@ rc=0；日志 `D:\ANSYS_Run\m4_build_solve_progress.log`（`trial 17.6 s` / `ful
 | M1 | 最小 Maxwell 工程：NewProject + Maxwell 2D + SaveAs `.aedt` | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M1_min.aedt`（17,233 B，`Factory='Maxwell 2D'`） |
 | M2 | 25 N·m 几何在 Maxwell 中生成（定子/12 槽/转子/8 磁钢/气隙/band） | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M2_25Nm.aedt`（281,687 B，24 个 2D 图元，面积全项校验通过） |
 | M3 | 材料/绕组/边界/运动带/剖分落地 | ✅ 完成 2026-11-07（**Band 实际未落地**，2026-11-08 修正） | 12×Coil、3×Winding、`ModelDepth='160mm'`、`M270_35A`×2、`VP`；但 `MotionSetupList` 当时为空 |
-| M4 | 空载瞬态求解（BEMF/齿槽） | 🟡 **BEMF 通过 / 齿槽不达标（2026-11-09）** | 401 点全时长解（0–20 ms，50 µs）。BEMF 相 RMS **118.88 V**、三相不平衡 0.008%、线 205.91 V、线 THD 10.60%；折算 81 匝 **120.37 V** vs 解析 132.4 V = **−9.09% ✅**。齿槽 **6.84 N·m ptp = 27.37% 额定 ❌**（解析 1.82%，被低估 15 倍） |
+| M4 | 空载瞬态求解（BEMF/齿槽） | 🟡 **BEMF 通过 / 齿槽不达标（2026-11-08）** | 401 点全时长解（0–20 ms，50 µs）。BEMF 相 RMS **118.88 V**、三相不平衡 0.008%、线 205.91 V、线 THD 10.60%；折算 81 匝 **120.37 V** vs 解析 132.4 V = **−9.09% ✅**。齿槽 **6.84 N·m ptp = 27.37% 额定 ❌**（解析 1.82%，被低估 15 倍） |
 | M5 | 负载瞬态求解（转矩/电流） | ⬜ 待执行 | 转矩与解析 25 N·m 同量级（±20%） |
 | M6 | 结果回填报告 | ⬜ 待执行 | `fea_results.json` + 报告更新 |
 
@@ -131,7 +135,7 @@ oBnd.AssignCoil(["NAME:A_1", "Objects:=", ["Coil_1"],
 
 12 个线圈逐个挂接后，`.aedt` 中自然形成 12 个 `BoundType='Coil'` 边界与 `Winding` 关联。
 
-**M4 完成记录（2026-11-09，`M5_25Nm.aedt` 776,049 B（含全时长解），真机执行）**
+**M4 完成记录（2026-11-08，`M5_25Nm.aedt` 776,049 B（含全时长解），真机执行）**
 
 三次真机运行才拿下这一格，每次都是不同的坑，全部留痕：
 
@@ -222,7 +226,7 @@ ci_venv/Scripts/python.exe projects/25Nm_PMSM/ingest_fea.py --csvdir D:/ANSYS_Ru
 - `CreateReport` 用 `Standard` + 14 元素 `SimValueContext` + `X Component`/`Y Component`；
   `ExportToFile` 后必须检查 `os.path.exists` + size，失败回退原生 `.TrCrv`。
 
-### 结果（`M5_25Nm.aedt`，401 点全时长解，2026-11-09 实测）
+### 结果（`M5_25Nm.aedt`，401 点全时长解，2026-11-08 实测）
 
 | 指标 | 解析 | FEA（80 匝/相） | 差异 |
 |---|---|---|---|
@@ -247,7 +251,7 @@ ci_venv/Scripts/python.exe projects/25Nm_PMSM/ingest_fea.py --csvdir D:/ANSYS_Ru
 | G1 | 建模入口几何不自洽（`rotor_od` 写死 135.6） | ✅ 完成 2026-11-07 | `scripts/motor_config.py`、`tests/test_motor_config.py` |
 | G2 | 报告链路依赖未声明（matplotlib/numpy/pytest） | ✅ 完成 2026-11-07 | `pyproject.toml`、`SKILL.md`、`make_report.py`、`tests/test_report_deps.py` |
 | G3 | 2D 叠长丢失（无 `ModelDepth`） | ⬜ 待做（下一步） | `scripts/main.py::_gen_setup`、`maxwell_model/solve_25Nm_SPMSM.py` |
-| G6 | **`compute_winding_factor` 表把 12S8P 记成 0.933** | ⬜ 待修（2026-11-09 由 FEA 反查发现） | `scripts/motor_param_calc.py:364` |
+| G6 | **`compute_winding_factor` 表把 12S8P 记成 0.933** | ⬜ 待修（2026-11-08 由 FEA 反查发现） | `scripts/motor_param_calc.py:364` |
 
 **G6 说明（新发现，暂不动手）**：`scripts/motor_param_calc.py` 的查表里
 `(12, 8): 0.933` 与 `(12, 10): 0.933` 取了同一个值，但 12S8P 的真实绕组因数应为

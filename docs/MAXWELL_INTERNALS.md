@@ -266,7 +266,7 @@ oDesign.GetModule("ModelSetup").AssignBand(
 | 单位 | `SetModelUnits("Length:=", "mm")` | `"Units:=", "mm"` |
 | 折线闭合 | N 顶点 + N−1 段 | N 顶点 + 1 复写点 + N 段 |
 
-### 9.4 报告导出（2026-11-09 解决：唯一可用配方）
+### 9.4 报告导出（2026-11-08 解决：唯一可用配方）
 
 先说结论：`ReportSetup.CreateReport` 在批处理下**能用**，但只有下面这一种写法。
 此前「144 种组合全失败」是因为三处参数都踩在坑上，缺一即 `call failed`：
@@ -320,7 +320,7 @@ FluxLinkage(WindingA) [Wb]  →  e(t) = − dλ(t)/dt
 | 并行进程 | `solver2d.exe` 独立进程，CPU 累计 975 s；`ansysedt.exe` 此时近乎空闲 |
 | 结果体积 | `.aedtresults` 约 23 MB（SaveFields = Every 2 Steps） |
 
-### 9.6 匝数口径：`Conductor number` 不是线圈匝数（2026-11-09 查实）
+### 9.6 匝数口径：`Conductor number` 不是线圈匝数（2026-11-08 查实）
 
 这是 M4 首轮反电势只有解析值一半的**唯一**原因，磁路本身是准的。
 
@@ -361,7 +361,7 @@ N_phase = 2 × Conductor number
 而 `pmsm_config.py` 里用的是 **0.933**（那是 12S10P 的值）——这是解析链路的独立问题，
 会在 M6 回填时一并标注，不影响 M4 的 Maxwell 结论。
 
-### 9.7 「求解」与「导出」之间的两个陷阱（2026-11-09 实测）
+### 9.7 「求解」与「导出」之间的两个陷阱（2026-11-08 实测）
 
 **陷阱一：不要为了保险在 `EditSetup` 后重挂 Band。**
 `EditSetup` 改 StopTime 时，**运动设置是保留的**，读回即可确认：
