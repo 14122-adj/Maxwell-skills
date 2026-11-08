@@ -300,7 +300,7 @@ rep.ExportToFile("Tq", r"D:/ANSYS_Run/csv/tq_noload.csv")   # 失败时再试三
    直接 `ExportToFile` 即可；因此代码里要「忽略 Create 异常、照常尝试导出」。
 2. **`ExportToFile` 可能在数据缺失时只给警告不报错**，返回的 CSV 是空的。
    消息窗口出现 `Report BemfA has no data for export` 即属此类 ⇒ 导出后必须数行数校验
-   （见 `maxwell_model/export_m4_csv.py::data_rows`）。
+   （见 `maxwell/export_m4_csv.py::data_rows`）。
 
 **电流型绕组没有 `*.Voltage` 观测**：`AssignWindingGroup(Type="Current")` 下不存在
 `WindingA.Voltage`，导它必然得到 "no data"。空载反电势的正确取法是导磁链再求导：
@@ -309,7 +309,7 @@ rep.ExportToFile("Tq", r"D:/ANSYS_Run/csv/tq_noload.csv")   # 失败时再试三
 FluxLinkage(WindingA) [Wb]  →  e(t) = − dλ(t)/dt
 ```
 
-求解与导出已解耦：重导出用 `maxwell_model/export_m4_csv.py`，不必重跑 400+ s 的求解。
+求解与导出已解耦：重导出用 `maxwell/export_m4_csv.py`，不必重跑 400+ s 的求解。
 
 ### 9.5 求解耗时基线
 
@@ -360,6 +360,37 @@ N_phase = 2 × Conductor number
 12S8P 的真实绕组因数 **kw = 0.866**（= kp 0.866 × kd 1.0），
 而 `pmsm_config.py` 里用的是 **0.933**（那是 12S10P 的值）——这是解析链路的独立问题，
 会在 M6 回填时一并标注，不影响 M4 的 Maxwell 结论。
+
+### 9.7 「求解」与「导出」之间的两个陷阱（2026-11-09 实测）
+
+**陷阱一：不要为了保险在 `EditSetup` 后重挂 Band。**
+`EditSetup` 改 StopTime 时，**运动设置是保留的**，读回即可确认：
+
+```
+[20:00:38] OK   EditSetup full
+[20:00:38] motion setups before full solve: ['MotionSetup1']
+```
+
+反倒是「先 `DeleteMotionSetup()` 再 `AssignBand()`」这个看似稳妥的动作会重建求解列表，
+使随后的 `CreateReport(..., "Time:=", ["All"])` 绑到**残留的试算解**上 ——
+明明 `full elapsed 401.6 s` 跑完了 400 步，导出的 csv 却只有 5 个点（0–200 µs）。
+正确做法是 `ensure_band()`：读回 `GetMotionSetupNames()`，有就保留，没有才用变体链补挂。
+
+**陷阱二：导出后必须数行数，别信「没有异常」。**
+`ExportToFile` 在数据不匹配时**只给警告不给异常**，照样生成一个小文件。判据很简单：
+
+| 文件 | 数据行 | 含义 |
+|---|---|---|
+| `tq_noload.csv` | ~150 B / 5 行 | **试算段**（0–200 µs），不可用 |
+| `tq_noload.csv` | ~11.7 KB / **401 行** | 全时长解（0–20 ms / 50 µs），可用 |
+
+误用试算段的典型后果：把 t=0.2 ms 的 tq=0.4036 N·m 当成「齿槽峰值」，
+得出「齿槽 1.6%、与解析吻合」的错误结论（真实值 6.84 N·m / 27.4%，差 15 倍）。
+`build_m4_solve.py` 与 `export_m4_csv.py` 都在导出后立刻把行数写进日志。
+
+**顺带的排查手法**：拿两次只有匝数不同的运行对比，若 λ_pp 之比精确等于匝数之比
+（本例 0.51871 / 0.25937 = 2.000），说明差异**纯粹来自匝数**，磁路/网格/材料都没动过；
+反之若比值不是整数倍，才需要往几何或材料上查。
 
 
 ## 9. 空载求解与导出实测（2026-11-08）

@@ -1,11 +1,52 @@
 {
-  "source": "ANSYS Maxwell 2D Transient, M5_25Nm.aedt (thin-ring band)",
-  "status": "trial_5step_partial; full-solve export pending",
-  "bemf_phase_peak_V": 157.0,
-  "bemf_phase_rms_est_V": 111.0,
-  "bemf_phase_rms_partial_V": 155.77,
-  "cogging_peak_Nm": 0.4036,
-  "cogging_pct_rated": 1.61,
-  "torque_mean_Nm": 0.00015,
-  "note": "BEMF from 5-step trial (0-200us), peak/√2 estimate; cogging 0.404 Nm matches analytical 0.454 Nm (1.8%). Full-solve 400-step export pending."
+  "source": "ANSYS Maxwell 2D Transient (real FEA)",
+  "csvdir": "D:/ANSYS_Run/csv",
+  "bemf_phase_A": {
+    "rms_v": 118.8793,
+    "peak_v": 156.9734,
+    "thd_pct": 10.593
+  },
+  "bemf_phase_B": {
+    "rms_v": 118.8887,
+    "peak_v": 156.9676,
+    "thd_pct": 10.593
+  },
+  "bemf_phase_C": {
+    "rms_v": 118.8815,
+    "peak_v": 156.9563,
+    "thd_pct": 10.588
+  },
+  "bemf_source": {
+    "A": "d(FluxLinkage(WindingA))/dt",
+    "B": "d(FluxLinkage(WindingB))/dt",
+    "C": "d(FluxLinkage(WindingC))/dt"
+  },
+  "bemf_rms_phase": 118.8832,
+  "bemf_rms_line": 205.9117,
+  "bemf_balance_pct": 0.008,
+  "bemf_line_direct": {
+    "rms_v": 205.9101,
+    "peak_v": 313.5285,
+    "thd_pct": 10.595
+  },
+  "turns": {
+    "model_per_phase": 80,
+    "design_per_phase": 81,
+    "scale_to_design": 1.0125
+  },
+  "bemf_rms_phase_at_design_turns": 120.3692,
+  "bemf_analytic_phase_rms": 132.4,
+  "bemf_vs_analytic_pct": -9.09,
+  "bemf_pass": true,
+  "cogging": {
+    "mean_nm": 3e-05,
+    "min_nm": -3.42118,
+    "max_nm": 3.4219,
+    "peak_to_peak_nm": 6.84307,
+    "pct_of_rated": 27.372,
+    "n_samples": 200,
+    "analytic_pct_of_rated": 1.815,
+    "pass_5pct": false
+  },
+  "status": "OK"
 }

@@ -4,18 +4,35 @@
 
 > 本周目标见 WEEKLY_GOALS.md
 
-## 昨日 / 今日 / 明日（2026-11-08）
+## 昨日 / 今日 / 明日（2026-11-09）
 
-- **昨日（2026-11-07）**：M0–M3 打通（`M1_min/M2_25Nm/M4_25Nm.aedt`），AEDT 默认工程目录改到
-  `D:\ANSYS_Run\projects`，新增 `docs/MAXWELL_INTERNALS.md`、`docs/WORKSPACE_MAP.md`。
-- **今日（2026-11-08）**：**M4 求解跑通**。查实 M2/M3 的 `M4_25Nm.aedt` 根本不可解（36 条 intersect +
-  1 条 non-manifold），新建 `maxwell_model/build_m4_solve.py` 从零重建自洽几何 →
-  `M5_25Nm.aedt`（584,612 B）→ `Analyze("Setup1")` **OK，416.7 s / 400 步**；
-  4 项面积 + 面积守恒全 PASS；`MotionSetup1` 实落（`Init Pos:` 键）。
-  同时重写 `ingest_fea.py`（零依赖 CSV 解析 + DFT/THD）并补 11 例单测。
-- **明日（2026-11-09）**：解决报告导出（`CreateReport` 批处理全灭，见§M4 未完成项），
-  拿到 BEMF/齿槽 CSV → 跑 `ingest_fea.py` 出 `fea_results.json`，完成 M4 验收；
-  之后进 M5 负载（9.89 A 三相）。
+- **昨日（2026-11-08）**：**M4 求解跑通**。查实 M2/M3 的 `M4_25Nm.aedt` 根本不可解（36 条 intersect +
+  1 条 non-manifold），新建 `maxwell/m4_build_solve.py` 从零重建自洽几何 →
+  `M5_25Nm.aedt` → `Analyze("Setup1")` OK，416.7 s / 400 步；4 项面积 + 面积守恒全 PASS；
+  `MotionSetup1` 实落。同时重写 `ingest_fea.py`（零依赖 CSV 解析 + DFT/THD）并补单测。
+- **今日（2026-11-09）**：**M4 验收完成（BEMF 通过、齿槽不达标）**。三件事：
+  1. **导出通道破解**：`CreateReport` 在批处理下是可用的，唯一正确配方是
+     `reportType="Standard"` + `NAME:Context/SimValueContext` + `["X Component:=",…]`；
+     此前「144 种组合全失败」是三处参数同时踩坑。已固化进
+     `maxwell/export_m4_csv.py`（求解/导出解耦，重导出不必重跑 400 s）。
+  2. **匝数口径纠错**：`Conductor number` 是**每槽边**导体数，相 A 只有 2 个绕齿线圈 ⇒
+     `N_phase = 2 × 40`，旧值 20 导致反电势正好少一半。改 40 后 λ_pp 由 0.25937 → 0.51871 Wb，
+     比值 **2.000**，口径确认。
+  3. **实机结果**：`full elapsed 377.3 s`、401 点全时长解、`conductor=40 ×12`；
+     BEMF 相 RMS **118.88 V**（三相不平衡 0.008%、线 205.91 V、线 THD 10.6%），
+     折算 81 匝 **120.37 V** vs 解析 132.4 V = **−9.1%，判据通过**；
+     齿槽 **6.84 N·m ptp = 额定 27.4%**，解析只给 1.8% ⇒ **判据不通过，且是真实物理结论**
+     （主频 600 Hz = LCM(12,8)×25 Hz，正是理论齿槽基频）。
+- **明日（2026-11-10）**：进 M5 负载瞬态（三相 9.89 A，`T_avg` 判 25±20%）；同时把 M6 回填做掉，
+  并把「齿槽被解析低估 15 倍」写成设计改进项（极弧/槽口/斜槽三选一，用现成 `sensitivity_*` 链路扫）。
+
+**Maxwell 状态（2026-11-09）**：实机运行 ✅ 3 次（19:45 / 19:50 / 20:00），有效结果取第 3 次
+rc=0；日志 `D:\ANSYS_Run\m4_build_solve_progress.log`（`trial 17.6 s` / `full 377.3 s` /
+`4×export … 401 rows`）；工程 `D:\ANSYS_Run\M5_25Nm.aedt` **776,049 B** 已存盘（求解后存 1 次 + 收尾 1 次，
+存解前为 583,669 B）；
+关键校验全 PASS：12×`Conductor number'='40'`、`MotionSetup1`（`Rotate`/`1500rpm`）、
+12×Coil / 3×Winding、`ModelDepth='160mm'`、4 项面积 + 面积守恒（28352.8737 / π·95²）；
+工程最终 776,049 B（存解前 583,669 B，增大即全时长解已落盘）。
 
 ## 目标机型
 
@@ -58,7 +75,7 @@
 | M1 | 最小 Maxwell 工程：NewProject + Maxwell 2D + SaveAs `.aedt` | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M1_min.aedt`（17,233 B，`Factory='Maxwell 2D'`） |
 | M2 | 25 N·m 几何在 Maxwell 中生成（定子/12 槽/转子/8 磁钢/气隙/band） | ✅ **完成 2026-11-07** | `D:\ANSYS_Run\M2_25Nm.aedt`（281,687 B，24 个 2D 图元，面积全项校验通过） |
 | M3 | 材料/绕组/边界/运动带/剖分落地 | ✅ 完成 2026-11-07（**Band 实际未落地**，2026-11-08 修正） | 12×Coil、3×Winding、`ModelDepth='160mm'`、`M270_35A`×2、`VP`；但 `MotionSetupList` 当时为空 |
-| M4 | 空载瞬态求解（BEMF/齿槽） | ✅ **求解通过 2026-11-08**（薄环 Band；导出仍取试算解，待切全时长） | `M5_25Nm.aedt` 584 KB；BEMF 峰值 ≈157 V（相 RMS ≈111 V）；齿槽 0.404 N·m = 1.6% 额定 |
+| M4 | 空载瞬态求解（BEMF/齿槽） | 🟡 **BEMF 通过 / 齿槽不达标（2026-11-09）** | 401 点全时长解（0–20 ms，50 µs）。BEMF 相 RMS **118.88 V**、三相不平衡 0.008%、线 205.91 V、线 THD 10.60%；折算 81 匝 **120.37 V** vs 解析 132.4 V = **−9.09% ✅**。齿槽 **6.84 N·m ptp = 27.37% 额定 ❌**（解析 1.82%，被低估 15 倍） |
 | M5 | 负载瞬态求解（转矩/电流） | ⬜ 待执行 | 转矩与解析 25 N·m 同量级（±20%） |
 | M6 | 结果回填报告 | ⬜ 待执行 | `fea_results.json` + 报告更新 |
 
@@ -114,6 +131,73 @@ oBnd.AssignCoil(["NAME:A_1", "Objects:=", ["Coil_1"],
 
 12 个线圈逐个挂接后，`.aedt` 中自然形成 12 个 `BoundType='Coil'` 边界与 `Winding` 关联。
 
+**M4 完成记录（2026-11-09，`M5_25Nm.aedt` 776,049 B（含全时长解），真机执行）**
+
+三次真机运行才拿下这一格，每次都是不同的坑，全部留痕：
+
+| 运行 | 起止 | 配置 | 结果 |
+|---|---|---|---|
+| ① 19:45 | trial 14.1 s | 20 导体/槽边 | `Analyze full` 被下一次启动打断，无数据 |
+| ② 19:50 | full **401.6 s** | 20 导体 + **删了 Band 再重挂** | 求解 OK，但导出只得到 **5 点试算段**（0–200 µs） |
+| ③ 20:00 | trial 17.6 s / full **377.3 s** | **40 导体/槽边**、不动 Band | ✅ 401 点全时长解 + 4 个 CSV 全部 401 行 |
+
+**为什么②只拿到 5 点**：`EditSetup` 之后 `DeleteMotionSetup()` 把运动设置清掉再重挂，
+求解列表被重建，`CreateReport(... "Time:=",["All"])` 绑到了残留的试算解。
+日志里 `motion setups before full solve: ['MotionSetup1']` 直接给出反证——
+**`EditSetup` 本身不会丢运动带**，是那句多余的 Delete 制造的问题。
+现脚本改成 `ensure_band()`：有就保留、没有才补挂（`BAND_VARIANTS` 变体链）。
+
+**匝数口径**：`Conductor number` 是**每槽边**导体数。相 A = 槽{1+,2−}绕齿1 + 槽{7+,8−}绕齿7
+= 2 个线圈 ⇒ `N_phase = 2 × 40 = 80` 匝（设计 81，−1.2%）。旧值 20 使反电势正好少一半。
+硬证据：λ_pp 由 0.25937 → **0.51871 Wb，比值 2.000**（严格线性，说明只是匝数变化）。
+
+**空载反电势（e = −dλ/dt，电流型绕组无 `*.Voltage` 观测）**
+
+| 项 | 实测 | 解析 | 判据 |
+|---|---|---|---|
+| 相 RMS（80 匝） | 118.88 V | — | — |
+| 相 RMS（折 81 匝） | **120.37 V** | 132.4 V | **−9.09% ✅（±25%）** |
+| 线 RMS（A−B 实测） | 205.91 V | — | 与 √3×相 = 205.91 一致 |
+| 三相不平衡 | **0.008%** | 0 | ✅ |
+| 相 THD | 10.59% | — | 线 THD 10.60%（解析 15.75%） |
+| λ_pp | 0.51871 Wb | — | — |
+
+−9.1% 的差额可完整解释：解析式用了 `Kw=0.933`，而 12S8P 的真实绕组因数是 **0.866**
+（kp=sin60°=0.866、kd=1），单这一项就带来 +7.7% 的高估，其余 ~1.4% 来自磁钢端部/漏磁。
+
+**齿槽转矩：解析严重低估（本条为设计问题，不是脚本问题）**
+
+| 项 | 实测 | 解析 | 判据 |
+|---|---|---|---|
+| ptp | **6.843 N·m** | 0.454 N·m | ❌ 差 15 倍 |
+| 占额定 | **27.37%** | 1.82% | ❌（≤5%） |
+| 均值 | 0.00003 N·m | 0 | ✅ 无直流偏置，纯齿槽 |
+| 主频 | **600 Hz** = LCM(12,8)×f_mech = 24×25 | — | ✅ 正是理论齿槽基频 |
+
+不是数值噪声的三条依据：① 均值 0.00003 N·m，若为伪迹通常带偏置；
+② 主频精确落在 600 Hz，且 `t=0.45 ms` 与 `t=10.45 ms` 数值完全重复（3.4219），周期性干净；
+③ 频谱上 100 次（0.0001 N·m）几乎为零，全部能量在 600 / 1200 / 2400 Hz 齿槽族上。
+
+根因按可能性排序：**槽口 2.5 mm / 气隙 0.675 mm = 3.7** 过大、无斜槽、极弧 0.87 未针对 12S8P 优化。
+下一步不是改脚本，而是先做网格敏感性排除离散化（Band `MaxLength` 0.3 → 0.15 mm 复算一次），
+再用现成 `sensitivity_design.py` 扫极弧×槽口。
+
+**产物**：`projects/25Nm_PMSM/results/fea_results.json`（`bemf_pass: true`、`cogging.pass_5pct: false`）。
+复现命令：
+
+```bash
+# 全流程（约 7 min）
+"C:/Program Files/AnsysEM/AnsysEM21.1/Win64/ansysedt.exe" -RunScriptAndExit "D:/ANSYS_Run/m4_build_solve.py"
+# 只补导出（不重求解）
+"…/ansysedt.exe" -RunScriptAndExit "D:/ANSYS_Run/export_m4_csv.py"
+# 回填
+ci_venv/Scripts/python.exe projects/25Nm_PMSM/ingest_fea.py --csvdir D:/ANSYS_Run/csv --turns-model 80
+```
+
+**口径警示（避免再次误读）**：导出文件必须核行数。521 B / 5 行的 csv 是**试算段**
+（0–200 µs），满篇 401 行才是全时长解；`0.404 N·m`「齿槽」正是把试算段末点
+（t=0.2 ms，tq=0.4036）当成峰值的产物，不可引用。
+
 **纪律**：M5–M6 未完成前不得标完成；解析结果只能写在「交叉校验」栏，不能替代 Maxwell 实机证据。
 
 ## M4 结果与「报错即退出」诊断（2026-11-08）
@@ -138,16 +222,23 @@ oBnd.AssignCoil(["NAME:A_1", "Objects:=", ["Coil_1"],
 - `CreateReport` 用 `Standard` + 14 元素 `SimValueContext` + `X Component`/`Y Component`；
   `ExportToFile` 后必须检查 `os.path.exists` + size，失败回退原生 `.TrCrv`。
 
-### 结果（薄环 Band，`M5_25Nm.aedt`）
+### 结果（`M5_25Nm.aedt`，401 点全时长解，2026-11-09 实测）
 
-| 指标 | 解析 | FEA |
-|---|---|---|
-| 相 BEMF 峰值 | 187.2 V | **≈157 V** |
-| 相 BEMF RMS | 132.4 V | **≈111 V**（−16%，漏磁/几何近似） |
-| 齿槽峰值 | 0.454 N·m（1.8%） | **0.404 N·m（1.6%）** |
-| 空载平均转矩 | ~0 | ~0 |
+| 指标 | 解析 | FEA（80 匝/相） | 差异 |
+|---|---|---|---|
+| 相 BEMF 峰值 | 187.2 V | **156.97 V** | — |
+| 相 BEMF RMS | 132.4 V | **118.88 V** | 折算 81 匝为 120.37 V ⇒ **−9.09%** |
+| 齿槽 ptp | 0.454 N·m（1.8%） | **6.843 N·m（27.37%）** | **+15 倍，解析失效** |
+| 空载平均转矩 | ~0 | 0.00003 N·m | ✅ |
 
-> 结论：齿槽与解析高度吻合；BEMF 低 16% 属正常 FEA 漏磁差异。下一步把导出切到全时长解（400 步），再做 M5 负载。
+> **纠正两处早前误读**（数据源混用所致，务必以本表为准）：
+> ① 「相 RMS ≈111 V」是 `156.97/√2` 的估算，没做真实 RMS（波形含 10.6% 谐波，
+> 真值 118.88 V）；② 「齿槽 0.404 N·m」取自**试算段 200 µs 末点**（tq=0.4036），
+> 不是全时长齿槽峰值。
+>
+> 结论：**BEMF 与解析同量级（−9.1%，可由 Kw 口径 0.933 vs 0.866 解释）；齿槽转矩被解析
+> 低估 15 倍，是真实设计问题**（槽口/气隙 = 3.7、无斜槽、极弧未优化），需在 M6 作为改进项
+> 处理。下一步不是改脚本，而是先做 Band 网格敏感性（0.3 → 0.15 mm）排除离散化影响。
 
 ## 本周目标（2026-11-07 起，G1–G3）进度
 
@@ -156,6 +247,14 @@ oBnd.AssignCoil(["NAME:A_1", "Objects:=", ["Coil_1"],
 | G1 | 建模入口几何不自洽（`rotor_od` 写死 135.6） | ✅ 完成 2026-11-07 | `scripts/motor_config.py`、`tests/test_motor_config.py` |
 | G2 | 报告链路依赖未声明（matplotlib/numpy/pytest） | ✅ 完成 2026-11-07 | `pyproject.toml`、`SKILL.md`、`make_report.py`、`tests/test_report_deps.py` |
 | G3 | 2D 叠长丢失（无 `ModelDepth`） | ⬜ 待做（下一步） | `scripts/main.py::_gen_setup`、`maxwell_model/solve_25Nm_SPMSM.py` |
+| G6 | **`compute_winding_factor` 表把 12S8P 记成 0.933** | ⬜ 待修（2026-11-09 由 FEA 反查发现） | `scripts/motor_param_calc.py:364` |
+
+**G6 说明（新发现，暂不动手）**：`scripts/motor_param_calc.py` 的查表里
+`(12, 8): 0.933` 与 `(12, 10): 0.933` 取了同一个值，但 12S8P 的真实绕组因数应为
+**0.866**（kp = sin(2π/3 / 2) = sin60° = 0.866，kd = 1）。该错值经
+`E_ph_rms = √2·π·f·Nph·Kw·φ` 使 BEMF 高估 7.7%，正是 FEA 与解析 −9.1% 差额的主因。
+修它会连带改变 `E_ph_rms_V` → `Nph` → 铜耗/转矩/热/NVH 全链路，不属于「Maxwell 建模」
+范畴，**本轮只登记不改**，留到 M6 回填时一次性重算并更新 S4/S7/S8/S9 结果。
 
 ## G1 完成记录（几何派生，2026-11-07）
 
