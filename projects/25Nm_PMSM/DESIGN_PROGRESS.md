@@ -46,7 +46,7 @@
 **Maxwell 状态（2026-11-09）**：实机运行 ✅ 4 次（19:08 / 19:11 / 19:21 / 19:28），
 有效结果取 19:28 那次 rc=0；日志 `D:\ANSYS_Run\m5_load_build_progress.log`（build 9 s /
 trial 31 s / **full 377.4 s** / 4×export 401 rows）；工程 `D:\ANSYS_Run\M5_load_25Nm.aedt`
-**1,156,603 B**；对象 24 个（Region/Stator/Rotor/Band/12 Coil/8 PM），面积 4 项 + 守恒全 PASS；
+**775,532 B**；对象 24 个（Region/Stator/Rotor/Band/12 Coil/8 PM），面积 4 项 + 守恒全 PASS；
 求解 0–20 ms / 50 µs / SaveFields Every 2；运动带 `MotionSetup1`（Rotate / 1500 rpm）保留。
 
 ## 上一轮：昨日 / 今日 / 明日（2026-11-08，晚间续推）
