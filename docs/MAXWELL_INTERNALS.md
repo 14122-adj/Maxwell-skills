@@ -419,3 +419,79 @@ N_phase = 2 × Conductor number
 - **单位陷阱**：`Time [us]`、`Torque [mNewtonMeter]`；换算成 s / N·m。
 - **结果**：相 BEMF 峰值 ≈157 V（相 RMS ≈111 V，解析 132.4 V，−16%）；齿槽峰值 0.404 N·m
   = 1.6% 额定（解析 0.454 N·m / 1.8%，吻合）。
+
+
+## 11. 负载工况（M5，2026-11-09 实测）
+
+### 11.1 「改已求解工程的绕组电流」是死路——必须重建
+
+想省 7 min 的建模时间，天然会想到「打开 M4 的 `M5_25Nm.aedt`，把 `Current` 从 0A 改成
+正弦，再 `Analyze`」。**这条路的每个 API 调用都成功，但结果不可用**，实测链路：
+
+| 步骤 | 调用结果 | 真实状态 |
+|---|---|---|
+| `EditWindingGroup("WindingA", [...Current:="...sin(2*pi*100*Time)"...])` | 不抛异常 | 电流确实改上了（原生 TrCrv 第 1 列立刻变 −12.1128 A） |
+| 消息窗口 | `Solutions have been invalidated. Undo to recover.` | 设计进入「解已失效」状态 |
+| `EditSetup` + `Analyze` | `Normal completion`，304.1 s | 求解器真跑了 |
+| `.aedtresults` | `DV42_SOL41_V111.Data/WindingA_TrCrv.txt` 只有 **10 步** | **解没落盘**（应是 400 步） |
+| `CreateReport` | **成功**（`GetAllReportNames()` 里能看到新名字） | 报告建出来了 |
+| `ExportToFile` | 不抛异常，CSV 只有表头（1 行）；`WindingX.Current` 直接不生成文件 | **报表无数据点** |
+
+对照实验（同一台机、同一份导出代码、只换工程）：
+
+```
+M5_25Nm.aedt（未编辑，400 步空载解）  ->  CreateReport OK, ExportToFile 401 行
+M5_load_25Nm.aedt（编辑过绕组电流）    ->  CreateReport OK, ExportToFile 1 行
+```
+
+⇒ 导出通道没问题，是**工程状态**问题。`Analyze` 在「解已失效」的设计上会跑，
+但新解不登记为该设计的当前解，后处理拿不到时间轴。
+
+**正确做法**：负载工况从头建一个新设计（`MAXWELL_CASE=load` 走同一条 build 代码路径），
+不触碰任何已求解对象，一次跑通（本日实测：试算 24 s 得 21 行、全时长 300 s 得 401 行）。
+
+### 11.2 三个新增 API 事实
+
+| 事实 | 细节 |
+|---|---|
+| `oDesign.Analyze()` 成功时**返回 None** | 用 `if analyze(...) is None:` 判失败会把成功当失败（首轮因此空转 2 min 并放弃）。判据只能是「导出数据行数」 |
+| 绕组电流表达式的时间变量是 `Time`（**大写**、单位**秒**） | `Current:="−13.9866*sin(2*pi*100*Time+2.094395)"`；原生 TrCrv 回读 −12.1128 A = −13.9866·sin120°，逐位吻合 |
+| 试算必须存场 | `SaveFieldsType="None"` 时 `Moving1.Torque` / `FluxLinkage` 报表都导不出数据 |
+
+### 11.3 相位与符号：电流要和 BEMF **反相**才对
+
+对 M4 空载磁链做最小二乘基波拟合（第二电周期 400 点）：
+
+```
+lambda_A = 0.26610*cos(wt + 120.005 deg)     amp 0.26610 Wb
+lambda_B = 0.26612*cos(wt - 119.998 deg)
+lambda_C = 0.26611*cos(wt +   0.013 deg)
+```
+
+几何自洽：t=0 时 N 极轴在 0°、相 A 线圈轴 15° 机械 = 60° 电角，cos60°=0.5，
+λ_A(0) 应为 −0.133 Wb（实测 −0.1297，差漏磁）。
+
+符号推导（系统的功率平衡，无歧义）：
+
+```
+T_em * w_m = avg(i * dlambda/dt) = - avg(i * e),      e = -dlambda/dt
+⇒ 正转矩要求 i 与 e 反相
+```
+
+若写成与 e 同相，会得到 −23 N·m（发电机/制动）。脚本用 `MAXWELL_SIGN` 控制，
+并用 1 ms 试算的转矩均值判号（|T| 与齿槽 3.4 N·m 差一个数量级，判号无歧义）。
+
+**旁证**：t=50 µs 时 `i_A=−11.887 A`、`v_A=−116.8 V`，三相 Σv·i ≈ 4.2 kW > 0，
+即绕组从电源吸收功率 ⇒ 电动，与转矩为正一致。
+
+### 11.4 原生 `WindingX_TrCrv.txt` 的列含义（电流型绕组）
+
+```
+WindingA
+  5 5              <- 5 列 x 5 行数据块头
+  0                <- 时间 [s]
+  -12.1128  0  0  -0.236714  0        <- i[A], 0, 0, lambda[Wb], v[V]
+```
+
+第 1 列电流、第 4 列磁链、第 5 列电压（= dλ/dt，**不含** R·i）。
+这条通道在报表不可用时可作兜底（转矩无对应 TrCrv，只能靠报表）。

@@ -48,5 +48,60 @@
     "analytic_pct_of_rated": 1.815,
     "pass_5pct": false
   },
+  "load": {
+    "T_avg_nm": 22.3344,
+    "T_min_nm": 18.1705,
+    "T_max_nm": 25.4044,
+    "T_ripple_pct": 32.389,
+    "T_rated_nm": 25.0,
+    "vs_rated_pct": -10.663,
+    "pass_20pct": true,
+    "window": "last electrical period (10 ms)",
+    "n_samples": 200,
+    "currents": {
+      "A": {
+        "samples": 10,
+        "t_window_ms": [
+          19.55,
+          20.0
+        ],
+        "max_dev_a": 0.0001,
+        "max_dev_pct_of_peak": 0.001,
+        "peak_measured_a": 13.5829
+      },
+      "B": {
+        "samples": 10,
+        "t_window_ms": [
+          19.55,
+          20.0
+        ],
+        "max_dev_a": 0.0001,
+        "max_dev_pct_of_peak": 0.0,
+        "peak_measured_a": 12.1127
+      },
+      "C": {
+        "samples": 10,
+        "t_window_ms": [
+          19.55,
+          20.0
+        ],
+        "max_dev_a": 0.0,
+        "max_dev_pct_of_peak": 0.0,
+        "peak_measured_a": 3.9021
+      }
+    },
+    "current_source": "native WindingX_TrCrv.txt (ring buffer, tail 10 steps)",
+    "current_commanded_rms_a": 9.89,
+    "current_waveform_dev_pct": 0.001,
+    "current_ok": true,
+    "power_balance": {
+      "P_mech_w": 3508.3,
+      "P_emf_w": 3527.3,
+      "dev_pct": -0.54,
+      "pass_10pct": true,
+      "note": "P_emf = 3*E_rms*I_rms 用空载 BEMF；差值含电枢反应与齿槽"
+    },
+    "Kt_nm_per_a_pk": 1.5968
+  },
   "status": "OK"
 }

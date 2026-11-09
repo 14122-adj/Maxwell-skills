@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-11-09（M5 负载瞬态：三相 9.89 A，`T_avg` 判据通过）
+
+- `maxwell/m4_build_solve.py` 增加 `MAXWELL_CASE=load` 负载工况（与空载共用同一条建模
+  代码路径，几何零改动）：三相电流型绕组注入 `−13.9866*sin(2*pi*100*Time+φ)`，
+  φ = 120°/240°/0°（由 M4 空载磁链最小二乘拟合得到），相电阻 0.47227 Ω；
+  试算判号改用原生 `WindingX_TrCrv.txt` 的 `Σv·i`，**不导报表**。
+- `ingest_fea.py`：新增 `load_block()`（`T_avg`/脉动/`Kt`/功率平衡）与
+  `read_native_trcrv()`（原生 TrCrv 解析），新增 `--native-dir`；
+  电流校核支持「报表 CSV 整周期 RMS」与「原生环形缓冲逐点波形比对」两种口径。
+- `tests/test_ingest_fea.py` +7 例（`TestLoadBlock` 8 例、`TestNativeTrCrv` 3 例）。
+- `docs/MAXWELL_INTERNALS.md` §11：负载工况四个新坑（改已求解工程绕组电流 → 解不落盘、
+  `Analyze()` 返回 None、试算后导报表会绑死试算解、TrCrv 列含义与环形缓冲）。
+
+### Fixed — 2026-11-09（M5 真机四轮排查）
+
+- **改已完成工程的绕组电流不可行**：`EditWindingGroup` 成功后设计进入
+  `Solutions have been invalidated`，`Analyze` 跑完 304 s 但 `.aedtresults` 只落试算 10 步，
+  `CreateReport` 建得出、`ExportToFile` 只写表头。对照实验（未编辑工程）得 401 行
+  ⇒ 是工程状态问题，负载工况必须重建。
+- **试算后导出转矩报表会污染全时长导出**：`Moving1.Torque` 绑到试算解，
+  全时长后再导仍是 21 行（0–1 ms），而同解 `FluxLinkage` 为 401 行。
+- `m5_load_solve.py` 作废（其「打开 M4 工程改电流」路线被证伪），改由
+  `m4_build_solve.py` 的 `MAXWELL_CASE=load` 承担；`m5_load_export.py` 保留为独立
+  导出通道诊断脚本。
+
 ### Added — 2026-11-07（Maxwell 批跑通道）
 
 - `projects/25Nm_PMSM/maxwell_model/prepare_batch.py`：把「控制台粘贴式」建模脚本转换为

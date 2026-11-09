@@ -33,6 +33,10 @@ import sys
 
 T_RATED = 25.0          # 额定转矩 N·m（判据基准）
 F_ELEC = 100.0          # 8 极 @ 1500 rpm ⇒ f_e = p·n/60 = 4·1500/60 = 100 Hz
+W_MECH = 2.0 * math.pi * 1500.0 / 60.0   # 157.0796 rad/s（额定转速）
+I_LOAD_RMS = 9.89       # 额定相电流 RMS（S4 解析值，M5 负载工况的指令值）
+LOAD_TOLERANCE = 0.20    # 负载判据：T_avg 与 25 N·m 偏差 ±20%
+PHASE_DEG = {"A": 120.0, "B": 240.0, "C": 0.0}   # 负载电流初相（空载磁链拟合）
 TIME_SCALE = {"s": 1.0, "ms": 1e-3, "us": 1e-6, "µs": 1e-6, "ns": 1e-9}
 
 # ---- 验收基准（全部来自 S4 解析链路 projects/results/sim_summary.json）----
@@ -268,7 +272,153 @@ def _tail_after_first_period(t, vals):
     return [vals[i] for i in sel] if len(sel) > 10 else vals
 
 
-def compute(csvdir: str, turns_model: int = TURNS_MODEL_DEFAULT) -> dict:
+def commanded_current(ph: str, t: float, sign: int = -1) -> float:
+    """负载工况的指令电流 i = sign·√2·I_rms·sin(2πf·t + φ_ph)（A）。
+
+    相位来自 M4 空载磁链拟合：λ_A = 0.26610·cos(ωt+120.005°)、B = −120°、C = 0°；
+    电动需与 e = −dλ/dt **反相** ⇒ sign = −1（见 docs/MAXWELL_INTERNALS.md §11.3）。
+    """
+    rad = math.radians(PHASE_DEG[ph])
+    return sign * I_LOAD_RMS * math.sqrt(2.0) * math.sin(2 * math.pi * F_ELEC * t + rad)
+
+
+def read_native_trcrv(path: str) -> dict:
+    """解析 Maxwell 原生 `WindingX_TrCrv.txt`（电流型绕组）。
+
+    文件结构（2026-11-09 实测）：
+
+        WindingA
+          5 5                     <- 5 列 x 5 行
+          0                       <- 时间 [s]
+          -12.1128  0  0  -0.236714  0     <- i[A], 0, 0, lambda[Wb], v[V]
+
+    返回 {"t": [...], "current": [...], "flux": [...], "voltage": [...]}。
+    `voltage` 列是 dλ/dt（**不含** R·i）。报表不可用时这是唯一的兜底通道。
+    """
+    out = {"t": [], "current": [], "flux": [], "voltage": []}
+    try:
+        with io.open(path, encoding="utf-8", errors="ignore") as fh:
+            lines = [ln.strip() for ln in fh if ln.strip()]
+    except OSError:
+        return out
+    i = 2                                # 跳过名称行与 "N M" 行
+    while i + 1 < len(lines):
+        try:
+            t = float(lines[i])
+            vals = [float(x) for x in lines[i + 1].split()]
+        except ValueError:
+            break
+        if len(vals) < 5:
+            break
+        out["t"].append(t)
+        out["current"].append(vals[0])
+        out["flux"].append(vals[3])
+        out["voltage"].append(vals[4])
+        i += 2
+    return out
+
+
+def load_block(csvdir: str, bemf_rms=None, native_dir=None):
+    """M5 负载工况：转矩均值/脉动 + 电流校核 + 功率平衡自检。
+
+    判据（任务书）：`T_avg` 与 25 N·m 同量级（±20%）。
+    自检 1（电流口径）：三相电流 RMS 必须回到 9.89 A，否则说明激励表达式没生效；
+    自检 2（功率平衡）：T_avg·ω_m 应等于 3·E_rms·I_rms（同相驱动），偏差 <10%，
+                       这一条能独立抓住「电流相位错 180°」以外的相位失配。
+    """
+    p = os.path.join(csvdir, "tq_load.csv")
+    if not os.path.exists(p):
+        return None
+    t, cols = load_maxwell_csv(p)
+    key = _pick(cols, "torque")
+    if not key:
+        return None
+
+    tq = _tail_after_first_period(t, cols[key])
+    tavg = _mean(tq)
+    ripple = 100.0 * (max(tq) - min(tq)) / abs(tavg) if abs(tavg) > 1e-9 else 0.0
+    blk = {
+        "T_avg_nm": round(tavg, 4),
+        "T_min_nm": round(min(tq), 4),
+        "T_max_nm": round(max(tq), 4),
+        "T_ripple_pct": round(ripple, 3),
+        "T_rated_nm": T_RATED,
+        "vs_rated_pct": round(100.0 * (tavg - T_RATED) / T_RATED, 3),
+        "pass_20pct": bool(abs(tavg - T_RATED) <= LOAD_TOLERANCE * T_RATED),
+        "window": "last electrical period (10 ms)",
+        "n_samples": len(tq),
+    }
+
+    # ---- 电流校核 ----
+    # 主通道 cur_a|b|c.csv（整周期）；报表导不出时退回原生 `WindingX_TrCrv.txt`，
+    # 但原生文件是**环形缓冲**，只保最后 10 步（0.5 ms）⇒ 算不了 RMS，只能做
+    # 「实测 vs 指令波形」的逐点比对（同时验证幅值与相位）。
+    cur = {}
+    for ph in ("a", "b", "c"):
+        pc = os.path.join(csvdir, "cur_%s.csv" % ph)
+        if not os.path.exists(pc):
+            continue
+        tc, cc = load_maxwell_csv(pc)
+        kc = _pick(cc, "current")
+        if not kc:
+            continue
+        ig = _tail_after_first_period(tc, cc[kc])
+        cur[ph.upper()] = {"rms_a": round(math.sqrt(_mean([v * v for v in ig])), 4),
+                           "peak_a": round(max(abs(v) for v in ig), 4)}
+    if cur:
+        rms_list = [v["rms_a"] for v in cur.values()]
+        blk["currents"] = cur
+        blk["current_source"] = "cur_a|b|c.csv (full period)"
+        blk["current_rms_avg_a"] = round(_mean(rms_list), 4)
+        blk["current_balance_pct"] = round(
+            100.0 * (max(rms_list) - min(rms_list)) / _mean(rms_list), 3)
+        blk["current_commanded_rms_a"] = I_LOAD_RMS
+        blk["current_ok"] = bool(
+            abs(_mean(rms_list) - I_LOAD_RMS) <= 0.05 * I_LOAD_RMS)
+    elif native_dir:
+        dev = {}
+        for ph in ("a", "b", "c"):
+            pn = os.path.join(native_dir, "Winding%s_TrCrv.txt" % ph.upper())
+            if not os.path.exists(pn):
+                continue
+            nat = read_native_trcrv(pn)
+            if not nat["t"]:
+                continue
+            err = [abs(nat["current"][i] - commanded_current(ph.upper(), nat["t"][i]))
+                   for i in range(len(nat["t"]))]
+            dev[ph.upper()] = {
+                "samples": len(nat["t"]),
+                "t_window_ms": [round(nat["t"][0] * 1e3, 3), round(nat["t"][-1] * 1e3, 3)],
+                "max_dev_a": round(max(err), 4),
+                "max_dev_pct_of_peak": round(100.0 * max(err) / (I_LOAD_RMS * math.sqrt(2)), 3),
+                "peak_measured_a": round(max(abs(v) for v in nat["current"]), 4),
+            }
+        if dev:
+            worst = max(v["max_dev_pct_of_peak"] for v in dev.values())
+            blk["currents"] = dev
+            blk["current_source"] = "native WindingX_TrCrv.txt (ring buffer, tail 10 steps)"
+            blk["current_commanded_rms_a"] = I_LOAD_RMS
+            blk["current_waveform_dev_pct"] = round(worst, 3)
+            blk["current_ok"] = bool(worst <= 5.0)
+
+    # ---- 功率平衡：P_mech vs P_emf ----
+    if bemf_rms:
+        p_mech = tavg * W_MECH
+        p_emf = 3.0 * bemf_rms * I_LOAD_RMS
+        blk["power_balance"] = {
+            "P_mech_w": round(p_mech, 1),
+            "P_emf_w": round(p_emf, 1),
+            "dev_pct": round(100.0 * (p_mech - p_emf) / p_emf, 2) if p_emf else 0.0,
+            "pass_10pct": bool(p_emf and abs(p_mech - p_emf) <= 0.10 * p_emf),
+            "note": "P_emf = 3*E_rms*I_rms 用空载 BEMF；差值含电枢反应与齿槽",
+        }
+    # 转矩常数（按峰值电流，SPMSM 常规口径）
+    blk["Kt_nm_per_a_pk"] = round(tavg / (I_LOAD_RMS * math.sqrt(2.0)), 4)
+    return blk
+
+
+def compute(csvdir: str, turns_model: int = TURNS_MODEL_DEFAULT,
+            native_dir=None) -> dict:
     res = {"source": "ANSYS Maxwell 2D Transient (real FEA)", "csvdir": csvdir}
     have_any = False
 
@@ -348,21 +498,11 @@ def compute(csvdir: str, turns_model: int = TURNS_MODEL_DEFAULT) -> dict:
                 "pass_5pct": bool(pct <= 5.0),
             }
 
-    # ---- 负载转矩（M5 之后才有）----
-    p = os.path.join(csvdir, "tq_load.csv")
-    if os.path.exists(p):
-        t, cols = load_maxwell_csv(p)
-        key = _pick(cols, "torque")
-        if key:
-            have_any = True
-            tq = _tail_after_first_period(t, cols[key])
-            tavg = _mean(tq)
-            res["load"] = {
-                "T_avg_nm": round(tavg, 4),
-                "T_ripple_pct": round(100.0 * (max(tq) - min(tq)) / abs(tavg), 3) if tavg else 0.0,
-                "vs_analytic_pct": round(100.0 * (tavg - T_RATED) / T_RATED, 3),
-                "pass_20pct": bool(abs(tavg - T_RATED) <= 0.2 * T_RATED),
-            }
+    # ---- 负载转矩与电流（M5 之后才有）----
+    blk = load_block(csvdir, res.get("bemf_rms_phase"), native_dir)
+    if blk:
+        have_any = True
+        res["load"] = blk
 
     res["status"] = "OK" if have_any else "NO_DATA"
     if not have_any:
@@ -378,6 +518,9 @@ def main(argv=None) -> int:
     ap.add_argument("--csvdir", default=r"D:/ANSYS_Run/csv")
     ap.add_argument("--out", default=None,
                     help="默认写入 <repo>/projects/results/fea_results.json")
+    ap.add_argument("--native-dir", default=None,
+                    help="工程 .aedtresults/<Design>.results/<DV*.Data> 目录；"
+                         "报表导不出电流时从这里读 WindingX_TrCrv.txt")
     ap.add_argument("--turns-model", type=int, default=TURNS_MODEL_DEFAULT,
                     help="Maxwell 模型中每相串联匝数（默认 %d），用于折算到设计匝数"
                          % TURNS_MODEL_DEFAULT)
@@ -391,7 +534,7 @@ def main(argv=None) -> int:
     if os.path.dirname(out):
         os.makedirs(os.path.dirname(out), exist_ok=True)
 
-    res = compute(args.csvdir, turns_model=args.turns_model)
+    res = compute(args.csvdir, turns_model=args.turns_model, native_dir=args.native_dir)
     with io.open(out, "w", encoding="utf-8") as fh:
         json.dump(res, fh, indent=2, ensure_ascii=False)
     sys.stdout.write(json.dumps(res, indent=2, ensure_ascii=False) + "\n")

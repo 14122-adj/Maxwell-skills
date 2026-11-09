@@ -35,6 +35,18 @@ build_m4_solve.py — 25 N·m 8p12s SPMSM 的**可求解** Maxwell 2D 模型 + M
 运行
 ----
   "ansysedt.exe" -RunScriptAndExit "D:/ANSYS_Run/m4_build_solve.py"
+
+  工况由环境变量 `MAXWELL_CASE` 切换（2026-11-09 新增 M5 负载）：
+    （不设）      M4 空载：绕组 0A，导出 tq_noload.csv / flux_a|b|c.csv
+    MAXWELL_CASE=load  M5 负载：三相 9.89 A 正弦，导出 tq_load.csv / cur_* / flux_load_*
+
+  为什么负载工况也必须**从零重建**而不是改已完成工程的绕组电流：
+  2026-11-09 实测，对已求解工程调用 `EditWindingGroup` 改电流后，设计进入
+  "Solutions have been invalidated" 状态，`Analyze` 能跑完（304 s）但解不落盘
+  （`.aedtresults` 里只有试算段 10 步），`CreateReport` 建得出报告、`ExportToFile`
+  却只写表头。对照实验：同一导出代码对未编辑的 `M5_25Nm.aedt` 得 401 行 ⇒ 通道没问题，
+  是**工程状态**问题。故负载工况走全新设计（本脚本），一次跑通。
+
   注意：不带 -ng；oDesktop 由 AEDT 预注入；本文件必须是 IronPython 2.7 语法。
 """
 import math
@@ -42,8 +54,18 @@ import os
 import time
 import traceback
 
-LOG = r"D:/ANSYS_Run/m4_build_solve_progress.log"
-AEDT_OUT = r"D:/ANSYS_Run/M5_25Nm.aedt"
+# ---------------- 工况切换 ----------------
+#   MAXWELL_CASE={noload|load}   MAXWELL_SIGN={+1|-1}（仅负载，电流相位符号）
+CASE = os.environ.get("MAXWELL_CASE", "noload").strip().lower()
+LOAD = CASE.startswith("load")
+SIGN = int(os.environ.get("MAXWELL_SIGN", "-1"))
+
+if LOAD:
+    LOG = r"D:/ANSYS_Run/m5_load_build_progress.log"
+    AEDT_OUT = r"D:/ANSYS_Run/M5_load_25Nm.aedt"
+else:
+    LOG = r"D:/ANSYS_Run/m4_build_solve_progress.log"
+    AEDT_OUT = r"D:/ANSYS_Run/M5_25Nm.aedt"
 CSVDIR = r"D:/ANSYS_Run/csv"
 
 # ---------------- 设计常量（与 DESIGN_PROGRESS 冻结值一致） ----------------
@@ -82,8 +104,21 @@ TURNS_PER_PHASE = 2 * TURNS_PER_COIL
 MODEL_DEPTH = "160mm"
 STOP_FULL = "0.0200s"
 STEP = "0.000050s"
-STOP_TRIAL = "0.0002s"
+STOP_TRIAL = "0.0010s" if LOAD else "0.0002s"
 NSEG_PM = 24
+
+# ---------------- 负载工况（M5）----------------
+# 电流相位来自 M4 空载磁链的最小二乘基波拟合（2026-11-09，第二电周期）：
+#   lambda_A = 0.26610*cos(wt+120.005°)、B = -119.998°、C = 0.013°
+# ⇒ |λ| 峰值 0.26610 Wb、e_A 正弦初相 120°（= -dλ/dt 的 sin 形式相位）。
+# 几何自洽：t=0 时 N 极在 0°、相 A 线圈轴 15° 机械 = 60° 电角，cos60° = 0.5。
+# 电动化 = 电流与 e **反相**（能量法 T·ω = -avg(i·e)），由 SIGN 控制；
+# 9.89 A 时 Σv·i = 3×116.8×11.9 ≈ 4.2 kW > 0，即从电源吸收功率 ⇒ 电动而非制动。
+I_RMS = 9.89
+I_PEAK = I_RMS * math.sqrt(2.0)      # 13.9867 A
+F_ELEC = 100.0                       # 8 极 @ 1500 rpm
+PHASE_DEG = {"A": 120.0, "B": 240.0, "C": 0.0}
+R_PHASE = "0.47227ohm"               # 相电阻（S9 反标定值；电流型绕组只影响报出的电压）
 
 _L = []
 
@@ -107,6 +142,22 @@ def step(label, fn):
     except Exception:
         log("FAIL %s :: %s" % (label, traceback.format_exc().splitlines()[-1]))
         return None
+
+
+def cur_expr(ph):
+    """绕组电流表达式（A）。`Time` 是 Maxwell 表达式的时间变量，单位**秒**。
+
+    空载返回 "0A"；负载返回 SIGN*I_pk*sin(2πf·Time+φ)。
+    2026-11-09 实测：把 `Current` 设成 `Time` 的函数后，原生 `WindingA_TrCrv.txt`
+    第 1 列立刻回读为 -12.1128 A（= -13.9866·sin120°，与表达式逐位一致）⇒ 变量名与
+    单位口径正确。
+    """
+    if not LOAD:
+        return "0A"
+    rad = math.radians(PHASE_DEG[ph])
+    body = "%.4f*sin(2*pi*%g*Time%s)" % (I_PEAK, F_ELEC,
+                                        ("+%.6f" % rad) if abs(rad) > 1e-9 else "")
+    return body if SIGN > 0 else "-" + body
 
 
 def polygon_area(pts):
@@ -324,7 +375,8 @@ def main():
     for ph in ("A", "B", "C"):
         step("WindingGroup " + ph, lambda p=ph: oBnd.AssignWindingGroup(
             ["NAME:Winding" + p, "Type:=", "Current", "IsSolid:=", False,
-             "Current:=", "0A", "Resistance:=", "0.1ohm", "Inductance:=", "0.001H",
+             "Current:=", cur_expr(p),
+             "Resistance:=", R_PHASE if LOAD else "0.1ohm", "Inductance:=", "0.001H",
              "Voltage:=", "0V", "ParallelBranchesNum:=", "1"]))
     for k in range(1, 13):
         ph = "ABC"[((k - 1) // 2) % 3]
@@ -422,68 +474,20 @@ def main():
 
     # ------------------------------------------------ 求解设置
     oAnaly = oDesign.GetModule("AnalysisSetup")
+    # 负载工况试算要存场：`Moving1.Torque` 与 `FluxLinkage` 报表都依赖已保存的场
+    # （2026-11-09：试算 SaveFieldsType="None" 时导出只有表头）。
+    TRIAL_FIELDS = ("Every N Steps", 1) if LOAD else ("None", 1)
     step("InsertSetup Setup1", lambda: oAnaly.InsertSetup(
         "Transient",
         ["NAME:Setup1", "StopTime:=", STOP_TRIAL, "TimeStep:=", STEP,
-         "SaveFieldsType:=", "None", "N:=", "1",
+         "SaveFieldsType:=", TRIAL_FIELDS[0], "N:=", str(TRIAL_FIELDS[1]),
          "UseAdaptiveTimeStep:=", False, "NonlinearSolverResidual:=", "0.0001",
          "SmoothBHCurve:=", False]))
 
     oProject.SaveAs(AEDT_OUT, True)
     log("SAVED " + AEDT_OUT)
 
-    # ------------------------------------------------ 试算 4 步
-    log("=== trial solve 4 steps ===")
-    t0 = time.time()
-    trial = step("Analyze trial", lambda: (oDesign.Analyze("Setup1"), True)[1])
-    log("trial elapsed %.1fs" % (time.time() - t0))
-    if not trial:
-        log("trial solve failed -> keep project, skip full run")
-        step("save partial", lambda: oProject.Save())
-        log("=== end (trial failed) ===")
-        return
-
-    # ------------------------------------------------ 全时长求解
-    log("=== full solve %s / %s ===" % (STOP_FULL, STEP))
-    step("EditSetup full", lambda: oAnaly.EditSetup(
-        "Setup1",
-        ["NAME:Setup1", "StopTime:=", STOP_FULL, "TimeStep:=", STEP,
-         "SaveFieldsType:=", "Every N Steps", "N:=", "2",
-         "UseAdaptiveTimeStep:=", False, "NonlinearSolverResidual:=", "0.0001",
-         "SmoothBHCurve:=", False]))
-    # EditSetup 之后运动带理论上保留，但它是最容易静默丢失的一项（M3 就丢过一次）。
-    # 读回校验是廉价保险：有就留着，没有才补挂；补挂复用上面验证过的变体链。
-    def band_names():
-        try:
-            return list(oDesign.GetModule("ModelSetup").GetMotionSetupNames())
-        except Exception:
-            return []
-
-    def ensure_band():
-        got = band_names()
-        if got:
-            return "kept %r" % (got,)
-        for label, v in BAND_VARIANTS:
-            try:
-                oDesign.GetModule("ModelSetup").AssignBand(
-                    ["NAME:BandData"] + [x for pair in v for x in pair]
-                    + ["Objects:=", ["Band"]])
-                return "assigned via " + label
-            except Exception:
-                continue
-        raise Exception("no motion setup and every band variant failed")
-
-    log("motion setups before full solve: %r" % (band_names(),))
-    log("ensure band -> %r" % (step("ensure band", ensure_band),))
-
-    t0 = time.time()
-    step("Analyze full", lambda: oDesign.Analyze("Setup1"))
-    log("full elapsed %.1fs" % (time.time() - t0))
-    log("motion setups after solve: %r" % (band_names(),))
-    # 全时长解只活在进程内存里，先存盘再导出：导出再出岔子也不用重跑 400 s。
-    step("save after solve", lambda: oProject.Save())
-
-    # ------------------------------------------------ 导出 CSV
+    # ------------------------------------------------ 报告导出工具（试算 / 全时长共用）
     # 2026-11-08 实测：`CreateReport` 只有下面这一种写法在**批处理**下可用，
     # 其余 144 种组合（reportType="Transient"、`["Domain:=","Sweep"]` 形式的 ctx、
     # `[expr+":=",["None","None","None"]]` 形式的 trace 等）一律 `call failed`。
@@ -527,18 +531,173 @@ def main():
             rep.ExportToFile(name, CSVDIR + "/" + fname, True)
         return "%s (%d rows)" % (fname, data_rows(CSVDIR + "/" + fname))
 
-    log("export tq -> %s"
-        % (step("export tq_noload", lambda: export("Tq", "Moving1.Torque", "tq_noload.csv")),))
-    # 电流型绕组（WindingGroup Type="Current"）**没有** `WindingA.Voltage` 输出，
-    # 空载反电势只能由磁链对时间求导得到：e = −dλ/dt（见 ingest_fea.py）。
-    for ph in ("A", "B", "C"):
-        log("export flux_%s -> %s"
-            % (ph.lower(), step("export flux_" + ph.lower(),
-                                lambda p=ph: export("Flux" + p, "FluxLinkage(Winding" + p + ")",
-                                                    "flux_" + p.lower() + ".csv"))))
+    def native_data_dir():
+        """最新的 `<proj>.aedtresults/<Design>.results/*.Data` 目录。"""
+        base = AEDT_OUT + "results"
+        best = None
+        try:
+            des = os.listdir(base)
+        except Exception:
+            return None
+        for d in des:
+            p = os.path.join(base, d)
+            if not os.path.isdir(p):
+                continue
+            try:
+                subs = os.listdir(p)
+            except Exception:
+                continue
+            for s in subs:
+                if s.endswith(".Data"):
+                    q = os.path.join(p, s)
+                    m = os.path.getmtime(q)
+                    if best is None or m > best[0]:
+                        best = (m, q)
+        return best[1] if best else None
+
+    def winding_cols(path):
+        """解析 `WindingX_TrCrv.txt` -> (times, currents, fluxes, volts)。
+
+        格式（2026-11-09 实测）：名字行 / `  5 5` / 之后每步两行（时间、5 个数值）。
+        5 个数值依次是 i[A], 0, 0, lambda[Wb], v[V]（v = dλ/dt，不含 R·i）。
+        """
+        times, cur, flux, volt = [], [], [], []
+        try:
+            fh = open(path)
+            lines = [ln.strip() for ln in fh if ln.strip()]
+            fh.close()
+        except Exception:
+            return (times, cur, flux, volt)
+        i = 2
+        while i + 1 < len(lines):
+            try:
+                t = float(lines[i])
+                vals = [float(x) for x in lines[i + 1].split()]
+            except ValueError:
+                break
+            if len(vals) < 5:
+                break
+            times.append(t)
+            cur.append(vals[0])
+            flux.append(vals[3])
+            volt.append(vals[4])
+            i += 2
+        return (times, cur, flux, volt)
+
+    def trial_power():
+        """三相 Σv·i（时间平均）> 0 ⇒ 绕组从电源吸收功率 ⇒ 电动、转矩为正。"""
+        d = native_data_dir()
+        log("native data dir = %r" % (d,))
+        if not d:
+            return "no .Data dir"
+        total = 0.0
+        detail = []
+        for ph in ("A", "B", "C"):
+            p = os.path.join(d, "Winding" + ph + "_TrCrv.txt")
+            times, cur, flux, volt = winding_cols(p)
+            if not times:
+                return "Winding" + ph + "_TrCrv.txt unreadable"
+            n = len(times)
+            mean_p = sum([volt[k] * cur[k] for k in range(n)]) / n
+            total += mean_p
+            detail.append("%s:i0=%.3fA,P=%.0fW" % (ph, cur[0], mean_p))
+        verdict = "MOTORING (T>0)" if total > 0 else "BRAKING (T<0) -> 改 MAXWELL_SIGN"
+        return "Σv·i=%.0fW [%s] -> %s" % (total, ", ".join(detail), verdict)
+
+    # ------------------------------------------------ 试算
+    log("=== trial solve (%s) ===" % STOP_TRIAL)
+    t0 = time.time()
+    trial = step("Analyze trial", lambda: (oDesign.Analyze("Setup1"), True)[1])
+    log("trial elapsed %.1fs" % (time.time() - t0))
+    if not trial:
+        log("trial solve failed -> keep project, skip full run")
+        step("save partial", lambda: oProject.Save())
+        log("=== end (trial failed) ===")
+        return
+
+    # ------------------------------------------------ 负载试算判号（1 ms / 20 步）
+    # 空载时试算只为验证可解；负载时必须确认「电流生效」且「方向是电动」。
+    #
+    # **不要用报表判号**（2026-11-09 实测）：试算后 `export("TqTrial", ...)` 会把
+    # `Moving1.Torque` 这个后处理量与**试算解**绑定，之后全时长求解完再建 `TqLoad`，
+    # 导出的仍是**试算段 21 行**（0–1 ms），而同一解的 `FluxLinkage` 却是 401 行。
+    # M4 之所以没事，是因为它试算后没有做任何导出。
+    # 正确判据走原生数据：`WindingX_TrCrv.txt` 第 1 列电流、第 5 列电压(λ̇)，
+    # 三相 Σv·i > 0 即从电源吸收功率 ⇒ 电动。
+    if LOAD:
+        log("trial currents: A=%s B=%s C=%s" % (cur_expr("A"), cur_expr("B"), cur_expr("C")))
+        log("trial power check -> %s" % (step("trial power", trial_power),))
+        step("save after trial", lambda: oProject.Save())
+
+    # ------------------------------------------------ 全时长求解
+    log("=== full solve %s / %s ===" % (STOP_FULL, STEP))
+    step("EditSetup full", lambda: oAnaly.EditSetup(
+        "Setup1",
+        ["NAME:Setup1", "StopTime:=", STOP_FULL, "TimeStep:=", STEP,
+         "SaveFieldsType:=", "Every N Steps", "N:=", "2",
+         "UseAdaptiveTimeStep:=", False, "NonlinearSolverResidual:=", "0.0001",
+         "SmoothBHCurve:=", False]))
+    # EditSetup 之后运动带理论上保留，但它是最容易静默丢失的一项（M3 就丢过一次）。
+    # 读回校验是廉价保险：有就留着，没有才补挂；补挂复用上面验证过的变体链。
+    def band_names():
+        try:
+            return list(oDesign.GetModule("ModelSetup").GetMotionSetupNames())
+        except Exception:
+            return []
+
+    def ensure_band():
+        got = band_names()
+        if got:
+            return "kept %r" % (got,)
+        for label, v in BAND_VARIANTS:
+            try:
+                oDesign.GetModule("ModelSetup").AssignBand(
+                    ["NAME:BandData"] + [x for pair in v for x in pair]
+                    + ["Objects:=", ["Band"]])
+                return "assigned via " + label
+            except Exception:
+                continue
+        raise Exception("no motion setup and every band variant failed")
+
+    log("motion setups before full solve: %r" % (band_names(),))
+    log("ensure band -> %r" % (step("ensure band", ensure_band),))
+
+    t0 = time.time()
+    step("Analyze full", lambda: oDesign.Analyze("Setup1"))
+    log("full elapsed %.1fs" % (time.time() - t0))
+    log("motion setups after solve: %r" % (band_names(),))
+    # 全时长解只活在进程内存里，先存盘再导出：导出再出岔子也不用重跑 400 s。
+    step("save after solve", lambda: oProject.Save())
+
+    # ------------------------------------------------ 导出 CSV
+    # ------------------------------------------------ 导出 CSV（全时长解）
+    if LOAD:
+        log("export tq_load -> %s"
+            % (step("export tq_load",
+                    lambda: export("TqLoad", "Moving1.Torque", "tq_load.csv")),))
+        # 电流**不**导报表：`WindingX.Current` 在电流型绕组下不存在（实测返回 -1 行，
+        # 连文件都不生成）。电流走原生 `WindingX_TrCrv.txt` 第 1 列，由 ingest_fea.py
+        # 的 `--native-dir` 读取（见 docs/MAXWELL_INTERNALS.md §11.4）。
+        for ph in ("A", "B", "C"):
+            log("export flux_load_%s -> %s"
+                % (ph.lower(), step("export flux_load_" + ph.lower(),
+                                    lambda p=ph: export("FluxLoad" + p,
+                                                        "FluxLinkage(Winding" + p + ")",
+                                                        "flux_load_" + p.lower() + ".csv"))))
+    else:
+        log("export tq -> %s"
+            % (step("export tq_noload",
+                    lambda: export("Tq", "Moving1.Torque", "tq_noload.csv")),))
+        # 电流型绕组（WindingGroup Type="Current"）**没有** `WindingA.Voltage` 输出，
+        # 空载反电势只能由磁链对时间求导得到：e = −dλ/dt（见 ingest_fea.py）。
+        for ph in ("A", "B", "C"):
+            log("export flux_%s -> %s"
+                % (ph.lower(), step("export flux_" + ph.lower(),
+                                    lambda p=ph: export("Flux" + p, "FluxLinkage(Winding" + p + ")",
+                                                        "flux_" + p.lower() + ".csv"))))
     step("save project", lambda: oProject.Save())
 
-    log("=== build_m4_solve end ===")
+    log("=== build_m4_solve end (case=%s) ===" % CASE)
 
 
 main()

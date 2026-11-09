@@ -197,6 +197,138 @@ class TestFluxPath:
         assert res["bemf_rms_phase_at_design_turns"] == pytest.approx(res["bemf_rms_phase"])
 
 
+class TestLoadBlock:
+    """M5 负载工况回填：转矩均值、电流口径校核、功率平衡自检。"""
+
+    N = 401
+
+    def _grid(self):
+        return [i * 0.020 / (self.N - 1) for i in range(self.N)]     # 20 ms = 2 电周期
+
+    def _write(self, tmp_path, tq_nm, i_rms=9.89):
+        t = self._grid()
+        _write_csv(tmp_path / "tq_load.csv", [ti * 1e3 for ti in t],
+                   {"Moving1.Torque": [tq_nm] * len(t)}, col_unit="NewtonMeter")
+        i_pk = i_rms * math.sqrt(2.0)
+        w = 2 * math.pi * 100.0
+        for k, ph in enumerate("abc"):
+            _write_csv(tmp_path / ("cur_%s.csv" % ph), [ti * 1e3 for ti in t],
+                       {"Winding%s.Current" % ph.upper():
+                        [i_pk * math.sin(w * ti - 2.0944 * k) for ti in t]},
+                       col_unit="A")
+
+    def test_torque_mean_and_pass_flag(self, ing, tmp_path):
+        self._write(tmp_path, 22.0)
+        blk = ing.load_block(str(tmp_path), bemf_rms=118.88)
+        assert blk["T_avg_nm"] == pytest.approx(22.0, abs=1e-6)
+        assert blk["vs_rated_pct"] == pytest.approx(-12.0, abs=1e-6)
+        assert blk["pass_20pct"] is True
+        assert blk["T_ripple_pct"] == pytest.approx(0.0, abs=1e-6)
+
+    def test_under_torque_fails_criterion(self, ing, tmp_path):
+        self._write(tmp_path, 15.0)
+        blk = ing.load_block(str(tmp_path), bemf_rms=118.88)
+        assert blk["pass_20pct"] is False
+        assert blk["vs_rated_pct"] == pytest.approx(-40.0, abs=1e-6)
+
+    def test_current_rms_readback(self, ing, tmp_path):
+        self._write(tmp_path, 22.0, i_rms=9.89)
+        blk = ing.load_block(str(tmp_path))
+        assert blk["current_rms_avg_a"] == pytest.approx(9.89, rel=5e-3)
+        assert blk["current_ok"] is True
+        assert blk["current_balance_pct"] < 1.0
+
+    def test_current_mismatch_flagged(self, ing, tmp_path):
+        """激励未生效时电流不是指令值，必须被 current_ok 抓到。"""
+        self._write(tmp_path, 22.0, i_rms=5.0)
+        blk = ing.load_block(str(tmp_path))
+        assert blk["current_ok"] is False
+
+    def test_power_balance(self, ing, tmp_path):
+        self._write(tmp_path, 22.0)
+        blk = ing.load_block(str(tmp_path), bemf_rms=118.88)
+        pb = blk["power_balance"]
+        assert pb["P_mech_w"] == pytest.approx(22.0 * ing.W_MECH, rel=1e-4)   # 落盘 1 位小数
+        assert pb["P_emf_w"] == pytest.approx(3 * 118.88 * 9.89, rel=1e-4)
+        assert pb["pass_10pct"] is True            # 实测偏差约 -2%
+
+    def test_power_balance_detects_phase_error(self, ing, tmp_path):
+        """电流相位失配 → P_mech 远小于 P_emf，功率平衡必须判失败。"""
+        self._write(tmp_path, 5.0)
+        blk = ing.load_block(str(tmp_path), bemf_rms=118.88)
+        assert blk["power_balance"]["pass_10pct"] is False
+
+    def test_kt_from_peak_current(self, ing, tmp_path):
+        self._write(tmp_path, 22.0)
+        blk = ing.load_block(str(tmp_path))
+        assert blk["Kt_nm_per_a_pk"] == pytest.approx(22.0 / (9.89 * math.sqrt(2)), rel=1e-4)
+
+    def test_missing_tq_load_returns_none(self, ing, tmp_path):
+        assert ing.load_block(str(tmp_path)) is None
+
+
+class TestNativeTrCrv:
+    """报表导不出电流时的兜底通道：原生 `WindingX_TrCrv.txt`。"""
+
+    @staticmethod
+    def _write_native(path, t, current, flux=None, volt=None):
+        lines = [path.stem.split("_")[0], "  5 5"]
+        for i, ti in enumerate(t):
+            lam = flux[i] if flux else 0.0
+            v = volt[i] if volt else 0.0
+            lines.append(repr(float(ti)))
+            lines.append("  %.6g  0  0  %.6g  %.6g" % (current[i], lam, v))
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def test_parse_columns(self, ing, tmp_path):
+        p = tmp_path / "WindingA_TrCrv.txt"
+        self._write_native(p, [0.0, 5e-5], [-12.1128, -11.8871],
+                           [-0.236714, -0.242555], [0.0, -116.815])
+        nat = ing.read_native_trcrv(str(p))
+        assert nat["t"] == pytest.approx([0.0, 5e-5])
+        assert nat["current"][0] == pytest.approx(-12.1128)
+        assert nat["flux"][1] == pytest.approx(-0.242555)
+        assert nat["voltage"][1] == pytest.approx(-116.815)
+
+    def test_truncated_file_stops_cleanly(self, ing, tmp_path):
+        p = tmp_path / "WindingA_TrCrv.txt"
+        p.write_text("WindingA\n  5 5\n0\n-12.1 0 0 -0.23 0\n5e-05\n", encoding="utf-8")
+        nat = ing.read_native_trcrv(str(p))
+        assert len(nat["t"]) == 1
+
+    def test_load_block_reads_currents_from_native(self, ing, tmp_path):
+        """原生 TrCrv 是环形缓冲（只保最后 10 步）：做「实测 vs 指令」逐点比对。"""
+        n = 401
+        t = [i * 0.020 / (n - 1) for i in range(n)]
+        _write_csv(tmp_path / "tq_load.csv", [ti * 1e3 for ti in t],
+                   {"Moving1.Torque": [22.0] * n}, col_unit="NewtonMeter")
+        d = tmp_path / "DV42_SOL41_V0.Data"
+        d.mkdir()
+        tail = t[-10:]
+        for ph in "ABC":
+            self._write_native(d / ("Winding%s_TrCrv.txt" % ph), tail,
+                               [ing.commanded_current(ph, ti) for ti in tail])
+        blk = ing.load_block(str(tmp_path), bemf_rms=118.88, native_dir=str(d))
+        assert blk["current_source"].startswith("native")
+        assert blk["current_waveform_dev_pct"] == pytest.approx(0.0, abs=1e-6)
+        assert blk["current_ok"] is True
+
+    def test_native_detects_phase_error(self, ing, tmp_path):
+        """电流相位错 180°（写成与 BEMF 同相）必须被抓出来。"""
+        n = 401
+        t = [i * 0.020 / (n - 1) for i in range(n)]
+        _write_csv(tmp_path / "tq_load.csv", [ti * 1e3 for ti in t],
+                   {"Moving1.Torque": [22.0] * n}, col_unit="NewtonMeter")
+        d = tmp_path / "DV42_SOL41_V0.Data"
+        d.mkdir()
+        tail = t[-10:]
+        for ph in "ABC":
+            self._write_native(d / ("Winding%s_TrCrv.txt" % ph), tail,
+                               [ing.commanded_current(ph, ti, sign=+1) for ti in tail])
+        blk = ing.load_block(str(tmp_path), native_dir=str(d))
+        assert blk["current_ok"] is False
+
+
 class TestCompute:
     def test_three_phase_balance_and_cogging(self, ing, tmp_path):
         f = ing.F_ELEC
