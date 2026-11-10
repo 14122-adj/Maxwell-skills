@@ -3,10 +3,12 @@
 """
 生成 25N·m SPMSM 工程报告：
   1) 电机二维截面图 (matplotlib)
-  2) 各仿真结果图表
-  3) 自包含 HTML 报告（内嵌 base64 图 + 表 + pass/fail）
-读取 results/sim_summary.json 与 results/*.csv
+  2) 各仿真结果图表（解析链路）
+  3) Maxwell 2D FEA 实测图表与交叉校验表（M6：读 results/fea_results.json + results/fea/*.csv）
+  4) 自包含 HTML 报告（内嵌 base64 图 + 表 + pass/fail）
+读取 results/sim_summary.json、results/fea_results.json 与 results/*.csv
 """
+import datetime
 import os
 import sys
 import json
@@ -35,9 +37,16 @@ except ModuleNotFoundError as exc:  # 环境缺包：给中文可读提示，不
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = os.path.abspath(os.path.join(HERE, "..", "results"))  # projects/results
 FIG = os.path.join(RES, "figures")
+FEA_JSON = os.path.join(RES, "fea_results.json")            # ingest_fea.py 回填产物
+FEA_CSV = os.path.join(RES, "fea")                          # Maxwell 导出波形（ASCII）
 os.makedirs(FIG, exist_ok=True)
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, "..", "..", "scripts")))
-import pmsm_config as C
+sys.path.insert(0, HERE)
+import pmsm_config as C  # noqa: E402  (sys.path 追加后才能导入)
+try:                       # 复用零依赖的 Maxwell CSV 解析（表头 + 单位行 + 数据块）
+    import ingest_fea as IF  # noqa: E402  同目录复用零依赖 CSV 解析
+except ImportError:        # pragma: no cover - 同目录文件缺失时才触发
+    IF = None
 
 # 主题色（暗色）
 BG = "#0f1419"
@@ -209,7 +218,287 @@ def chart_demag():
     return fig_to_b64(fig, "demag.png")
 
 
-def build_html(res, figs):
+# ───────────── Maxwell 2D FEA（M4 空载 / M5 负载） ─────────────
+def load_fea():
+    """读 results/fea_results.json；缺失或未跑通时返回 None（报告自动降级为解析版）。"""
+    if not os.path.exists(FEA_JSON):
+        return None
+    try:
+        with open(FEA_JSON, encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return d if d.get("status") == "OK" else None
+
+
+def _fea_series(stem, needle):
+    """读 results/fea/<stem>.csv → (t[s], series)；列名含 needle 的列被选中。
+
+    解析复用 `ingest_fea.load_maxwell_csv`：它按「表头 + 单位行 + 数据块」取数，
+    并按单位行把时间换算成秒（Maxwell 可能给 `Time [us]` / `[ms]`），此处不再重复。
+    """
+    if IF is None:
+        return None
+    path = os.path.join(FEA_CSV, stem + ".csv")
+    if not os.path.exists(path):
+        return None
+    try:
+        t, cols = IF.load_maxwell_csv(path)
+    except ValueError:
+        return None
+    for k in cols:
+        if needle in k.lower():
+            return t, cols[k]
+    return None
+
+
+def _legend_style(ax):
+    leg = ax.legend(fontsize=7, frameon=False, loc="upper right")
+    for txt in leg.get_texts():
+        txt.set_color(TXT)
+    return leg
+
+
+def chart_fea_bemf(fea):
+    """三相空载反电势：电流型绕组无 Voltage，只有磁链 ⇒ e = −dλ/dt（M4 实测口径）。"""
+    fig, ax = plt.subplots(figsize=(7.4, 3.2))
+    style_ax(ax)
+    plotted = False
+    for ph, col in (("a", ACCENT), ("b", GREEN), ("c", AMBER)):
+        got = _fea_series("flux_" + ph, "flux")
+        if not got:
+            continue
+        t, lam = got
+        ax.plot([x * 1e3 for x in t], IF.flux_to_bemf(t, lam),
+                color=col, lw=1.2, label="Phase %s" % ph.upper())
+        plotted = True
+    if not plotted:
+        plt.close(fig)
+        return None
+    ax.axhline(0, color=GRID, lw=0.6)
+    ax.set_xlabel("Time (ms)")
+    ax.set_ylabel("EMF (V)")
+    ax.set_title("FEA No-Load Back-EMF (3-phase)")
+    ax.grid(True, color=GRID, lw=0.5)
+    _legend_style(ax)
+    if fea:
+        rms = fea.get("bemf_rms_phase")
+        turns = (fea.get("turns") or {}).get("model_per_phase")
+        if rms:
+            label = "phase RMS %.2f V" % rms
+            if turns:
+                label += " @ %d turns" % turns
+            ax.text(0.01, 0.06, label, transform=ax.transAxes,
+                    color="#8a98a8", fontsize=7,
+                    bbox=dict(boxstyle="round,pad=0.2", fc=PANEL, ec="none"))
+    return fig_to_b64(fig, "fea_bemf.png")
+
+
+def chart_fea_torque(fea):
+    """左：满负载转矩（9.89 A rms）；右：空载齿槽转矩（含 ±5% 额定判据带）。"""
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(8.6, 3.1))
+    style_ax(a1)
+    style_ax(a2)
+
+    got = _fea_series("tq_load", "torque")
+    if got:
+        t, tq = got
+        a1.plot([x * 1e3 for x in t], tq, color=GREEN, lw=1.2)
+        blk = (fea or {}).get("load") or {}
+        if blk:
+            a1.axhline(blk["T_avg_nm"], color=RED, ls="--", lw=0.9)
+            a1.text(0.98, 0.06, "T_avg %.2f N·m" % blk["T_avg_nm"],
+                    transform=a1.transAxes, ha="right", color=RED, fontsize=7,
+                    bbox=dict(boxstyle="round,pad=0.2", fc=PANEL, ec="none"))
+        a1.set_xlabel("Time (ms)")
+        a1.set_ylabel("Torque (N·m)")
+        a1.set_title("FEA Load Torque (9.89 A rms)")
+        a1.grid(True, color=GRID, lw=0.5)
+    else:
+        a1.text(0.5, 0.5, "no load-torque data", ha="center", va="center",
+                transform=a1.transAxes, color="#8a98a8", fontsize=9)
+        a1.set_title("FEA Load Torque (unavailable)")
+
+    got = _fea_series("tq_noload", "torque")
+    if got:
+        t, tq = got
+        a2.plot([x * 1e3 for x in t], tq, color=AMBER, lw=1.2)
+        band = 0.05 * 25.0
+        a2.axhline(band, color=RED, ls=":", lw=0.9)
+        a2.axhline(-band, color=RED, ls=":", lw=0.9)
+        cg = (fea or {}).get("cogging") or {}
+        if cg:
+            a2.text(0.02, 0.06, "ptp %.2f N·m = %.1f%% rated"
+                    % (cg["peak_to_peak_nm"], cg["pct_of_rated"]),
+                    transform=a2.transAxes, color=RED, fontsize=7,
+                    bbox=dict(boxstyle="round,pad=0.2", fc=PANEL, ec="none"))
+        a2.set_xlabel("Time (ms)")
+        a2.set_ylabel("Torque (N·m)")
+        a2.set_title("FEA Cogging Torque (no-load)")
+        a2.grid(True, color=GRID, lw=0.5)
+        a2.text(0.98, 0.06, "dotted = ±5% rated", transform=a2.transAxes,
+                ha="right", color="#8a98a8", fontsize=7,
+                bbox=dict(boxstyle="round,pad=0.2", fc=PANEL, ec="none"))
+    else:
+        a2.text(0.5, 0.5, "no cogging data", ha="center", va="center",
+                transform=a2.transAxes, color="#8a98a8", fontsize=9)
+        a2.set_title("FEA Cogging Torque (unavailable)")
+    return fig_to_b64(fig, "fea_torque.png")
+
+
+def chart_fea_cogging_spectrum():
+    """齿槽转矩频谱：标注理论齿槽基频 LCM(12,8)×f_mech = 600 Hz。"""
+    got = _fea_series("tq_noload", "torque")
+    if not got:
+        return None
+    t, tq = got
+    y = np.asarray(tq, dtype=float)
+    y = y - y.mean()
+    n = len(y)
+    if n < 16:
+        return None
+    dt = (t[-1] - t[0]) / (n - 1)
+    amp = 2.0 * np.abs(np.fft.rfft(y)) / n
+    freq = np.fft.rfftfreq(n, d=dt)
+
+    fig, ax = plt.subplots(figsize=(6.4, 3.0))
+    style_ax(ax)
+    ax.plot(freq, amp, color=AMBER, lw=1.2)
+    f_cog = float(math.lcm(C.SLOTS, C.POLES)) * C.RATED_SPEED_RPM / 60.0
+    if freq[-1] >= f_cog:
+        i = int(np.argmin(np.abs(freq - f_cog)))
+        ax.axvline(f_cog, color=RED, ls="--", lw=0.8)
+        ax.annotate("%.0f Hz (LCM·f_mech)" % f_cog, xy=(f_cog, amp[i]),
+                    xytext=(6, 6), textcoords="offset points",
+                    color=RED, fontsize=7)
+        ax.set_xlim(0, 2.5 * f_cog)   # 2.5× 齿槽基频足够覆盖 600/1200 两族，且避开 FFT 边界伪峰
+    ax.set_xlabel("Frequency (Hz)")
+    ax.set_ylabel("Amplitude (N·m)")
+    ax.set_title("FEA Cogging Torque Spectrum")
+    ax.grid(True, color=GRID, lw=0.5)
+    return fig_to_b64(fig, "fea_cogging_spec.png")
+
+
+def fea_kpi(fea):
+    """首屏 KPI 追加一格 FEA 平均转矩；无 FEA 数据时为空串。"""
+    blk = (fea or {}).get("load") or {}
+    if not blk:
+        return ""
+    return ('<div><div class="v">%.2f</div><div class="l">FEA 平均转矩 N·m</div></div>'
+            % blk["T_avg_nm"])
+
+
+def build_fea_section(res, fea, figs):
+    """§11 Maxwell 2D FEA 实测交叉校验：解析 vs FEA 逐项对照 + 波形 + 口径说明。"""
+    head = ('<div class="card"><h2 style="margin-top:0">'
+            '11. Maxwell 2D FEA 实测交叉校验（M4 空载 / M5 负载）</h2>')
+    if fea is None:
+        return head + (
+            '<div class="note">未找到 <code>projects/results/fea_results.json</code>'
+            '（或其中 <code>status</code> 非 <code>OK</code>），本节降级为空，'
+            '上表数值仅为解析结果。恢复路径：在 Maxwell 中跑 '
+            '<code>maxwell/m4_build_solve.py</code> → <code>export_m4_csv.py</code> → '
+            '<code>ingest_fea.py --native-dir …</code> 回填后重出报告。</div></div>')
+
+    def stat(ok, warn=False):
+        if warn:
+            return '<span style="color:%s">⚠ 警示</span>' % AMBER
+        return ('<span style="color:%s">✅ PASS</span>' % GREEN) if ok \
+            else ('<span style="color:%s">❌ FAIL</span>' % RED)
+
+    bemf = res["bemf"]
+    cg_a = res["cogging"]
+    e_phase_a = bemf["E_rms"]
+    e_line_a = e_phase_a * math.sqrt(3.0)
+    rows = []
+    rows.append((
+        "相 BEMF RMS（折 81 匝）", "%.1f V" % e_phase_a,
+        "%.2f V" % fea["bemf_rms_phase_at_design_turns"],
+        "±25%", "%+.2f%%" % fea["bemf_vs_analytic_pct"], stat(fea["bemf_pass"])))
+    rows.append((
+        "线 BEMF RMS", "%.1f V" % e_line_a,
+        "%.2f V" % fea["bemf_rms_line"], "±25%",
+        "%+.2f%%" % (100.0 * (fea["bemf_rms_line"] - e_line_a) / e_line_a),
+        stat(abs(fea["bemf_rms_line"] - e_line_a) <= 0.25 * e_line_a)))
+    rows.append((
+        "三相不平衡", "0%", "%.3f%%" % fea["bemf_balance_pct"], "≤0.5%", "—",
+        stat(fea["bemf_balance_pct"] <= 0.5)))
+    rows.append((
+        "相 BEMF THD（对基波）", "%.2f%%（解析上限）" % (bemf["THD_BEMF_line"] * 100),
+        "%.2f%%" % fea["bemf_phase_A"]["thd_pct"], "≤ 解析上限", "—",
+        stat(fea["bemf_phase_A"]["thd_pct"] <= bemf["THD_BEMF_line"] * 100 + 1e-9)))
+    cg = fea["cogging"]
+    rows.append((
+        "齿槽转矩 ptp", "%.3f N·m（%.2f%%）" % (cg_a["peak_Tcog_Nm"], cg["analytic_pct_of_rated"]),
+        "%.3f N·m（%.2f%%）" % (cg["peak_to_peak_nm"], cg["pct_of_rated"]),
+        "≤5% 额定", "+%.0f×" % (cg["peak_to_peak_nm"] / max(cg_a["peak_Tcog_Nm"], 1e-9)),
+        stat(cg["pass_5pct"])))
+    blk = fea.get("load")
+    if blk:
+        rows.append((
+            "负载平均转矩", "%.1f N·m（设计值）" % blk["T_rated_nm"],
+            "%.2f N·m" % blk["T_avg_nm"], "±20%",
+            "%+.2f%%" % blk["vs_rated_pct"], stat(blk["pass_20pct"])))
+        rows.append((
+            "转矩脉动（末电周期）", "±%.0f%%（解析估计）" % res["rated_load"]["ripple_pct"],
+            "%.2f%%" % blk["T_ripple_pct"], "—", "齿槽主导", stat(False, warn=True)))
+        pb = blk.get("power_balance") or {}
+        if pb:
+            rows.append((
+                "功率平衡 T·ω vs 3EI", "—",
+                "%.1f W vs %.1f W" % (pb["P_mech_w"], pb["P_emf_w"]), "±10%",
+                "%+.2f%%" % pb["dev_pct"], stat(pb["pass_10pct"])))
+        if blk.get("current_ok"):
+            src = blk.get("current_source", "")
+            detail = ("逐点偏差 %.3f%%" % blk["current_waveform_dev_pct"]
+                      if "current_waveform_dev_pct" in blk
+                      else "RMS 回到 %.2f A" % blk.get("current_rms_avg_a", 0))
+            rows.append((
+                "指令电流 9.89 A rms", "9.89 A rms", detail,
+                "幅值+相位", "原生 TrCrv" if "native" in src else "报表 CSV",
+                stat(True)))
+        rows.append((
+            "转矩常数 Kt", "—", "%.4f N·m/A_pk" % blk["Kt_nm_per_a_pk"],
+            "—", "= %.4f N·m/A_rms" % (blk["Kt_nm_per_a_pk"] / math.sqrt(2.0)), "—"))
+
+    body = "".join(
+        "<tr><td>%s</td><td>%s</td><td><b>%s</b></td><td>%s</td><td>%s</td><td>%s</td></tr>" % r
+        for r in rows)
+    table = ("<table><tr><th>指标</th><th>解析</th><th>Maxwell 2D FEA</th>"
+             "<th>判据</th><th>偏差</th><th>结论</th></tr>%s</table>" % body)
+
+    imgs = ""
+    for key, cap in (("fea_bemf", "三相空载反电势（e = −dλ/dt，401 点 / 0–20 ms / 50 µs）"),
+                     ("fea_torque", "左：满负载转矩；右：空载齿槽转矩（点线为 ±5% 额定判据）"),
+                     ("fea_cogging_spec", "齿槽转矩频谱：能量集中在 600 Hz 齿槽族")):
+        b64 = figs.get(key)
+        if b64:
+            imgs += ('<img src="data:image/png;base64,%s" alt="%s">'
+                     '<div class="note">%s</div>' % (b64, key, cap))
+
+    scale = (fea.get("turns") or {}).get("scale_to_design", 81.0 / 80.0)
+    notes = [
+        "<b>口径（务必按此引用，否则会得出 403 N·m 之类的错值）：</b>"
+        "① FEA 模型为 <b>80 匝/相</b>（40 导体/槽边 × 2 绕齿线圈），折 81 匝 × "
+        "%.5f；② 电流型绕组没有 <code>WindingA.Voltage</code>，反电势由 "
+        "<code>FluxLinkage</code> 求导；③ 导出单位随试算/全时长解变化"
+        "（<code>Time [us]</code>/<code>[ms]</code>、<code>Torque [mNewtonMeter]</code>），"
+        "<code>ingest_fea.py</code> 按单位行自动换算；④ 只有 401 行才是全时长解，"
+        "5 行是试算段（0–200 µs），不可引用。" % scale,
+        "<b>−9.09% 差额的成因：</b>解析式取 <code>Kw=0.933</code>，而 12S8P 集中绕组的"
+        "真实绕组因数为 <code>0.866</code>（kp=sin60°、kd=1），单此一项即高估 7.7%，"
+        "其余来自端部漏磁与带载电枢反应。此项已在进度看板登记为 <b>G6</b>，"
+        "修正会连带 S4/S7/S8/S9 全链路重算，故暂不改。",
+        "<b>齿槽 27.4% 是真实设计问题，不是数值噪声：</b>均值 0.00003 N·m（无直流偏置）、"
+        "主频精确落在 600 Hz、<code>t=0.45 ms</code> 与 <code>t=10.45 ms</code> 数值完全重复。"
+        "三个可行改法（按性价比排序）：极弧 0.87→0.80、槽口 2.5→1.5 mm、定子斜槽 0.5 槽距；"
+        "前两项可由既有 <code>sensitivity_design.py</code> 先算，再进 Maxwell 复算。",
+    ]
+    return head + table + imgs + "".join(
+        '<div class="note">%s</div>' % t for t in notes) + "</div>"
+
+
+def build_html(res, figs, fea=None):
     m = res["magnetic"]; ag = res["airgap"]; bemf = res["bemf"]
     cg = res["cogging"]; rl = res["rated_load"]; ov = res["overload"]
     cu = res["copper"]; ir = res["iron"]; pm = res["pm_eddy"]
@@ -280,14 +569,15 @@ img{display:block;max-width:100%%;margin:10px auto;border-radius:8px;}
 </style></head><body>
 <h1>ANSYS Maxwell 电机设计 — 仿真报告</h1>
 <div class="sub">25 N·m 表贴式永磁同步电机 (SPMSM) · 8极12槽 · 设计 B（紧凑型）<br>
-生成日期：2026-09-22 · 仿真方法：解析电磁模型（Pyrhönen/Zhu-Howe，FEA 前基线）+ 完整 Maxwell 2D 求解脚本（待桌面执行）</div>
+生成日期：<!--DATE--> · 仿真方法：解析电磁模型（Pyrhönen/Zhu-Howe）+ <b>ANSYS Maxwell 2D 瞬态 FEA 实机求解</b>
+（M4 空载 BEMF/齿槽 + M5 负载转矩，401 点全时长解，交叉校验见 §11）</div>
 
 <div class="kpi">
   <div><div class="v">25.0</div><div class="l">额定转矩 N·m</div></div>
   <div><div class="v">%.1f</div><div class="l">效率 %%</div></div>
   <div><div class="v">%.2f×</div><div class="l">过载能力</div></div>
   <div><div class="v">%.3f</div><div class="l">气隙磁密 T</div></div>
-  <div><div class="v">%.0f</div><div class="l">额定转速 rpm</div></div>
+  <div><div class="v">%.0f</div><div class="l">额定转速 rpm</div></div><!--FEA_KPI-->
 </div>
 
 <div class="card"><h2 style="margin-top:0">电机二维截面图（Maxwell 建模目标）</h2>
@@ -395,9 +685,13 @@ img{display:block;max-width:100%%;margin:10px auto;border-radius:8px;}
 <div class="note">最低显著力波阶次 = %d（电阶次 = 2×极对数）。需模态分析确认结构固有频率，避免力波阶次与机壳/端盖模态共振。</div>
 </div>
 
+<!--FEA_SECTION-->
+
 <div class="card"><h2 style="margin-top:0">性能总评（目标 vs 解析）</h2>
 <table><tr><th>指标</th><th>目标</th><th>解析值</th><th>结论</th></tr>
 %s</table>
+<div class="note">本表为解析链路口径；<b>Maxwell FEA 实测值见 §11</b>。两处不一致时以 FEA 为准，
+差异已在 §11 逐项解释（BEMF −9.1%% 源于绕组因数口径，齿槽解析低估 15 倍是物理事实）。</div>
 </div>
 
 <div class="card"><h2 style="margin-top:0">成本估算（活性材料）</h2>
@@ -411,6 +705,7 @@ img{display:block;max-width:100%%;margin:10px auto;border-radius:8px;}
 
 <div class="card"><h2 style="margin-top:0">结论与建议</h2>
 <ul>
+<!--FEA_BULLET-->
 <li><b>总体：</b>该 25 N·m 8p12s SPMSM 在效率（%.2f%%）、过载（1.90×）、退磁裕度（SF 3.1–3.7）、齿槽转矩（%.1f%% 额定）等关键指标上均达成或优于设计目标，方案可行。</li>
 <li><b>高利用率设计：</b>齿部/轭部磁密均逼近 1.65 T 饱和点，叠长与极弧已较充分地挖掘材料能力；建议在 Maxwell FEA 中核实局部饱和、漏磁与热耦合。</li>
 <li><b>铁耗偏保守：</b>Bertotti 解析给出 39 W（设计目标 25.8 W），差异源于高频叠片损耗模型上限；FEA 后取实测曲线可进一步收敛效率至 94%%。</li>
@@ -421,12 +716,22 @@ img{display:block;max-width:100%%;margin:10px auto;border-radius:8px;}
 
 <div class="card"><h2 style="margin-top:0">附录 · 交付物与仿真说明</h2>
 <p class="note">
-<b>说明：</b>Maxwell 2021 R1 已安装（<code>D:\\Program Files\\AnsysEM\\AnsysEM21.1</code>，许可证 localhost:1055），但 agent 沙箱无法初始化 AEDT 的 GUI 运行时，故 FEA 求解须在本机桌面会话执行（见 <code>solve_25Nm_SPMSM.py</code>）。下表数值为与真实 FEA 同源的解析估算（Pyrhönen/Zhu-Howe），作为 FEA 前基线，须以真实 Maxwell 结果复核。
+<b>FEA 执行事实（2026-11-08 / 11-09 实机）：</b>Maxwell 2021 R1
+（<code>D:\\Program Files\\AnsysEM\\AnsysEM21.1</code>，许可证 localhost:1055）由
+<code>ansysedt.exe -RunScriptAndExit &lt;脚本&gt;</code> 驱动，<b>不加 <code>-ng</code></b>。
+空载工程 <code>D:\\ANSYS_Run\\M5_25Nm.aedt</code>（全时长求解 377.3 s）、负载工程
+<code>D:\\ANSYS_Run\\M5_load_25Nm.aedt</code>（377.4 s），两者均为 0–20 ms / 50 µs /
+401 点全时长解，几何 24 个图元、面积 4 项 + 面积守恒全 PASS、<code>ModelDepth='160mm'</code>、
+<code>MotionSetup1</code> 保留。解析结果仅作<b>交叉校验</b>，不作为交付依据。
 </p>
 <p class="note">
 <b>交付文件：</b><br>
-· <code>maxwell_model/build_25Nm_SPMSM.py</code> — 可一键在 Maxwell 重建电机的 IronPython 建模脚本（绘制电机）<br>
-· <code>results/sim_summary.json</code> + <code>*.csv</code> — 全套解析仿真数据与波形<br>
+· <code>maxwell/m4_build_solve.py</code> — 从零重建 2D 几何 + 材料 + 绕组 + 运动带 + 求解（<code>MAXWELL_CASE=load</code> 切负载工况）<br>
+· <code>maxwell/export_m4_csv.py</code> — 求解/导出解耦，401 行校验<br>
+· <code>ingest_fea.py</code> — Maxwell CSV / 原生 <code>*_TrCrv.txt</code> → <code>results/fea_results.json</code><br>
+· <code>results/fea/*.csv</code> — FEA 波形留档（本报告 §11 的全部图即由此绘制）<br>
+· <code>maxwell_model/build_25Nm_SPMSM.py</code> — 建模脚本（IronPython，Maxwell 内一键重建）<br>
+· <code>results/sim_summary.json</code> + <code>*.csv</code> — 解析仿真数据与波形<br>
 · <code>sim_analytical.py</code> — 解析仿真引擎（可复算/调参）<br>
 · 本 HTML 报告
 </p>
@@ -453,14 +758,44 @@ img{display:block;max-width:100%%;margin:10px auto;border-radius:8px;}
         perf["efficiency_pct"], cg["pct_rated"],
     )
 
+    html = html.replace("<!--DATE-->", datetime.date.today().isoformat())
+    html = html.replace("<!--FEA_KPI-->", fea_kpi(fea))
+    html = html.replace("<!--FEA_BULLET-->", fea_bullet(fea))
+    html = html.replace("<!--FEA_SECTION-->", build_fea_section(res, fea, figs))
+
     out = os.path.join(HERE, "REPORT_25Nm_SPMSM.html")
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
     return out
 
 
+def fea_bullet(fea):
+    """结论区的 FEA 首条：把「解析说达标」与「FEA 实测」的差异摆在最前面。"""
+    if not fea:
+        return ""
+    blk = fea.get("load") or {}
+    cg = fea.get("cogging") or {}
+    bemf = fea.get("bemf_rms_phase_at_design_turns")
+    bits = []
+    if bemf:
+        bits.append("相 BEMF <b>%.2f V</b>（vs 解析 %.1f V，%+.2f%%）"
+                    % (bemf, fea["bemf_analytic_phase_rms"], fea["bemf_vs_analytic_pct"]))
+    if blk:
+        bits.append("负载平均转矩 <b>%.2f N·m</b>（%+.2f%%）"
+                    % (blk["T_avg_nm"], blk["vs_rated_pct"]))
+    if cg:
+        bits.append("齿槽 <b>%.2f N·m = %.1f%% 额定</b>（判据 ≤5%%，未达标）"
+                    % (cg["peak_to_peak_nm"], cg["pct_of_rated"]))
+    if not bits:
+        return ""
+    return ("<li><b>Maxwell FEA 实测（以此为准）：</b>%s。BEMF 与转矩均与解析同量级，"
+            "说明几何与激磁正确；齿槽是当前唯一硬伤，须在下一轮改极弧/槽口/斜槽。</li>"
+            % "；".join(bits))
+
+
 def main():
     res = load()
+    fea = load_fea()
     figs = {
         "cross": draw_cross_section(),
         "bemf": chart_bemf(),
@@ -468,8 +803,11 @@ def main():
         "losses": chart_losses(),
         "torque": chart_torque(),
         "demag": chart_demag(),
+        "fea_bemf": chart_fea_bemf(fea) if fea else None,
+        "fea_torque": chart_fea_torque(fea) if fea else None,
+        "fea_cogging_spec": chart_fea_cogging_spectrum() if fea else None,
     }
-    out = build_html(res, figs)
+    out = build_html(res, figs, fea)
     print("报告已生成:", out)
 
 

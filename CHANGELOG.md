@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-11-10（M6：FEA 结果进入交付报告）
+
+- `projects/25Nm_PMSM/make_report.py` 新增 §11「Maxwell 2D FEA 实测交叉校验」：
+  `load_fea()` 读 `results/fea_results.json`，生成 10 行「解析 vs FEA」逐项对照表
+  （相/线 BEMF、三相不平衡、THD、齿槽 ptp、`T_avg`、脉动、功率平衡、指令电流、`Kt`）
+  与 3 张图（三相空载 BEMF、负载+齿槽转矩、齿槽频谱标注 600 Hz）。
+  首屏 KPI 增「FEA 平均转矩」，结论区首条改为以 FEA 为准。
+- `projects/results/fea/`：M4/M5 波形留档（`flux_a|b|c.csv`、`tq_noload.csv`、`tq_load.csv`，
+  各 401 行全时长解），报告不再依赖 `D:\ANSYS_Run` 的外部文件即可复现。
+- `tests/test_report_fea.py`（11 例）：JSON 结构/判据口径/物理自洽、CSV 必须 401 行、
+  用留档 CSV 重算 `ingest_fea.compute()` 复现 JSON、源码级降级契约。
+
+### Fixed — 2026-11-10（报告过期表述与渲染陷阱）
+
+- 报告首页「FEA 待桌面执行」与附录「agent 沙箱无法初始化 AEDT 运行时」两句已与实机事实
+  （2026-11-08 / 11-09 两次真机求解）相反，改为记录真实工程路径、求解耗时与 401 点解。
+- §11 为普通字符串拼接，`%%` 会被原样输出（首版渲染出 `±25%%`、`折 81 匝 × %.5f`）。
+  现以「生成后 grep `%%` 与 `%.Nf` 残留数均为 0」作为验收项。
+
 ### Added — 2026-11-09（M5 负载瞬态：三相 9.89 A，`T_avg` 判据通过）
 
 - `maxwell/m4_build_solve.py` 增加 `MAXWELL_CASE=load` 负载工况（与空载共用同一条建模

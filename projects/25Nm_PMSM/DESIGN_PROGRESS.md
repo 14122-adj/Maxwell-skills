@@ -4,7 +4,51 @@
 
 > 本周目标见 WEEKLY_GOALS.md
 
-## 昨日 / 今日 / 明日（2026-11-09，M5 负载瞬态打通）
+## 昨日 / 今日 / 明日（2026-11-10，M6 报告链路打通）
+
+- **昨日（2026-11-09）**：M5 负载瞬态跑通 —— 三相 9.89 A(rms) / 20 ms / 400 步，
+  `T_avg = 22.33 N·m = −10.66% 额定（±20% ✅）`，电流波形逐点偏差 0.001%，功率平衡 −0.54%。
+- **今日（2026-11-10）**：**M6 完成 —— FEA 结果正式进入交付报告**。
+  `make_report.py` 新增 §11「Maxwell 2D FEA 实测交叉校验」：10 行解析 vs FEA 逐项对照表
+  + 3 张 FEA 图（三相空载 BEMF、负载/齿槽转矩、齿槽频谱）+ 口径说明；
+  M4/M5 的 5 个波形 CSV 收进 `projects/results/fea/`（401 行全时长解，59 KB），
+  报告不再依赖 `D:\ANSYS_Run` 的外部文件即可复现。
+  报告实测 **491,996 B / 9 图 / 13 表**（M6 前 255,102 B / 6 图 / 12 表），
+  `pytest 224 passed`（新增 11 例）、`ruff check scripts tests examples` 全通过。
+- **明日（2026-11-11）**：二选一，按性价比取 **G3（`ModelDepth` 注入）** —— 这是 M4 之外
+  唯一还没关的建模正确性缺口（`scripts/main.py::_gen_setup` 与
+  `maxwell_model/solve_25Nm_SPMSM.py` 均无 `ModelDepth`，2D 默认 1 mm）；
+  若 G3 顺利，再看齿槽治理的解析预筛（极弧 0.87→0.80 / 槽口 2.5→1.5 mm）。
+
+### 今日关键结论（M6）
+
+| 项 | 数值 | 说明 |
+|---|---|---|
+| 报告体积 | **491,996 B** | M6 前 255,102 B；增量全是 3 张 FEA 图（base64） |
+| 内嵌图 / 表 | **9 / 13** | M6 前 6 / 12 |
+| FEA 波形留档 | **5 个 CSV × 401 行** | `results/fea/flux_{a,b,c}`、`tq_noload`、`tq_load` |
+| 交叉校验行数 | **10 行** | 相/线 BEMF、不平衡、THD、齿槽、负载 T_avg、脉动、功率平衡、电流、Kt |
+| 自检 | pytest **224 passed**（+11）、ruff 全通过 | 新增 `tests/test_report_fea.py` |
+| 降级路径 | 有 | 缺 `fea_results.json` → §11 显示降级说明 + 回填命令，不抛栈 |
+
+**M6 的两条方法论结论**
+
+1. **报告只能有一个数据源**：`fea_results.json` 是 §11 的唯一输入，`make_report.py` 不再
+   直接解析 `D:\ANSYS_Run\csv`（跨机器不可复现）。波形 CSV 入库后，
+   `tests/test_report_fea.py::test_ingest_reproduces_committed_results` 用留档 CSV 重算一遍
+   `ingest_fea.compute()`，与 JSON 逐项比对（BEMF 118.8832 V、齿槽 6.84307 N·m、
+   `T_avg` 22.3344 N·m 全部严格复现）——**报告里的数字不可再手填**。
+2. **`%%` 的作用域陷阱**：报告用 `%` 运算符渲染一个 12 KB 模板，模板里写字面 `%` 必须写 `%%`；
+   而新加的 §11 是**普通字符串拼接**，写 `%%` 会原样输出。首次生成就踩到
+   （`±25%%`、`折 81 匝 × %.5f` 未替换），靠「渲染后 grep `%%` 与 `%.` 计数」才发现。
+   以后凡新增报告段落：生成后必查 `%%` 残留数 = 0、`%.Nf` 残留数 = 0。
+
+**Maxwell 状态（2026-11-10）**：**未运行**（本轮为纯后处理，rc = N/A，无新日志）；
+沿用 2026-11-09 的工程 `D:\ANSYS_Run\M5_25Nm.aedt`（776,049 B）/ `M5_load_25Nm.aedt`（775,532 B），
+两者均含 401 点全时长解，24 个图元、4 项面积 + 守恒全 PASS、`MotionSetup1` 保留 —— 本轮未改动，
+故数值与 11-09 完全一致（BEMF 118.8832 V、齿槽 6.84307 N·m、`T_avg` 22.3344 N·m）。
+
+## 上一轮：昨日 / 今日 / 明日（2026-11-09，M5 负载瞬态打通）
 
 - **昨日（2026-11-08）**：M4 验收完成 —— 401 点全时长解，BEMF 相 RMS 118.88 V
   （折算 81 匝 120.37 V，vs 解析 132.4 V = −9.09% ✅）；齿槽 6.843 N·m ptp = 27.37% 额定 ❌
@@ -107,12 +151,12 @@ rc=0；日志 `D:\ANSYS_Run\m4_build_solve_progress.log`（`trial 17.6 s` / `ful
 | S3 | 材料与损耗模型 | ✅ 完成 | `pmsm_config.py`、`sim_analytical.py` |
 | S4 | 解析电磁仿真（磁场/反电势/转矩/损耗/退磁） | ✅ 完成 | `sim_analytical.py`、`projects/results/sim_summary.json` |
 | S5 | Maxwell 2D 建模脚本（几何+材料+绕组+剖分） | ✅ 完成 | `maxwell_model/build_25Nm_SPMSM.py` |
-| S6 | Maxwell FEA 实跑与结果回填 | ⏳ 待桌面执行（G1 已修，`main.py` 可重建 Dsi=93 机型；G3 `ModelDepth` 待补） | `maxwell_model/solve_25Nm_SPMSM.py`、`ingest_fea.py` |
+| S6 | Maxwell FEA 实跑与结果回填 | ✅ **完成 2026-11-10**（经 M4/M5 实机求解 + M6 回填；`main.py` 代码生成路径的 `ModelDepth` 仍待 G3） | `maxwell/m4_build_solve.py`、`export_m4_csv.py`、`ingest_fea.py`、`results/fea_results.json` |
 | S7 | 热分析（损耗→绕组/磁钢温升） | ✅ 完成 | `thermal_analysis.py`、`projects/results/thermal_summary.json` |
 | S8 | NVH / 结构模态与力波避振 | ✅ 完成 | `nvh_analysis.py`、`projects/results/nvh_summary.json` |
 | S9 | 参数敏感性 / 多目标优化 | ✅ 完成（斜槽×极弧 → 叠长×匝数） | `sensitivity_design.py`、`sensitivity_stack_turns.py`、`projects/results/sensitivity_summary.json`、`sensitivity_stack_turns.json` |
 | S10 | 制造公差、BOM 与图纸 | ⬜ 未开始 | — |
-| S11 | 最终设计评审报告（汇总全链路） | ⬜ 未开始（前置 G2 已通：`pip install -e .` → `make_report.py` rc=0、255 KB / 6 图） | `make_report.py`、`REPORT_25Nm_SPMSM.html` |
+| S11 | 最终设计评审报告（汇总全链路） | ⬜ 未开始（前置已全部具备：G2 报告链路 + M6 FEA 段；报告现 491,996 B / 9 图 / 13 表） | `make_report.py`、`REPORT_25Nm_SPMSM.html` |
 
 ## Maxwell 实机执行轨（M0–M6，最高优先级）
 
@@ -126,7 +170,7 @@ rc=0；日志 `D:\ANSYS_Run\m4_build_solve_progress.log`（`trial 17.6 s` / `ful
 | M3 | 材料/绕组/边界/运动带/剖分落地 | ✅ 完成 2026-11-07（**Band 实际未落地**，2026-11-08 修正） | 12×Coil、3×Winding、`ModelDepth='160mm'`、`M270_35A`×2、`VP`；但 `MotionSetupList` 当时为空 |
 | M4 | 空载瞬态求解（BEMF/齿槽） | 🟡 **BEMF 通过 / 齿槽不达标（2026-11-08）** | 401 点全时长解（0–20 ms，50 µs）。BEMF 相 RMS **118.88 V**、三相不平衡 0.008%、线 205.91 V、线 THD 10.60%；折算 81 匝 **120.37 V** vs 解析 132.4 V = **−9.09% ✅**。齿槽 **6.84 N·m ptp = 27.37% 额定 ❌**（解析 1.82%，被低估 15 倍） |
 | M5 | 负载瞬态求解（转矩/电流） | ✅ **完成 2026-11-09** | `T_avg = 22.3344 N·m = −10.66% 额定（±20% ✅）`；三相 9.89 A(rms)，电流波形偏差 0.001%；脉动 32.4%；功率平衡 −0.54% |
-| M6 | 结果回填报告 | ⬜ 待执行 | `fea_results.json` + 报告更新 |
+| M6 | 结果回填报告 | ✅ **完成 2026-11-10** | `fea_results.json` + `results/fea/*.csv` → 报告 §11（10 行交叉校验 + 3 图），报告 491,996 B / 9 图 / 13 表 |
 
 **M0/M1/M2 实测记录（2026-11-07 22:16–22:26，本 agent 会话，真机执行）**
 
@@ -298,6 +342,28 @@ ci_venv/Scripts/python.exe projects/25Nm_PMSM/ingest_fea.py --csvdir D:/ANSYS_Ru
   --turns-model 80
 ```
 
+
+## M6 完成记录（报告链路，2026-11-10）
+
+目标：把 `fea_results.json` 接进交付报告，让 FEA 成为可引用的证据而不是散落在 `D:\ANSYS_Run` 的中间产物。
+
+| 项 | 改动 / 实测 |
+|---|---|
+| 数据入库 | 新增 `projects/results/fea/`：`flux_a|b|c.csv`、`tq_noload.csv`、`tq_load.csv`，各 401 行（0–20 ms / 50 µs），合计 59 KB |
+| 报告 | `make_report.py` 新增 `load_fea()` / `_fea_series()` / `chart_fea_bemf()` / `chart_fea_torque()` / `chart_fea_cogging_spectrum()` / `build_fea_section()` / `fea_kpi()` / `fea_bullet()`；新增 §11 章节，首屏 KPI 加「FEA 平均转矩」 |
+| 降级 | `fea_results.json` 缺失或 `status != OK` → §11 输出降级说明并给出回填命令，其余章节照常 |
+| 图表 | BEMF 三相（e = −dλ/dt）、负载转矩 + 齿槽转矩、齿槽频谱（标注 600 Hz = LCM(12,8)×25 Hz） |
+| 报告实测 | **491,996 B / 9 图 / 13 表**（M6 前 255,102 B / 6 / 12），`<!--…-->` 占位符残留 0、`%%` 残留 0 |
+| 测试 | 新增 `tests/test_report_fea.py`（11 例）：JSON 结构、判据口径、物理自洽、CSV 必须 401 行、**用留档 CSV 重算复现 JSON**、源码级降级契约 |
+| CI | `pytest` **224 passed**（213+11）、`ruff check scripts tests examples` 全通过 |
+
+**口径（报告已写明，勿再误用）**：FEA 模型 80 匝/相（40 导体/槽边 × 2 绕齿线圈），
+折 81 匝 × 1.0125；电流型绕组无 `WindingA.Voltage`，反电势由 `FluxLinkage` 求导；
+导出单位随解变化（`Time [us]`/`[ms]`、`Torque [mNewtonMeter]`），换算由
+`ingest_fea.load_maxwell_csv` 按单位行自动完成；只有 401 行才是全时长解。
+
+**同时修正的过期表述**：原报告首页写「FEA 须桌面执行（待执行）」、附录写「agent 沙箱无法初始化
+AEDT 运行时」——均与 11-08/11-09 的实机事实相反，已改为记录真实工程路径、求解耗时与 401 点解。
 
 ## M4 结果与「报错即退出」诊断（2026-11-08）
 
