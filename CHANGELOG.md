@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-11-11（G3：2D 叠长 `ModelDepth` 注入闭环）
+
+- `scripts/main.py`：`_gen_setup()` 在 `SetDesignSettings(DesignSettingsData)` 里注入
+  `"ModelDepth:=", "<stack_length>mm"`；新增 `format_mm()` 归一尺寸字符串
+  （160.0 → `160mm`，非整数保留有效位）。非正叠长直接在生成期抛 `ValueError`，
+  不让 `Nonemm` 流到 AEDT。
+- `scripts/motor_config.py`：`validate()` 增叠长闸口（缺失/非正 → `ERROR`，L/D>3 → `WARNING`）。
+- `projects/25Nm_PMSM/maxwell_model/solve_25Nm_SPMSM.py`：`MODEL_DEPTH = "160mm"`
+  进 `SetDesignSettings`，并删除文件头误导性的 `-ng -RunScriptAndExit`（与
+  `-RunScriptAndExit` 互斥，是 2026-11-07 之前"启动即失败"的源头）。
+- 生成物 `maxwell_model/setup.py` / `build_25Nm_SPMSM.py` 同步落地 `ModelDepth`。
+- `tests/test_model_depth.py`（27 例）：模板注入 + 随叠长变化 + 生成文本可编译 +
+  `validate()` 闸口 + 生成物与模板不漂移 + **4 处真机 API 修复护栏**。
+- 真机验证（rc=0 ×3）：`G3_depth160.aedt`（23,905 B → `ModelDepth='160mm'`）、
+  `G3_depth180.aedt`（23,930 B → `'180mm'`）、`G3_generated_setup.aedt`
+  （23,906 B → `'160mm'`，由模板产出的 `setup.py` 本体执行）。
+
+### Fixed — 2026-11-11（生成器段序与 API 说明）
+
+- `projects/25Nm_PMSM/gen_maxwell_model.py`：合并顺序改为 `setup → materials → geometry`。
+  旧序让合并脚本先建几何再定义材料，Maxwell 在 `SetMaterial` 处报 Unknown material，
+  也是 `tests/test_prepare_batch.py::test_materials_before_geometry` 长期红灯的根因。
+- 同文件增「⚠ 重跑前必读」：4 处真机 API 修复尚未回灌 `scripts/main.py` 模板，
+  空白重跑会把模型改回不可解；护栏为 `TestModelerApiRegressions` 与
+  `TestCombinedScriptApiFixes`。
+
 ### Added — 2026-11-10（M6：FEA 结果进入交付报告）
 
 - `projects/25Nm_PMSM/make_report.py` 新增 §11「Maxwell 2D FEA 实测交叉校验」：

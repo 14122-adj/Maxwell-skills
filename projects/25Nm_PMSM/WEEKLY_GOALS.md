@@ -38,6 +38,14 @@
 
 ## G3 —【major｜阶段 S6】2D 叠长丢失，FEA 转矩/损耗将低估约 160×
 
+> **状态：✅ 已关闭 2026-11-11**。验收 ①②③ 全达成，④ 由 M4/M5 既有的 401 点解覆盖
+> （`T_avg` 22.3344 N·m = −10.66% 额定，落在 ±20% 内；`m4_build_solve.py` 早已手写
+> `MODEL_DEPTH = "160mm"`，本次把它变成模板的默认行为，不再靠人记得）。
+> 实机证据：`G3_depth160.aedt` → `ModelDepth='160mm'`、`G3_depth180.aedt` → `'180mm'`
+> （证明非硬编码）、`G3_generated_setup.aedt` → `'160mm'`（**模板生成的 setup.py 本体**
+> 在 AEDT 里跑出来的工程）。回归 `tests/test_model_depth.py` 27 例，全仓 251 passed。
+> 遗留：4 处真机 API 修复仍只存在于生成物、未回灌模板 → 新开 **G3b**（明日）。
+
 | 项 | 内容 |
 |---|---|
 | 问题 | `stack_length`（25 N·m 机型 = 160 mm）从未被任何生成器消费：`main.py` 生成的 `setup.py` 与 `maxwell_model/solve_25Nm_SPMSM.py` 的 `SetDesignSettings` 都只设 `PreserveTransientSolution`/`ComputeTransientInductance`，**不含 `ModelDepth`**；全仓 121 个 `.py` 中 `ModelDepth` 仅出现在 `debug/` 三个读取器里。Maxwell 2D 默认模型深度 1 mm，实跑转矩、铁耗、反电势幅值将整体低估 ≈160×。 |
@@ -84,13 +92,14 @@
 
 | 日 | 动作 | 完成判据 |
 |---|---|---|
-| D1 | G3 代码层：`_gen_setup()` 注入 `ModelDepth` + `validate()` 断言 | 生成物 `grep -c ModelDepth ≥ 1`；`stack_length` 可配 |
+| D1 | G3 代码层：`_gen_setup()` 注入 `ModelDepth` + `validate()` 断言 | ✅ 完成 2026-11-11（`G3_depth160/180` + `G3_generated_setup.aedt`） |
 | D2 | G4/M1：`ansysedt -RunScriptAndExit` 最小脚本 | ✅ 完成（`M1_min.aedt`） |
 | D3 | G5/M2：25 N·m 几何在 Maxwell 中生成 | ✅ 完成（`M2_25Nm.aedt`，24 图元） |
 | D4 | M3：材料/绕组/Band/边界/Setup | ✅ 完成（`M4_25Nm.aedt`：12×Coil、3×Winding、160mm、M270、VP、Setup1） |
-| D5 | **M4：空载瞬态** | **BEMF/齿槽 CSV 非空（下一步）** |
-| D6 | M5：负载瞬态 | `T_avg` 与解析 25 N·m 同量级（±20%） |
-| D7 | M6 + 周检复跑 | `fea_results.json` 回填；判定升级 |
+| D5 | **M4：空载瞬态** | ✅ 完成（401 点全时长解，BEMF 118.8832 V，齿槽 6.84307 N·m） |
+| D6 | M5：负载瞬态 | ✅ 完成（`T_avg` 22.3344 N·m，−10.66%） |
+| D7 | M6 + 周检复跑 | ✅ 完成（`fea_results.json` 进报告 §11） |
+| D8 | **G3b：4 处真机 API 修复回灌模板** | 重跑 `gen_maxwell_model.py` 后 `TestModelerApiRegressions` 仍全绿（下一步） |
 
 ## 明确不在本周范围
 

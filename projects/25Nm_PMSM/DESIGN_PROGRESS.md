@@ -4,7 +4,63 @@
 
 > 本周目标见 WEEKLY_GOALS.md
 
-## 昨日 / 今日 / 明日（2026-11-10，M6 报告链路打通）
+## 昨日 / 今日 / 明日（2026-11-11，G3 叠长注入闭环）
+
+- **昨日（2026-11-10）**：M6 完成 —— `fea_results.json` 进交付报告（§11 十行对照 + 3 图），
+  报告 491,996 B / 9 图 / 13 表。
+- **今日（2026-11-11）**：**G3 关闭 —— 2D 叠长（`ModelDepth`）从"手写脚本里有、模板里没有"
+  变成"两侧都有且真机可验证"**。
+  ① `scripts/main.py::_gen_setup()` 注入 `"ModelDepth:=", "<stack_length>mm"`，
+  经新增的 `format_mm()` 归一（160.0 → `160mm`，非整数保留有效位），随 `--params stack_length=` 变；
+  ② `MotorConfig.validate()` 新增叠长闸口（非正 → ERROR，L/D>3 → WARNING）；
+  ③ `maxwell_model/solve_25Nm_SPMSM.py` 同步 `MODEL_DEPTH = "160mm"`，并删掉头部误导性的
+  `-ng -RunScriptAndExit`（两者互斥，是 11-07 之前"启动即失败"的源头）；
+  ④ 生成物 `setup.py` / `build_25Nm_SPMSM.py` 同步落地。
+  新增 `tests/test_model_depth.py`（27 例，含 4 处真机 API 修复的护栏），
+  `pytest 251 passed`、`ruff check scripts tests examples` 全通过。
+- **明日（2026-11-12）**：**G3b —— 把 4 处真机 API 修复回灌 `scripts/main.py` 模板**
+  （`Units:=` / `DuplicateAroundAxis` 第 3 参 / `Slot_1_1..` 实名 / `CreatePolyline` 嵌套字典）。
+  现状是"生成物正确、模板落后"，任何一次重跑生成器都会把模型改回不可解；护栏测试已就位，
+  但护栏只能报警、不能自愈。回灌后 `gen_maxwell_model.py` 才是可信的重生成入口。
+  若有余力，再进齿槽治理的解析预筛（极弧 0.87→0.80 / 槽口 2.5→1.5 mm）。
+
+### 今日关键结论（G3）
+
+| 项 | 结果 | 说明 |
+|---|---|---|
+| 模板注入 | `"ModelDepth:=", "160mm"` | 位于 `DesignSettingsData` 内，随 `stack_length` 变（120/160/180/142.5 均验） |
+| 真机写读 160 mm | ✅ | `G3_depth160.aedt` **23,905 B**，`ModelDepth='160mm'` |
+| 真机写读 180 mm | ✅ | `G3_depth180.aedt` **23,930 B**，`ModelDepth='180mm'` —— 证明该键非硬编码、未被静默忽略 |
+| 生成物端到端 | ✅ | 直接执行模板产出的 `setup.py`（仅换掉 3 行 `ScriptEnv` 取桌面），`G3_generated_setup.aedt` **23,906 B**，`ModelDepth='160mm'` |
+| 回归 | 251 passed（+27）、ruff 全通过 | `tests/test_model_depth.py` |
+| 顺带修复 | `gen_maxwell_model.py` 段序 geometry→**materials** | 旧序会让合并脚本在 `SetMaterial` 处报 Unknown material；`test_materials_before_geometry` 早已是红灯 |
+
+**今日两条方法论结论**
+
+1. **Maxwell 2D 的 design 对象没有深度读取器**：`dir(oDesign)` 90 个成员里只有
+   `SetDesignSettings`，`GetDesignSettings` / `GetModelDepth` / `getModelDepth` 全部
+   `AttributeError`。所以"写进去再读回来"这条路根本不存在，唯一可信的核对是
+   **存盘后解析 `.aedt` 文本**（`$begin 'Maxwell2DModel'` 段内的 `ModelDepth='160mm'`，
+   与 `debug/aedt_parser.py` 同法）。别再把"没有读接口"误判成"写失败了"。
+2. **不写就是默认值，文件里连键都没有**：`M1_min.aedt`（从未设过深度）里搜不到任何
+   `ModelDepth=` 字样 ⇒ 事后从工程文件反查"当时用了多深"是不可行的，只有写进去才留痕。
+   这就是 G3 必须先落地的原因 —— 它不是"补一个参数"，而是"让物理量有据可查"。
+
+**今日最值得记的坑：生成器是回退按钮**
+
+重跑 `gen_maxwell_model.py` 后合并脚本**不会**保持原样，它把 M2 阶段用真机报错逐条修出来的
+4 处 API 改回旧写法（`Length:=`、缺 `NAME:Options`、`Slot_2..Slot_12` 实名、`CreatePolyline`
+未嵌套），模型立刻变不可解。本次全靠 `pytest`（`TestModelerApiRegressions` 4 红）当场拦住，
+才没有把"回退版"提交上去。**结论：生成物与模板已分叉，重生成前必须先回灌**（列 G3b）。
+
+**Maxwell 状态（2026-11-11）**：实机运行 ✅ 3 次（19:04 / 19:05 / 19:06），全部 rc=0；
+日志 `D:\ANSYS_Run\g3_depth_check.log`、`g3_run_generated_setup.log`（另有 API 探测轮
+`g3_probe_api.log`）；本轮只建设计设置、不建几何 ⇒ **对象数 0**；
+产物 `G3_depth160.aedt` / `G3_depth180.aedt` / `G3_generated_setup.aedt` 三个工程；
+未触及 M4/M5 的 `M5_25Nm.aedt`（776,049 B）/ `M5_load_25Nm.aedt`（775,532 B）与 401 点解，
+故 FEA 数值与 11-09 完全一致（BEMF 118.8832 V、齿槽 6.84307 N·m、`T_avg` 22.3344 N·m）。
+
+## 上一轮：昨日 / 今日 / 明日（2026-11-10，M6 报告链路打通）
 
 - **昨日（2026-11-09）**：M5 负载瞬态跑通 —— 三相 9.89 A(rms) / 20 ms / 400 步，
   `T_avg = 22.33 N·m = −10.66% 额定（±20% ✅）`，电流波形逐点偏差 0.001%，功率平衡 −0.54%。

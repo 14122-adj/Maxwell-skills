@@ -23,6 +23,19 @@ from motor_config import MotorConfig, SlotType, PMTopology, MotorType, create_mo
 from pmsm_winding_builder import WindingBuilder, LayerType
 
 
+def format_mm(value: float) -> str:
+    """把 mm 尺寸格式化成 AEDT 能吃的字符串（G3）。
+
+    整数值去掉多余的 ``.0``：160.0 → ``"160mm"``（与实机脚本
+    ``m4_build_solve.py`` 的 ``MODEL_DEPTH = "160mm"`` 口径一致），
+    非整数保留一位小数：142.5 → ``"142.5mm"``。
+    """
+    value = float(value)
+    if abs(value - round(value)) < 1e-9:
+        return f"{int(round(value))}mm"
+    return f"{value:g}mm"
+
+
 class MotorModelBuilder:
     """电机模型自动化建模器"""
 
@@ -67,6 +80,12 @@ class MotorModelBuilder:
 
     def _gen_setup(self):
         c = self.config
+        if c.stack_length is None or float(c.stack_length) <= 0:
+            raise ValueError(
+                f"叠片长度必须为正实数才能生成 ModelDepth（当前 {c.stack_length!r}）；"
+                "请先修正 stack_length，否则 2D 求解会按默认 1 mm 深度算"
+            )
+        depth = format_mm(c.stack_length)
         return f'''#!/usr/bin/env python3
 """Step 1: 项目设置 — 修复 NewProject 弹"是否保存"对话框的问题"""
 import ScriptEnv
@@ -113,11 +132,18 @@ except Exception:
 oProject = oDesktop.NewProject()
 oProject.InsertDesign("Maxwell 2D", "Motor_Design", "Transient", "")
 oDesign = oProject.SetActiveDesign("Motor_Design")
+# ── G3：2D 求解必须显式写叠长 ──
+#  Maxwell 2D 的默认 ModelDepth 是 1 mm（不是 0），若这里不写，
+#  转矩/反电势/铁耗/铜耗全部按 1 mm 深度算，物理量整体缩小约 160 倍，
+#  而求解器不会报任何错（“模型自洽、物理错量级”的静默错误）。
+#  实测依据：m4_build_solve.py 写入 ModelDepth:="160mm" 后，
+#  空载 BEMF 118.88 V(rms)、负载 T_avg 22.33 N·m，与解析值同量级。
 oDesign.SetDesignSettings(
     ["NAME:DesignSettingsData",
+     "ModelDepth:=", "{depth}",
      "PreserveTransientSolution:=", False,
      "ComputeTransientInductance:=", True])
-print("Setup done: {c.slots} slots, {c.poles} poles, {c.slot_type.value}, {c.pm_topology.value}")
+print("Setup done: {c.slots} slots, {c.poles} poles, {c.slot_type.value}, {c.pm_topology.value}, ModelDepth={depth}")
 '''
 
     def _gen_materials(self):

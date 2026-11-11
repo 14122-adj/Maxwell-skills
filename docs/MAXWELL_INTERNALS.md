@@ -495,3 +495,59 @@ WindingA
 
 第 1 列电流、第 4 列磁链、第 5 列电压（= dλ/dt，**不含** R·i）。
 这条通道在报表不可用时可作兜底（转矩无对应 TrCrv，只能靠报表）。
+
+## 12. 叠长 `ModelDepth`（G3，2026-11-11 实测）
+
+### 12.1 默认深度会静默吃掉 160 倍
+
+Maxwell 2D 的 `DesignSettingsData` 里有一个 `ModelDepth`，**默认 1 mm**。
+不写它，求解照跑、曲线照出、报告照导，但转矩 / 反电势 / 铁耗 / 铜耗全部按 1 mm 厚度算，
+物理量整体缩小约 160 倍（本机型叠长 160 mm）。这是最难查的一类错：
+**模型自洽、单位干净、量级离谱**。
+
+正确写法（与 `SetDesignSettings` 的其它键同在一个字典里）：
+
+```python
+oDesign.SetDesignSettings(
+    ["NAME:DesignSettingsData",
+     "ModelDepth:=", "160mm",
+     "PreserveTransientSolution:=", False,
+     "ComputeTransientInductance:=", True])
+```
+
+单位是字符串 `"160mm"`，不是裸数字、也不是 `160`（裸数字会按工程单位 mm 解析，
+但跨脚本容易与 `SetModelUnits` 的 `"Units:="` / `"Length:="` 混淆，统一带单位更稳）。
+
+### 12.2 没有读接口：只能解析 `.aedt`
+
+`dir(oDesign)` 共 **90** 个成员，与深度相关的**只有 `SetDesignSettings`**：
+
+| 尝试 | 结果 |
+|---|---|
+| `oDesign.GetDesignSettings()` | `AttributeError: 'ADispatchWrapper' object has no attribute ...` |
+| `oDesign.GetModelDepth()` | 同上 |
+| `oDesign.getModelDepth()` | 同上（pyaedt 有这个，裸 COM 没有） |
+
+所以核对只能**存盘后读文件**：
+
+```
+$begin 'Maxwell2DModel'
+    ...
+    ModelDepth='160mm'
+```
+
+（`debug/aedt_parser.py` 就是干这个的。）别把"读不出来"当成"写失败"——
+2026-11-11 首轮脚本就是这么误判的，白跑一轮。
+
+### 12.3 不写就查不到：默认值没有留痕
+
+`M1_min.aedt`（从未设过深度）里搜不到任何 `ModelDepth=` 字样。也就是说：
+
+- 事后想从工程文件反查"当时用了多深"——**做不到**；
+- 只有显式写入才留痕，所以注入不是"补个参数"，而是"让物理量有据可查"。
+
+### 12.4 判据：两个工程必须给出不同值
+
+单看一个工程等于自证。有效判据是：同一段代码写 `160mm` 存一个工程、写 `180mm` 存另一个，
+两个文件里的 `ModelDepth` **必须是各自的值**（实测 `'160mm'` / `'180mm'`）。
+这能一次性排除"参数被静默忽略、实际用的是默认值"这种最坏情况。

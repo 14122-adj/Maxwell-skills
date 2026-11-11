@@ -246,6 +246,18 @@ class MotorConfig:
         airgap_actual = (self.stator_id - self.rotor_od) / 2.0
         if abs(airgap_actual - self.airgap) > 0.01:
             issues.append(f"WARNING: 气隙={self.airgap}mm, 但Dsi-Dro计算值={airgap_actual:.3f}mm")
+
+        # 叠长检查（G3）：2D 求解必须把叠长写成 ModelDepth，否则 Maxwell 默认 1 mm，
+        # 转矩/反电势/损耗整体按 1/160 缩小，属于"模型自洽但物理错 160 倍"的静默错误。
+        if self.stack_length is None:
+            issues.append("ERROR: 叠片长度未给出，无法确定 2D ModelDepth")
+        elif self.stack_length <= 0:
+            issues.append(f"ERROR: 叠片长度必须为正（当前 {self.stack_length} mm）")
+        elif self.stator_od > 0 and self.stack_length / self.stator_od > 3.0:
+            issues.append(
+                f"WARNING: 长径比 L/D={self.stack_length / self.stator_od:.2f} > 3，"
+                f"叠长 {self.stack_length} mm 相对定子外径 {self.stator_od} mm 偏长"
+            )
         
         # 槽型参数检查
         if self.slot_type == SlotType.PEAR:

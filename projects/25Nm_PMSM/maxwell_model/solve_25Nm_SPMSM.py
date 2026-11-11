@@ -5,7 +5,9 @@
 #  用途：在本机（已装 Maxwell + 许可证）一键完成「建模 → 剖分 → 求解 → 导出」
 #  运行方式（在装了 Maxwell 的机器上，CMD/PowerShell 执行）：
 #     "D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" ^
-#         -ng -RunScriptAndExit "D:\ANSYS_Run\solve_25Nm_SPMSM.py"
+#         -RunScriptAndExit "D:\ANSYS_Run\solve_25Nm_SPMSM.py"
+#  注意：不要加 -ng —— 它与 -RunScriptAndExit 互斥（-ng 只能配 -batchsolve/-batchsave），
+#        加了会被参数解析直接拒掉。此模式下 oDesktop 由 AEDT 预注入。
 #  产物：
 #     D:\ANSYS_Run\SPMSM_25Nm.aedt            (Maxwell 工程，可双击打开复核)
 #     D:\ANSYS_Run\csv\tq_noload.csv          (空载转矩/齿槽)
@@ -24,6 +26,11 @@ import ScriptEnv, math, os, json, time
 LOGPATH = r"D:\ANSYS_Run\solve.log"
 CSVDIR  = r"D:\ANSYS_Run\csv"
 PRJ     = r"D:\ANSYS_Run\SPMSM_25Nm.aedt"
+
+# 叠长（G3）：本机型叠片长度 160 mm（pmsm_config / pmsm_config.STACK_LENGTH）。
+# Maxwell 2D 默认 ModelDepth = 1 mm，不写这一项会让转矩/反电势/损耗整体缩小约 160 倍，
+# 且求解器不报错 —— 必须显式写入。数值须与 pmsm_config 冻结值同步。
+MODEL_DEPTH = "160mm"
 
 def log(msg):
     line = "[%s] %s" % (time.strftime("%H:%M:%S"), msg)
@@ -57,9 +64,10 @@ oProject.InsertDesign("Maxwell 2D", "Motor_Design", "Transient", "")
 oDesign = oProject.SetActiveDesign("Motor_Design")
 oDesign.SetDesignSettings(
     ["NAME:DesignSettingsData",
+     "ModelDepth:=", MODEL_DEPTH,
      "PreserveTransientSolution:=", False,
      "ComputeTransientInductance:=", True])
-log("Project created: Maxwell 2D / Transient")
+log("Project created: Maxwell 2D / Transient, ModelDepth=" + MODEL_DEPTH)
 
 # ---------------------------------------------------------------- GEOMETRY
 oEditor = oDesign.SetActiveEditor("3D Modeler")

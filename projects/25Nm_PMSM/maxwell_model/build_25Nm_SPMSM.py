@@ -54,11 +54,18 @@ except Exception:
 oProject = oDesktop.NewProject()
 oProject.InsertDesign("Maxwell 2D", "Motor_Design", "Transient", "")
 oDesign = oProject.SetActiveDesign("Motor_Design")
+# ── G3：2D 求解必须显式写叠长 ──
+#  Maxwell 2D 的默认 ModelDepth 是 1 mm（不是 0），若这里不写，
+#  转矩/反电势/铁耗/铜耗全部按 1 mm 深度算，物理量整体缩小约 160 倍，
+#  而求解器不会报任何错（“模型自洽、物理错量级”的静默错误）。
+#  实测依据：m4_build_solve.py 写入 ModelDepth:="160mm" 后，
+#  空载 BEMF 118.88 V(rms)、负载 T_avg 22.33 N·m，与解析值同量级。
 oDesign.SetDesignSettings(
     ["NAME:DesignSettingsData",
+     "ModelDepth:=", "160mm",
      "PreserveTransientSolution:=", False,
      "ComputeTransientInductance:=", True])
-print("Setup done: 12 slots, 8 poles, rectangular, SPM")
+print("Setup done: 12 slots, 8 poles, rectangular, SPM, ModelDepth=160mm")
 
 
 # ============ MATERIALS ============

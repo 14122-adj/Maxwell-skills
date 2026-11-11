@@ -8,6 +8,19 @@ Driver — 调用 skill 的 scripts/main.py (MotorModelBuilder) 为 25N·m SPMSM
   定子外径 150mm / 内径 93mm / 叠长 160mm / 气隙 0.675mm
   磁钢 N35, Br=1.17T, 极弧系数 0.87
   绕组 Kw=0.933, 每相 81 匝, 每槽 40 导体, AWG15
+
+⚠ 重跑前必读（2026-11-11 G3）
+--------------------------------------------------------------------------
+`maxwell_model/geometry.py` / `build_25Nm_SPMSM.py` 里有 **4 处只在真机上验证过、
+但尚未回灌到 scripts/main.py 模板**的手工修复：
+  1. `SetModelUnits` 用 `"Units:="` 而不是 `"Length:="`
+  2. `DuplicateAroundAxis` 必须带第 3 个参数 `["NAME:Options", ...]`
+  3. 克隆体实名是 `Slot_1_1..Slot_1_11`，不是 `Slot_2..Slot_12`
+  4. `CreatePolyline` 的点/段必须各自嵌进独立字典
+空白重跑本脚本会把这 4 处改回旧写法，模型立刻变不可解。
+`tests/test_prepare_batch.py::TestModelerApiRegressions` 与
+`tests/test_model_depth.py::TestCombinedScriptApiFixes` 是护栏；
+真要重跑，跑完必须逐条核对这两个测试类。
 """
 import os
 import sys
@@ -87,7 +100,11 @@ OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maxwell_mode
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # 写出 7 个分脚本
-order = ["setup", "geometry", "materials", "winding", "boundary", "mesh", "solver"]
+# 合并顺序必须 materials → geometry：Maxwell 里对象的 MaterialValue 引用必须已存在，
+# 反序会让 build_25Nm_SPMSM.py 在 "SetMaterial" 处直接报 Unknown material。
+# （2026-11-11 G3：旧顺序是 setup→geometry→materials，与 tests/test_prepare_batch.py
+#  的 test_materials_before_geometry 冲突，本次一并纠正。）
+order = ["setup", "materials", "geometry", "winding", "boundary", "mesh", "solver"]
 written = []
 for key in order:
     fname = f"{key}.py"
