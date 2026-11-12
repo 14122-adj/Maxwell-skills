@@ -214,7 +214,184 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
         pole_pitch = 360.0 / c.slots
         pm_pitch = 360.0 / c.poles
 
-        slot_names_str = ', '.join([f"Slot_{i}" for i in range(1, c.slots + 1)])
+        # ── 槽克隆体命名（G3b 真机修复·几何 3）──
+        # `DuplicateAroundAxis` 的产物是 `Slot_1_1..Slot_1_{N-1}`（原对象名 + 序号），
+        # **不是** `Slot_2..Slot_N`。按后者去 Subtract 会报 Object not found，
+        # 槽一个都减不掉，定子齿形根本不存在。生成物里用运行期列表拼名，
+        # 与 `maxwell_model/build_25Nm_SPMSM.py` 的 `"Slot_1_" + str(i)` 完全一致。
+
+        # ── 槽型绘制块：按 slot_type 生成槽轮廓 IronPython 代码段 ──
+        # fixed: 旧版只有梨形槽模板; 现支持 rectangular / pear / trapezoidal / round,
+        # 线圈区域参数随槽型推导, 保证线圈始终位于槽内。
+        x0 = c.stator_id / 2.0
+        _bs0, _hs0 = c.slot_Bs0, c.slot_Hs0
+        if c.slot_type.value == "pear":
+            x1 = x0 + c.slot_Hs0
+            x2 = x0 + c.slot_Hs0 + c.slot_Hs1
+            x3 = x0 + c.slot_Hs0 + c.slot_Hs1 + c.slot_Rs
+            slot_block = "\n".join([
+                f"# Slot creation (pear type)",
+                f"x0 = {x0}", f"bs0 = {c.slot_Bs0}", f"bs1 = {c.slot_Bs1}", f"bs2 = {c.slot_Bs2}",
+                f"hs0 = {c.slot_Hs0}", f"hs1 = {c.slot_Hs1}", f"hs2 = {c.slot_Hs2}", f"rs = {c.slot_Rs}",
+                f"x1 = x0 + hs0", f"x2 = x0 + hs0 + hs1", f"x3 = x0 + hs0 + hs1 + rs",
+                "oEditor.CreatePolyline(",
+                '    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,',
+                '     ["NAME:PolylinePoints",',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-bs0/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-bs1/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-bs2/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x3) + "mm", "Y:=", "0mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(bs2/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(bs1/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(bs0/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-bs0/2) + "mm", "Z:=", "0mm"]],',
+                '     ["NAME:PolylineSegments",',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Arc", "StartIndex:=", 3, "NoOfPoints:=", 3],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 7, "NoOfPoints:=", 2]]],',
+                '    ["NAME:Attributes", "Name:=", "Slot_1", "Flags:=", "", "Color:=", "(0 200 0)",',
+                '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
+                '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
+            ])
+            _r_in = x0 + c.slot_Hs0
+            _r_out = x0 + c.slot_Hs0 + c.slot_Hs1 + c.slot_Rs
+            _t_max = c.slot_Bs2
+            _rad_factor = 0.55
+        elif c.slot_type.value == "rectangular":
+            # 槽口(窄) + 槽体(宽), 直角台阶, 单个 6 点 Polyline 闭合
+            slot_block = "\n".join([
+                f"# Slot creation (rectangular type)",
+                f"x0 = {x0}", f"x1 = x0 + {c.slot_Hs0}", f"x2 = x0 + {c.slot_Hs2}",
+                f"b0 = {_bs0}", f"b2 = {c.slot_Bs2}",
+                "oEditor.CreatePolyline(",
+                '    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,',
+                '     ["NAME:PolylinePoints",',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-b2/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(b2/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"]],',
+                '     ["NAME:PolylineSegments",',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 3, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 4, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2]]],',
+                '    ["NAME:Attributes", "Name:=", "Slot_1", "Flags:=", "", "Color:=", "(0 200 0)",',
+                '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
+                '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
+            ])
+            _r_in = x0 + c.slot_Hs0
+            _r_out = x0 + c.slot_Hs2
+            _t_max = c.slot_Bs2
+            _rad_factor = 0.80
+        elif c.slot_type.value == "trapezoidal":
+            # 开口窄 → 槽底宽, 直线斜坡, 4 点 Polyline
+            slot_block = "\n".join([
+                f"# Slot creation (trapezoidal type)",
+                f"x0 = {x0}", f"x1 = x0 + {c.slot_Hs0} + {c.slot_Hs1}",
+                f"b0 = {_bs0}", f"b1 = {c.slot_Bs1}",
+                "oEditor.CreatePolyline(",
+                '    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,',
+                '     ["NAME:PolylinePoints",',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-b1/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(b1/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],',
+                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"]],',
+                '     ["NAME:PolylineSegments",',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 3, "NoOfPoints:=", 2],',
+                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 4, "NoOfPoints:=", 2]]],',
+                '    ["NAME:Attributes", "Name:=", "Slot_1", "Flags:=", "", "Color:=", "(0 200 0)",',
+                '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
+                '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
+            ])
+            _r_in = x0 + c.slot_Hs0
+            _r_out = x0 + c.slot_Hs0 + c.slot_Hs1
+            _t_max = c.slot_Bs1
+            _rad_factor = 0.80
+        else:  # round
+            # 槽口矩形 + 圆(直径 Bs2), Unite 合并
+            slot_block = "\n".join([
+                f"# Slot creation (round type)",
+                f"x0 = {x0}",
+                f"c_center = x0 + {c.slot_Hs2} / 2.0",
+                f"cr = {c.slot_Bs2} / 2.0",
+                f"open_w = max(0.01, {c.slot_Hs2} / 2.0 - cr)",
+                "oEditor.CreateRectangle(",
+                f'    ["NAME:RectangleParameters", "IsCovered:=", True,',
+                f'     "XStart:=", str(x0) + "mm", "YStart:=", str(-{_bs0}/2) + "mm", "ZStart:=", "0mm",',
+                f'     "Width:=", str(open_w) + "mm", "Height:=", "{_bs0}mm", "WhichAxis:=", "Z"],',
+                '    ["NAME:Attributes", "Name:=", "Slot_1_open", "Flags:=", "", "Color:=", "(0 200 0)",',
+                '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
+                '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
+                "oEditor.CreateCircle(",
+                f'    ["NAME:CircleParameters", "XCenter:=", str(c_center) + "mm", "YCenter:=", "0mm",',
+                f'     "ZCenter:=", "0mm", "Radius:=", str(cr) + "mm", "WhichAxis:=", "Z"],',
+                '    ["NAME:Attributes", "Name:=", "Slot_1_circle", "Flags:=", "", "Color:=", "(0 200 0)",',
+                '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
+                '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
+                'oEditor.Unite(',
+                '    ["NAME:Selections", "Selections:=", "Slot_1_open,Slot_1_circle"],',
+                '    ["NAME:UniteParameters", "KeepOriginals:=", False])',
+                'oEditor.ChangeProperty(',
+                '    ["NAME:AllTabs",',
+                '     ["NAME:Geometry3DAttributeTab",',
+                '      ["NAME:PropServers", "Slot_1_open"],',
+                '      ["NAME:ChangedProps", ["NAME:Name", "Value:=", "Slot_1"]]]])',
+            ])
+            _cx = x0 + c.slot_Hs2 / 2.0
+            _r_in = _cx - c.slot_Bs2 / 2.0
+            _r_out = _cx + c.slot_Bs2 / 2.0
+            _t_max = c.slot_Bs2
+            _rad_factor = 0.55
+
+        # ── 线圈截面生成参数（槽内居中；命名 Coil_1..Coil_N 与 WindingBuilder.coil_names 对齐）──
+        # 修复: 旧版 geometry 只建槽不建线圈, 导致 AssignCoilGroup 引用的对象不存在,
+        #       绕组"不在槽内"/无法加激励。此处自动补齐铜线圈截面。
+        _coil_r_mid = (_r_in + _r_out) / 2.0
+        _coil_radial = (_r_out - _r_in) * _rad_factor
+        _coil_tang = _t_max * 0.60
+        _coil_slot_angle = 360.0 / c.slots
+        coil_block = "\n".join([
+            "",
+            "# ── 线圈截面（铜，槽内居中；命名 Coil_1..Coil_N 与绕组脚本对齐）──",
+            f"coil_r_mid = {_coil_r_mid:.3f}",
+            f"coil_radial = {_coil_radial:.3f}",
+            f"coil_tang = {_coil_tang:.3f}",
+            f"coil_slot_angle = {_coil_slot_angle:.6f}",
+            f"for k in range({c.slots}):",
+            "    angle = k * coil_slot_angle",
+            '    cname = f"Coil_{k + 1}"',
+            "    oEditor.CreateRectangle(",
+            '        ["NAME:RectangleParameters", "IsCovered:=", True,',
+            '         "XStart:=", str(coil_r_mid - coil_radial / 2.0) + "mm",',
+            '         "YStart:=", str(-coil_tang / 2.0) + "mm",',
+            '         "ZStart:=", "0mm",',
+            '         "Width:=", str(coil_radial) + "mm",',
+            '         "Height:=", str(coil_tang) + "mm",',
+            '         "WhichAxis:=", "Z"],',
+            '        ["NAME:Attributes", "Name:=", cname, "Flags:=", "", "Color:=", "(255 128 0)",',
+            '         "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
+            '         "MaterialValue:=", \'"copper"\', "SolveInside:=", True])',
+            "    if angle > 0:",
+            "        oEditor.Rotate(",
+            '            ["NAME:Selections", "Selections:=", cname],',
+            '            ["NAME:RotateParameters", "RotateAxis:=", "Z",',
+            '             "RotateAngle:=", str(angle) + "deg",',
+            '             "DuplicateObjects:=", False])',
+        ])
 
         s = f'''#!/usr/bin/env python3
 """Step 3: 几何建模"""
@@ -224,7 +401,9 @@ oDesktop = ScriptEnv.GetDesktop()
 oProject = oDesktop.GetActiveProject()
 oDesign = oProject.SetActiveDesign("Motor_Design")
 oEditor = oDesign.SetActiveEditor("3D Modeler")
-oEditor.SetModelUnits(["NAME:UnitsSettings", "Length:=", "mm"])
+# ── G3b 真机修复·几何 1：单位设置的键名是 Units，不是 Length ──
+#   写 "Length:=" 会被 AEDT 判为未知键（rc=1, "Unknown key"），脚本在第一步就死。
+oEditor.SetModelUnits(["NAME:UnitsSettings", "Units:=", "mm"])
 
 # Region（外部边界）
 oEditor.CreateCircle(
@@ -254,53 +433,23 @@ oEditor.Subtract(
     ["NAME:Selections", "Blank Parts:=", "StatorOuter", "Tool Parts:=", "StatorInner"],
     ["NAME:SubtractParameters", "KeepOriginals:=", False])
 
-# Slot creation (pear type)
-x0 = {c.stator_id/2}
-bs0 = {c.slot_Bs0}
-bs1 = {c.slot_Bs1}
-bs2 = {c.slot_Bs2}
-hs0 = {c.slot_Hs0}
-hs1 = {c.slot_Hs1}
-hs2 = {c.slot_Hs2}
-rs = {c.slot_Rs}
-
-x1 = x0 + hs0
-x2 = x0 + hs0 + hs1
-x3 = x0 + hs0 + hs1 + rs
-
-oEditor.CreatePolyline(
-    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True],
-    ["NAME:PolylinePoints",
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-bs0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-bs1/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-bs2/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x3) + "mm", "Y:=", "0mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(bs2/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(bs1/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(bs0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-bs0/2) + "mm", "Z:=", "0mm"]],
-    ["NAME:PolylineSegments",
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Arc", "StartIndex:=", 3, "NoOfPoints:=", 3],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 7, "NoOfPoints:=", 2]],
-    ["NAME:Attributes", "Name:=", "Slot_1", "Flags:=", "", "Color:=", "(0 200 0)",
-     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
-     "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
+{slot_block}
 
 # Duplicate slots
+# ── G3b 真机修复·几何 2：DuplicateAroundAxis 必须带第 3 个参数 ──
+#   缺 ["NAME:Options", ...] 时报 "expects at least 3 arguments"，克隆不执行。
 oEditor.DuplicateAroundAxis(
     ["NAME:Selections", "Selections:=", "Slot_1", "NewPartsModelFlag:=", "Model"],
     ["NAME:DuplicateAroundAxisParameters", "CreateNewObjects:=", True,
-     "WhichAxis:=", "Z", "AngleStr:=", "{pole_pitch}deg", "Numclones:=", "{c.slots}"])
+     "WhichAxis:=", "Z", "AngleStr:=", "{pole_pitch}deg", "Numclones:=", "{c.slots}"],
+    ["NAME:Options", "DuplicateAssignments:=", False])
 
 # Subtract slots from stator
+# ── G3b 真机修复·几何 3：克隆体实名 Slot_1_1..Slot_1_{c.slots-1} ──
+slot_names = ["Slot_1"] + ["Slot_1_" + str(i) for i in range(1, {c.slots})]
 oEditor.Subtract(
     ["NAME:Selections", "Blank Parts:=", "StatorOuter",
-     "Tool Parts:=", "{slot_names_str}"],
+     "Tool Parts:=", ", ".join(slot_names)],
     ["NAME:SubtractParameters", "KeepOriginals:=", False])
 
 # Rotor outer
@@ -367,8 +516,9 @@ oEditor.CreateCircle(
     ["NAME:Attributes", "Name:=", "Band", "Flags:=", "", "Color:=", "(0 255 255)",
      "Transparency:=", 0.75, "PartCoordinateSystem:=", "Global",
      "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
+{coil_block}
 
-print("Geometry done: {c.slots} slots, {c.poles} PMs, Band")
+print("Geometry done: {c.slots} slots, {c.poles} PMs, Band, {c.slots} coils")
 '''
         return s
 
@@ -391,42 +541,35 @@ print("Geometry done: {c.slots} slots, {c.poles} PMs, Band")
         )
         config = builder.compute_winding()
 
-        # ── 按 builder 实际输出的 coil_groups 渲染 AssignCoilGroup ──
-        # 每个 CoilGroup: phase, polarity ('+'|'-'), coil_indices, coil_names
-        coil_group_blocks = []
-        coil_name_blocks  = []
+        # ── 按 builder 的 coil_groups 逐槽边渲染 AssignCoil（G3b 真机修复·绕组 4）──
+        # 2026-11-12 真机实测：AEDT 2021.1 批处理下
+        #   `AssignCoilGroup` 报 "expects at least 2 arguments. 1 arguments provided"
+        #   （COM 签名是 (nameArg, dataArg)，单数组调用必失败）
+        # ⇒ 绕组不能用「组 + AddWindingCoils」两级结构，必须一个槽边一个 `AssignCoil`，
+        #   并用 `Winding:="WindingX"` 直接挂到相绕组上。这是 M4/M5 跑出 401 点解时的写法。
+        # 口径：`Conductor number` 是**单个槽边**的导体数（不是线圈匝数）。
+        coil_assign_blocks = []
         # 在主进程算好每相 +/- 线圈组数(供 print 报告用)
         n_pos_neg = {p: {"+": 0, "-": 0} for p in ["A", "B", "C"]}
         for group in config.coil_groups:
             if not group.coil_indices:
                 continue
             pol_str = builder.polarity_type(group.polarity)   # 走 builder 的标准约定
-            coil_name = f"{group.phase}{group.polarity}"  # 例: "A+", "B-"
-            coil_objs = ", ".join(f'"{n}"' for n in group.coil_names)
-            coil_group_blocks.append(
-                f'oModule.AssignCoilGroup(\n'
-                f'    ["NAME:{coil_name}",\n'
-                f'     "Objects:=", [{coil_objs}],\n'
-                f'     "Conductor number:=", "{c.conductors_per_slot}",\n'
-                f'     "PolarityType:=", "{pol_str}"])\n'
-            )
-            coil_name_blocks.append(f'    "{coil_name}"')
+            for cname in group.coil_names:
+                slot_no = cname.rsplit("_", 1)[-1]            # "Coil_7" → "7"
+                coil_assign_blocks.append(
+                    f'oModule.AssignCoil(\n'
+                    f'    ["NAME:{group.phase}_{slot_no}",\n'
+                    f'     "Objects:=", ["{cname}"],\n'
+                    f'     "Conductor number:=", "{c.conductors_per_slot}",\n'
+                    f'     "PolarityType:=", "{pol_str}",\n'
+                    f'     "Winding:=", "Winding{group.phase}"])\n'
+                )
             n_pos_neg[group.phase][group.polarity] += 1
-        coil_groups_py = "\n".join(coil_group_blocks)
+        coil_groups_py = "\n".join(coil_assign_blocks)
         n_A_pos, n_A_neg = n_pos_neg["A"]["+"], n_pos_neg["A"]["-"]
         n_B_pos, n_B_neg = n_pos_neg["B"]["+"], n_pos_neg["B"]["-"]
         n_C_pos, n_C_neg = n_pos_neg["C"]["+"], n_pos_neg["C"]["-"]
-
-        # ── AddWindingCoils: 把每相的 + / - 组连到 WindingX ──
-        add_winding_lines = []
-        for phase in ["A", "B", "C"]:
-            phase_groups = [g for g in config.coil_groups
-                            if g.phase == phase and g.coil_indices]
-            names = ", ".join(f'"{g.phase}{g.polarity}"' for g in phase_groups)
-            add_winding_lines.append(
-                f'oModule.AddWindingCoils("Winding{phase}", [{names}])'
-            )
-        add_winding_py = "\n".join(add_winding_lines)
 
         # ── 相位带表(供人类/AI 阅读校对) ──
         # 输出多行 print, 每槽一行, 一目了然
@@ -447,8 +590,8 @@ print("Geometry done: {c.slots} slots, {c.poles} PMs, Band")
             )
         phase_belt_prints.append('print("=" * 60)')
         phase_belt_prints.append('print("  说明: ★ = 电流方向 + (N 极下); · = 电流方向 - (S 极下)")')
-        phase_belt_prints.append('print("  同相/同极性的所有槽属于同一 AssignCoilGroup")')
-        phase_belt_prints.append('print("  按 A+/A-/B+/B-/C+/C- 的顺序连到 WindingA/B/C")')
+        phase_belt_prints.append('print("  每个槽边 = 一个 Coil 对象 = 一个 AssignCoil（直接挂 Winding:=）")')
+        phase_belt_prints.append('print("  同一相 +/- 的槽边共用同一个 WindingX，靠 PolarityType 定方向")')
         phase_belt_py = "\n".join(phase_belt_prints)
 
         return f'''#!/usr/bin/env python3
@@ -482,11 +625,8 @@ for phase in ["A", "B", "C"]:
          "Voltage:=", "0V",
          "ParallelBranchesNum:=", "1"])
 
-# ── Step 2: 线圈组赋值(按 builder.coil_groups 逐组) ──
+# ── Step 2: 逐槽边 AssignCoil（每对象一个，直接挂 Winding:=）──
 {coil_groups_py}
-
-# ── Step 3: 把线圈组连到对应相绕组 ──
-{add_winding_py}
 
 print("Winding assignment complete: {c.slots} slots, {c.poles} poles, 3 phases")
 print(f"  Winding factor kw = {config.winding_factor:.4f}")
@@ -504,25 +644,37 @@ ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
 oDesktop = ScriptEnv.GetDesktop()
 oProject = oDesktop.GetActiveProject()
 oDesign = oProject.SetActiveDesign("Motor_Design")
+oEditor = oDesign.SetActiveEditor("3D Modeler")
 oModule = oDesign.GetModule("BoundarySetup")
 
 # 零矢势边界（定子外边界）
+# ── G3b 真机修复·边界 1：AssignVectorPotential 只吃 1D 实体（Edges）──
+#   传 `"Objects:=", ["Region"]` 会被拒：
+#   `Boundary 'VectorPotential1' can only be assigned on 1D entities`。
+#   Region 是整圆 sheet，唯一一条边就是外圆；边号必须运行期取。
+edges = [int(e) for e in oEditor.GetEdgeIDsFromObject("Region")]
 oModule.AssignVectorPotential(
     ["NAME:VectorPotential1",
-     "Edges:=", [], "Objects:=", ["Region"],
+     "Edges:=", edges,
      "Value:=", "0",
      "CoordinateSystem:=", ""])
 
 print("Boundary: VectorPotential=0 on Region")
 
 # 运动设置
+# ── G3b 真机修复·边界 2：键名是 "Init Pos:="（带空格）──
+#   实测（m4_build_solve_progress.log: `OK AssignBand A Init Pos`，两轮均通过）：
+#   带空格且**同时给全** Coordinate System / HasRotateLimit / NonCylindrical /
+#   Consider Mechanical Transient 这几个可选键，2021.1 才按旋转带处理；
+#   缺键或写成 "InitPos:=" 会被判成平动，报
+#   `For 2D XY translation problem, only X or Y axis could be used`。
 oDesign.GetModule("ModelSetup").AssignBand(
     ["NAME:BandData",
      "Move Type:=", "Rotate",
      "Coordinate System:=", "Global",
      "Axis:=", "Z",
      "Is Positive:=", True,
-     "InitPos:=", "0deg",
+     "Init Pos:=", "0deg",
      "HasRotateLimit:=", False,
      "NonCylindrical:=", False,
      "Consider Mechanical Transient:=", False,
@@ -545,14 +697,14 @@ oDesign = oProject.SetActiveDesign("Motor_Design")
 oModule = oDesign.GetModule("MeshSetup")
 
 # 气隙网格
-oModule.AssignSurfApproxOp(
-    ["NAME:SurfApprox_Airgap",
+# ── G3b 真机修复·网格 6：2021.1 没有 AssignSurfApproxOp ──
+#   用 AssignLengthOp 控 Band 内最大边长即可（m4_build_solve.py 实机验证的写法）。
+oModule.AssignLengthOp(
+    ["NAME:Mesh_Band",
      "Objects:=", ["Band"],
-     "CurvedSurfaceApproxChoice:=", "ManualSettings",
-     "SurfDevChoice:=", 2,
-     "SurfDev:=", "{c.mesh_airgap}mm",
-     "NormalDevChoice:=", 2,
-     "NormalDev:=", "15deg"])
+     "MaxLength:=", "{c.mesh_airgap}mm",
+     "RestrictElem:=", False,
+     "RestrictLength:=", True])
 
 # 定转子网格
 oModule.AssignLengthOp(
@@ -654,9 +806,14 @@ Examples:
   python main.py --preset 8p36s_tutorial
   python main.py --preset 8p12s_servo
   python main.py --params "slots=36 poles=8 stator_od=210 stator_id=136"
+  python main.py --params "slots=12 poles=8 stator_od=80 stator_id=52 slot_type=rectangular"
   python main.py --json '{"slots":36,"poles":8,"stator_od":210,"stator_id":136}'
   python main.py --csv "slots,36\\npoles,8\\nstator_od,210"
   python main.py --interactive
+
+槽型 (slot_type): rectangular | pear(默认) | trapezoidal | round
+槽参数反推公式: references/motor_design_guide.md §4 "Slot size back-calculation"
+电磁参数推导公式: references/motor_design_guide.md §3 (实现见 motor_param_calc.py)
 """)
     parser.add_argument("--preset", type=str,
                         choices=["8p12s_servo", "36slot_industrial", "8p12s_ipm_ev", "8p36s_tutorial"],

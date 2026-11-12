@@ -125,7 +125,7 @@ def to_batch_script(source: str) -> str:
     return text + "\n"
 
 
-def prepare(repo_script: str, workdir: str) -> dict:
+def prepare(repo_script: str, workdir: str, aedt_name: str = "M2_25Nm.aedt") -> dict:
     with io.open(repo_script, encoding="utf-8") as fh:
         src = fh.read()
     body = to_batch_script(src)
@@ -137,7 +137,7 @@ def prepare(repo_script: str, workdir: str) -> dict:
     with io.open(body_path, "w", encoding="utf-8") as fh:
         fh.write(body)
 
-    cfg = {"aedt": "M2_25Nm.aedt", "design": "Motor_Design"}
+    cfg = {"aedt": aedt_name, "design": "Motor_Design"}
     aedt = os.path.join(workdir, cfg["aedt"]).replace("\\", "/")
     log = os.path.join(workdir, REPORT_NAME).replace("\\", "/")
     driver_path = os.path.join(workdir, DRIVER_NAME).replace(chr(92), "/")
@@ -151,8 +151,10 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--script", default=os.path.join(here, "build_25Nm_SPMSM.py"))
     ap.add_argument("--workdir", default=r"D:/ANSYS_Run")
+    ap.add_argument("--aedt", default="M2_25Nm.aedt",
+                    help="SaveAs 的工程名（回归验证时换新名，避免覆盖既有证据工程）")
     args = ap.parse_args(argv)
-    paths = prepare(args.script, args.workdir)
+    paths = prepare(args.script, args.workdir, args.aedt)
     print("body   :", paths["body"])
     print("driver :", paths["driver"])
     print("aedt   :", paths["aedt"])

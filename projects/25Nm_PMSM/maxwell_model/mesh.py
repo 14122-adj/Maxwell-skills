@@ -8,14 +8,14 @@ oDesign = oProject.SetActiveDesign("Motor_Design")
 oModule = oDesign.GetModule("MeshSetup")
 
 # 气隙网格
-oModule.AssignSurfApproxOp(
-    ["NAME:SurfApprox_Airgap",
+# ── G3b 真机修复·网格 6：2021.1 没有 AssignSurfApproxOp ──
+#   用 AssignLengthOp 控 Band 内最大边长即可（m4_build_solve.py 实机验证的写法）。
+oModule.AssignLengthOp(
+    ["NAME:Mesh_Band",
      "Objects:=", ["Band"],
-     "CurvedSurfaceApproxChoice:=", "ManualSettings",
-     "SurfDevChoice:=", 2,
-     "SurfDev:=", "0.2mm",
-     "NormalDevChoice:=", 2,
-     "NormalDev:=", "15deg"])
+     "MaxLength:=", "0.2mm",
+     "RestrictElem:=", False,
+     "RestrictLength:=", True])
 
 # 定转子网格
 oModule.AssignLengthOp(

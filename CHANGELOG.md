@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — 2026-11-12（G3b：建模模板 8 处 API 回灌，真机全链路建模通过）
+
+- `scripts/main.py::_gen_geometry()` 回灌 M2 阶段手改出来的 4 处真机修复：
+  `SetModelUnits` 用 `"Units:="`（非 `"Length:="`）、`DuplicateAroundAxis` 补第 3 参
+  `["NAME:Options", ...]`、槽克隆体按 `Slot_1_1..` 实名相减、`CreatePolyline` 的点/段
+  嵌进 `PolylineParameters`（pear / rectangular / trapezoidal 三种槽型同步）。
+- 真机连跑三轮又抓出 4 处同类缺陷并修复：
+  `_gen_winding()` 改用逐槽边 `AssignCoil`（2021.1 的 `AssignCoilGroup` 是 2 参签名，
+  单数组调用报 `expects at least 2 arguments`）；`_gen_boundary()` 的
+  `AssignVectorPotential` 改用运行期 `GetEdgeIDsFromObject`（`can only be assigned on
+  1D entities`），`AssignBand` 键名改 `"Init Pos:="`（带空格）；`_gen_mesh()` 用
+  `AssignLengthOp` 替代 2021.1 不存在的 `AssignSurfApproxOp`。
+- `projects/25Nm_PMSM/gen_maxwell_model.py` 重构为可测函数
+  （`build_config` / `render_scripts` / `combine` / `artifacts` / `write_all` / `check`），
+  新增 `--check`（漂移列出文件并 rc=1）与 `--out_dir`（此前参数被静默忽略）；
+  合并脚本表头数值改为随配置走，不再硬编码 150/93/160/0.675。
+- `projects/25Nm_PMSM/maxwell_model/prepare_batch.py` 新增 `--aedt`，回归验证不再覆盖
+  `M2_25Nm.aedt`。
+- 新增 `tests/test_gen_maxwell_model.py`（13 例）：生成物与模板逐字比对（双向防漂移）、
+  8 处 API 修复的模板级护栏、四种槽型几何脚本可编译、`--check` 反向验证。
+- 真机证据（rc=0 ×3）：第 3 轮 `G3b_regen3.aedt`（288,557 B）`BODY_OK`，`Sheets=24`、
+  `Solids=0`、`Conductor number'='40'` ×12、`VectorPotential1`、`MotionSetup1`
+  （`Move Type='Rotate'`/1500 rpm）、`Setup1`（20 ms/5e-5 s）、`ModelDepth='160mm'`。
+- 文档：`docs/MAXWELL_INTERNALS.md` 新增 §13（8 处陷阱 + 报错原文 + 三轮证据）。
+
 ### Added — 2026-11-11（G3：2D 叠长 `ModelDepth` 注入闭环）
 
 - `scripts/main.py`：`_gen_setup()` 在 `SetDesignSettings(DesignSettingsData)` 里注入

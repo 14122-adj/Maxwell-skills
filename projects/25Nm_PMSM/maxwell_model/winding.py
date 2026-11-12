@@ -34,8 +34,8 @@ print(f"  Slot_11   C+    [C+] ★   上 N 极下")
 print(f"  Slot_12   C-    [C-] ·   下 S 极下")
 print("=" * 60)
 print("  说明: ★ = 电流方向 + (N 极下); · = 电流方向 - (S 极下)")
-print("  同相/同极性的所有槽属于同一 AssignCoilGroup")
-print("  按 A+/A-/B+/B-/C+/C- 的顺序连到 WindingA/B/C")
+print("  每个槽边 = 一个 Coil 对象 = 一个 AssignCoil（直接挂 Winding:=）")
+print("  同一相 +/- 的槽边共用同一个 WindingX，靠 PolarityType 定方向")
 
 # ── Step 1: 定义三相绕组 ──
 for phase in ["A", "B", "C"]:
@@ -49,48 +49,91 @@ for phase in ["A", "B", "C"]:
          "Voltage:=", "0V",
          "ParallelBranchesNum:=", "1"])
 
-# ── Step 2: 线圈组赋值(按 builder.coil_groups 逐组) ──
-oModule.AssignCoilGroup(
-    ["NAME:A+",
-     "Objects:=", ["Coil_1", "Coil_7"],
+# ── Step 2: 逐槽边 AssignCoil（每对象一个，直接挂 Winding:=）──
+oModule.AssignCoil(
+    ["NAME:A_1",
+     "Objects:=", ["Coil_1"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Positive"])
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingA"])
 
-oModule.AssignCoilGroup(
-    ["NAME:A-",
-     "Objects:=", ["Coil_2", "Coil_8"],
+oModule.AssignCoil(
+    ["NAME:A_7",
+     "Objects:=", ["Coil_7"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Negative"])
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingA"])
 
-oModule.AssignCoilGroup(
-    ["NAME:B+",
-     "Objects:=", ["Coil_3", "Coil_9"],
+oModule.AssignCoil(
+    ["NAME:A_2",
+     "Objects:=", ["Coil_2"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Positive"])
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingA"])
 
-oModule.AssignCoilGroup(
-    ["NAME:B-",
-     "Objects:=", ["Coil_4", "Coil_10"],
+oModule.AssignCoil(
+    ["NAME:A_8",
+     "Objects:=", ["Coil_8"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Negative"])
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingA"])
 
-oModule.AssignCoilGroup(
-    ["NAME:C+",
-     "Objects:=", ["Coil_5", "Coil_11"],
+oModule.AssignCoil(
+    ["NAME:B_3",
+     "Objects:=", ["Coil_3"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Positive"])
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingB"])
 
-oModule.AssignCoilGroup(
-    ["NAME:C-",
-     "Objects:=", ["Coil_6", "Coil_12"],
+oModule.AssignCoil(
+    ["NAME:B_9",
+     "Objects:=", ["Coil_9"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Negative"])
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingB"])
 
+oModule.AssignCoil(
+    ["NAME:B_4",
+     "Objects:=", ["Coil_4"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingB"])
 
-# ── Step 3: 把线圈组连到对应相绕组 ──
-oModule.AddWindingCoils("WindingA", ["A+", "A-"])
-oModule.AddWindingCoils("WindingB", ["B+", "B-"])
-oModule.AddWindingCoils("WindingC", ["C+", "C-"])
+oModule.AssignCoil(
+    ["NAME:B_10",
+     "Objects:=", ["Coil_10"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingB"])
+
+oModule.AssignCoil(
+    ["NAME:C_5",
+     "Objects:=", ["Coil_5"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingC"])
+
+oModule.AssignCoil(
+    ["NAME:C_11",
+     "Objects:=", ["Coil_11"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingC"])
+
+oModule.AssignCoil(
+    ["NAME:C_6",
+     "Objects:=", ["Coil_6"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingC"])
+
+oModule.AssignCoil(
+    ["NAME:C_12",
+     "Objects:=", ["Coil_12"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingC"])
+
 
 print("Winding assignment complete: 12 slots, 8 poles, 3 phases")
 print(f"  Winding factor kw = 0.8660")

@@ -551,3 +551,146 @@ $begin 'Maxwell2DModel'
 单看一个工程等于自证。有效判据是：同一段代码写 `160mm` 存一个工程、写 `180mm` 存另一个，
 两个文件里的 `ModelDepth` **必须是各自的值**（实测 `'160mm'` / `'180mm'`）。
 这能一次性排除"参数被静默忽略、实际用的是默认值"这种最坏情况。
+
+## 13. 模板生成脚本的 8 处 API 陷阱（G3b，2026-11-12 实测）
+
+`scripts/main.py` 的 7 段模板是"看起来像 Maxwell 脚本"的文本，其中 8 处 API 用法
+在 AEDT 2021.1 批处理（`-RunScriptAndExit`）下必然失败。它们是 M2/M4 阶段用手写脚本
+逐条试出来的，一直没回灌模板，导致 `gen_maxwell_model.py` 的重生成产物不可解。
+本节按真机报错顺序记录，**报错原文优先于任何文档**。
+
+### 13.1 `SetModelUnits` 的键是 `Units`，不是 `Length`
+
+```python
+oEditor.SetModelUnits(["NAME:UnitsSettings", "Units:=", "mm"])   # ✅
+oEditor.SetModelUnits(["NAME:UnitsSettings", "Length:=", "mm"])  # ❌ 未知键
+```
+
+### 13.2 `DuplicateAroundAxis` 是 3 参接口
+
+```
+DuplicateAroundAxis expects at least 3 arguments
+```
+
+第 3 个参数是 `["NAME:Options", "DuplicateAssignments:=", False]`。
+缺它时克隆**不执行**，且报错发生在建完第一个槽之后，容易误以为是槽轮廓有问题。
+
+### 13.3 克隆体实名是 `Slot_1_1..Slot_1_{N-1}`
+
+`DuplicateAroundAxis` 给克隆体命名 = 原对象名 + `_` + 序号，**不是** `Slot_2..Slot_N`。
+按后者去 `Subtract` 会报 Object not found，槽一个都减不掉 —— 但脚本会继续往下跑，
+最后得到一个"没有槽的实心定子环"，面积校验才会暴露。
+
+生成期用运行期表达式拼名（不要在 Python 端展开成字面量，槽数一变就错）：
+
+```python
+slot_names = ["Slot_1"] + ["Slot_1_" + str(i) for i in range(1, 12)]
+oEditor.Subtract(
+    ["NAME:Selections", "Blank Parts:=", "StatorOuter",
+     "Tool Parts:=", ", ".join(slot_names)], ...)
+```
+
+### 13.4 `CreatePolyline` 只吃 2 个位置参数
+
+点集 `PolylinePoints` 与段集 `PolylineSegments` 必须**嵌在** `PolylineParameters`
+字典内部，不能作为第 2/3 个并列实参：
+
+```python
+oEditor.CreatePolyline(
+    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,
+     ["NAME:PolylinePoints", ["NAME:PLPoint", ...], ...],
+     ["NAME:PolylineSegments", ["NAME:PLSegment", ...], ...]],
+    ["NAME:Attributes", "Name:=", "Slot_1", ...])
+```
+
+并列写法不会立刻报错（AEDT 把它当成"多余的实参"忽略或错位），失败的形态是
+**槽轮廓缺段**或 `CreatePolyline` 抛 `expects 2 arguments`。
+
+### 13.5 `AssignCoilGroup` 在 2021.1 批处理下不可用
+
+```
+AssignCoilGroup(Structured Array nameArg, Structured Array dataArg)
+    expects at least 2 arguments. 1 arguments provided
+```
+
+COM 签名是 `(nameArg, dataArg)`，而模板/历史生成物一直按单数组调用。
+**结论：绕组不要走"组 + `AddWindingCoils`"两级结构**，直接一个槽边一个 `AssignCoil`，
+用 `Winding:="WindingX"` 挂到相绕组上（M4/M5 跑出 401 点解时用的就是这条）：
+
+```python
+oBnd.AssignWindingGroup(["NAME:WindingA", "Type:=", "Current", "IsSolid:=", False,
+                         "Current:=", "0A", "Resistance:=", "0.1ohm",
+                         "Inductance:=", "0.001H", "Voltage:=", "0V",
+                         "ParallelBranchesNum:=", "1"])
+oBnd.AssignCoil(["NAME:A_1", "Objects:=", ["Coil_1"],
+                 "Conductor number:=", "40", "PolarityType:=", "Positive",
+                 "Winding:=", "WindingA"])
+```
+
+`Conductor number` 是**单槽边**导体数，不是线圈匝数（此坑 2026-11-09 已踩过一次）。
+
+### 13.6 `AssignVectorPotential` 只吃 1D 实体
+
+```
+Boundary 'VectorPotential1' can only be assigned on 1D entities.
+```
+
+传 `"Objects:=", ["Region"]`（一张 sheet）无效，必须给边号，而边号只能运行期取：
+
+```python
+edges = [int(e) for e in oEditor.GetEdgeIDsFromObject("Region")]
+oBnd.AssignVectorPotential(["NAME:VectorPotential1", "Edges:=", edges,
+                            "Value:=", "0", "CoordinateSystem:=", ""])
+```
+
+Region 是整圆 sheet，唯一一条边就是外圆；因此这条边界必须在 Region 还是"素圆"
+时赋值（`m4_build_solve.py` 的顺序就是先赋边界、再减定转子）。
+
+### 13.7 `AssignBand`：键名 `Init Pos`（带空格）+ 可选键给全
+
+```
+For 2D XY translation problem, only X or Y axis could be used
+```
+
+出现这句说明 band 被判成了**平动**。实测通过（`m4_build_solve_progress.log`：
+`OK AssignBand A Init Pos`，两轮）的写法是：`"Init Pos:="`（带空格）**并给全**
+`Coordinate System` / `HasRotateLimit` / `NonCylindrical` /
+`Consider Mechanical Transient`。存盘后可从 `.aedt` 复核：
+
+```
+$begin 'MotionSetup1'
+    MotionType='Band'
+    'Move Type'='Rotate'
+    Axis='Z'
+    InitPos='0deg'
+    'Angular Velocity'='1500rpm'
+$end 'MotionSetup1'
+```
+
+注意文件里键被归一化成 `InitPos`（无空格），**别拿文件里的写法反推脚本该怎么写**。
+
+### 13.8 2021.1 没有 `AssignSurfApproxOp`
+
+气隙网格只能用 `AssignLengthOp`（`"MaxLength:=", "0.5mm"`）控 Band 内最大边长，
+不要照抄 `CurvedSurfaceApproxChoice` / `SurfDev` / `NormalDev` 那一套。
+
+### 13.9 一键自检：`gen_maxwell_model.py --check`
+
+```bash
+python projects/25Nm_PMSM/gen_maxwell_model.py --check   # 无漂移 rc=0，有漂移 rc=1 并列出文件
+```
+
+`tests/test_gen_maxwell_model.py` 把「模板输出 == 仓库生成物」钉成 pytest 用例：
+改模板不重生成、或手改生成物，都会红灯。这是"重生成入口可信"的可执行定义。
+
+### 13.10 本节的真机证据
+
+| 轮次 | 修复项 | 结果 |
+|---|---|---|
+| 1 | 几何 4 处（13.1–13.4） | `Sheets=24`、12 个 `Coil_*` 都建出来了；卡在 `AssignCoilGroup` |
+| 2 | + 绕组（13.5） | 绕组通过；卡在 `AssignVectorPotential` |
+| 3 | + 边界/网格（13.6–13.8） | **`BODY_OK`**，7 段全部跑完、rc=0 |
+
+第 3 轮产物 `D:\ANSYS_Run\G3b_regen3.aedt`（288,557 B）文本核验：
+`Conductor number'='40'` × **12**、`VectorPotential1` × 2、`MotionSetup1`（`Move Type='Rotate'`）、
+`Setup1` × 8、`ModelDepth='160mm'` × 1、`Sheets=24`、`Solids=0`。

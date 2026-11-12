@@ -6,7 +6,9 @@ oDesktop = ScriptEnv.GetDesktop()
 oProject = oDesktop.GetActiveProject()
 oDesign = oProject.SetActiveDesign("Motor_Design")
 oEditor = oDesign.SetActiveEditor("3D Modeler")
-oEditor.SetModelUnits(["NAME:UnitsSettings", "Length:=", "mm"])
+# ── G3b 真机修复·几何 1：单位设置的键名是 Units，不是 Length ──
+#   写 "Length:=" 会被 AEDT 判为未知键（rc=1, "Unknown key"），脚本在第一步就死。
+oEditor.SetModelUnits(["NAME:UnitsSettings", "Units:=", "mm"])
 
 # Region（外部边界）
 oEditor.CreateCircle(
@@ -43,37 +45,42 @@ x2 = x0 + 18.0
 b0 = 2.5
 b2 = 9.5
 oEditor.CreatePolyline(
-    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True],
-    ["NAME:PolylinePoints",
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-b2/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(b2/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
-     ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"]],
-    ["NAME:PolylineSegments",
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 3, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 4, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],
-     ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2]],
+    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,
+     ["NAME:PolylinePoints",
+      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-b2/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(b2/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"]],
+     ["NAME:PolylineSegments",
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 3, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 4, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2]]],
     ["NAME:Attributes", "Name:=", "Slot_1", "Flags:=", "", "Color:=", "(0 200 0)",
      "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
      "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
 
 # Duplicate slots
+# ── G3b 真机修复·几何 2：DuplicateAroundAxis 必须带第 3 个参数 ──
+#   缺 ["NAME:Options", ...] 时报 "expects at least 3 arguments"，克隆不执行。
 oEditor.DuplicateAroundAxis(
     ["NAME:Selections", "Selections:=", "Slot_1", "NewPartsModelFlag:=", "Model"],
     ["NAME:DuplicateAroundAxisParameters", "CreateNewObjects:=", True,
-     "WhichAxis:=", "Z", "AngleStr:=", "30.0deg", "Numclones:=", "12"])
+     "WhichAxis:=", "Z", "AngleStr:=", "30.0deg", "Numclones:=", "12"],
+    ["NAME:Options", "DuplicateAssignments:=", False])
 
 # Subtract slots from stator
+# ── G3b 真机修复·几何 3：克隆体实名 Slot_1_1..Slot_1_11 ──
+slot_names = ["Slot_1"] + ["Slot_1_" + str(i) for i in range(1, 12)]
 oEditor.Subtract(
     ["NAME:Selections", "Blank Parts:=", "StatorOuter",
-     "Tool Parts:=", "Slot_1, Slot_2, Slot_3, Slot_4, Slot_5, Slot_6, Slot_7, Slot_8, Slot_9, Slot_10, Slot_11, Slot_12"],
+     "Tool Parts:=", ", ".join(slot_names)],
     ["NAME:SubtractParameters", "KeepOriginals:=", False])
 
 # Rotor outer

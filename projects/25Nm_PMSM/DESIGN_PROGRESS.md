@@ -4,7 +4,67 @@
 
 > 本周目标见 WEEKLY_GOALS.md
 
-## 昨日 / 今日 / 明日（2026-11-11，G3 叠长注入闭环）
+## 昨日 / 今日 / 明日（2026-11-12，G3b 模板回灌 + 真机全链路建模通过）
+
+- **昨日（2026-11-11）**：G3 关闭 —— `ModelDepth` 从"手写脚本里有、模板里没有"变成
+  "两侧都有且真机可验证"（`G3_depth160/180.aedt` 双值证据）。
+- **今日（2026-11-12）**：**G3b 关闭 —— `gen_maxwell_model.py` 从"回退按钮"变成"可信重生成入口"**。
+  ① 把 M2 阶段手改出来的 4 处几何 API 修复回灌 `scripts/main.py::_gen_geometry`
+  （`Units:=` / `DuplicateAroundAxis` 第 3 参 / `Slot_1_1..` 实名 / `CreatePolyline` 嵌套）；
+  ② 真机连跑三轮，**又抓出 4 处同类模板缺陷**并全部修掉：`AssignCoilGroup`（2021.1 批处理
+  单数组调用必失败 → 改逐槽边 `AssignCoil`）、`AssignVectorPotential` 只吃 1D 实体
+  （→ 运行期取 `GetEdgeIDsFromObject`）、`AssignBand` 键名 `Init Pos`（带空格）+ 可选键给全、
+  `AssignSurfApproxOp` 在 2021.1 不存在（→ `AssignLengthOp`）；
+  ③ 生成器重构成可测函数（`build_config` / `render_scripts` / `combine` / `check`），
+  新增 `--check` 自检（漂移则 rc=1），`--out_dir` 真正生效，表头数值改为随配置走；
+  ④ `prepare_batch.py` 新增 `--aedt`（回归验证不再覆盖 `M2_25Nm.aedt` 这类证据工程）。
+- **明日（2026-11-13）**：**用模板产出的模型直接求解空载**，与 M5 手写工程逐项对比
+  （BEMF 相 RMS 118.8832 V、齿槽 6.84307 N·m、`T_avg` 22.3344 N·m）。
+  一致 ⇒ 模板路径与手写路径等价，此后所有几何试验都走生成器；
+  不一致 ⇒ 差异就是模板与 `m4_build_solve.py` 的建模口径差（重点查 Region 是否挖件、
+  线圈是否内缩 0.88、Band 是薄环还是整圆）。
+
+### 今日关键结论（G3b）
+
+| 项 | 结果 | 说明 |
+|---|---|---|
+| 模板回灌 | **8 处** API 修复 | 几何 4 + 绕组 1 + 边界 2 + 网格 1，逐条有真机报错原文 |
+| 真机轮次 | **3 轮**（19:04 / 19:07 / 19:09） | rc 均为 0；第 1 轮卡 `AssignCoilGroup`、第 2 轮卡 `AssignVectorPotential`、第 3 轮 `BODY_OK` |
+| 建模产物 | `G3b_regen3.aedt` **288,557 B** | `Sheets=24`、`Solids=0`、`MotionSetup1`（`Move Type='Rotate'`/1500 rpm） |
+| 绕组 | **12 × `AssignCoil`（40 导体/槽边）** | 3 个 `WindingX`（Current 型），A+={1,7} A-={2,8} … kw=0.8660 |
+| 边界 | `VectorPotential1`（Edges） | 存盘后 `.aedt` 里 2 处命中 |
+| 求解设置 | `Setup1` 20 ms / 5e-5 s | 400 步，`SaveFieldsType=Every N Steps` |
+| 叠长 | `ModelDepth='160mm'` × 1 | G3 的注入在模板路径上同样生效 |
+| 生成物一致性 | **8/8 逐字一致** | `--check` 输出「无漂移」 |
+| 回归 | pytest **276 passed**（+13）、ruff 全通过 | 新增 `tests/test_gen_maxwell_model.py`（13 例） |
+
+**今日两条方法论结论**
+
+1. **"模板改了没重生成"和"重生成把模型改坏"是同一枚硬币的两面**：只测产物测不出前者，
+   只测模板测不出后者。可执行的判据是**双向逐字比对**（`--check` + pytest），
+   任何一侧漂移都红灯。今天之前，`gen_maxwell_model.py` 一次空白重跑就会毁掉可解模型。
+2. **报错原文优先于历史笔记**：今日新抓的 4 处里，`AssignCoilGroup` 与 `Init Pos` 都与
+   仓库里既有的"已验证写法"相反（`output_scripts/36slot_industrial/winding.py` 注释写着
+   "单数组参数"是 v4 修复，实际真机拒绝；`Init Pos` 空格问题 11-08 笔记记的是"无空格"，
+   而 `m4_build_solve_progress.log` 两次都是 `OK AssignBand A Init Pos` 赢）。
+   凡两者冲突，以真机日志为准，并回写文档。
+
+**今日最大的坑：日志里的"成功"不等于"跑完"**
+
+`-RunScriptAndExit` 的 rc=0 只表示 AEDT 进程正常退出，脚本里的异常会被驱动脚本
+`try/except` 吃掉并写进 `m2_report.txt` 的 `BODY_FAIL`。三轮里前两轮 rc 都是 0，
+但模型只建到一半（`BoundarySetup=`、`AnalysisSetup=` 都是空的）。
+**判据必须看 `m2_report.txt` 第一行是 `BODY_OK` 还是 `BODY_FAIL`，以及 `BoundarySetup`/
+`AnalysisSetup` 是否非空**，不能只看返回码。
+
+**Maxwell 状态（2026-11-12）**：实机运行 ✅ **3 次**（19:04 / 19:07 / 19:09），rc=0 ×3；
+日志 `D:\ANSYS_Run\m2_run.log`（第 3 轮报 `BODY_OK`），报告 `D:\ANSYS_Run\m2_report.txt`；
+产物 `G3b_regen.aedt`(281,699 B) / `G3b_regen2.aedt` / `G3b_regen3.aedt`(288,557 B)；
+对象数 **24 sheets / 0 solids**（Region、StatorOuter、RotorOuter、PM_1..8、Coil_1..12、Band）；
+求解**未执行**（本轮只验证建模链路，`.aedtresults` 未生成）；
+M4/M5 的 `M5_25Nm.aedt` / `M5_load_25Nm.aedt` 与 401 点解**未触碰**，FEA 数值不变。
+
+## 上一轮：昨日 / 今日 / 明日（2026-11-11，G3 叠长注入闭环）
 
 - **昨日（2026-11-10）**：M6 完成 —— `fea_results.json` 进交付报告（§11 十行对照 + 3 图），
   报告 491,996 B / 9 图 / 13 表。

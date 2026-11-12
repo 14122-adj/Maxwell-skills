@@ -137,6 +137,8 @@ oDesktop = ScriptEnv.GetDesktop()
 oProject = oDesktop.GetActiveProject()
 oDesign = oProject.SetActiveDesign("Motor_Design")
 oEditor = oDesign.SetActiveEditor("3D Modeler")
+# ── G3b 真机修复·几何 1：单位设置的键名是 Units，不是 Length ──
+#   写 "Length:=" 会被 AEDT 判为未知键（rc=1, "Unknown key"），脚本在第一步就死。
 oEditor.SetModelUnits(["NAME:UnitsSettings", "Units:=", "mm"])
 
 # Region（外部边界）
@@ -196,6 +198,8 @@ oEditor.CreatePolyline(
      "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
 
 # Duplicate slots
+# ── G3b 真机修复·几何 2：DuplicateAroundAxis 必须带第 3 个参数 ──
+#   缺 ["NAME:Options", ...] 时报 "expects at least 3 arguments"，克隆不执行。
 oEditor.DuplicateAroundAxis(
     ["NAME:Selections", "Selections:=", "Slot_1", "NewPartsModelFlag:=", "Model"],
     ["NAME:DuplicateAroundAxisParameters", "CreateNewObjects:=", True,
@@ -203,7 +207,7 @@ oEditor.DuplicateAroundAxis(
     ["NAME:Options", "DuplicateAssignments:=", False])
 
 # Subtract slots from stator
-# 注意: DuplicateAroundAxis 的克隆名为 Slot_1_1..Slot_1_11, 不是 Slot_2..Slot_12
+# ── G3b 真机修复·几何 3：克隆体实名 Slot_1_1..Slot_1_11 ──
 slot_names = ["Slot_1"] + ["Slot_1_" + str(i) for i in range(1, 12)]
 oEditor.Subtract(
     ["NAME:Selections", "Blank Parts:=", "StatorOuter",
@@ -341,8 +345,8 @@ print(f"  Slot_11   C+    [C+] ★   上 N 极下")
 print(f"  Slot_12   C-    [C-] ·   下 S 极下")
 print("=" * 60)
 print("  说明: ★ = 电流方向 + (N 极下); · = 电流方向 - (S 极下)")
-print("  同相/同极性的所有槽属于同一 AssignCoilGroup")
-print("  按 A+/A-/B+/B-/C+/C- 的顺序连到 WindingA/B/C")
+print("  每个槽边 = 一个 Coil 对象 = 一个 AssignCoil（直接挂 Winding:=）")
+print("  同一相 +/- 的槽边共用同一个 WindingX，靠 PolarityType 定方向")
 
 # ── Step 1: 定义三相绕组 ──
 for phase in ["A", "B", "C"]:
@@ -356,48 +360,91 @@ for phase in ["A", "B", "C"]:
          "Voltage:=", "0V",
          "ParallelBranchesNum:=", "1"])
 
-# ── Step 2: 线圈组赋值(按 builder.coil_groups 逐组) ──
-oModule.AssignCoilGroup(
-    ["NAME:A+",
-     "Objects:=", ["Coil_1", "Coil_7"],
+# ── Step 2: 逐槽边 AssignCoil（每对象一个，直接挂 Winding:=）──
+oModule.AssignCoil(
+    ["NAME:A_1",
+     "Objects:=", ["Coil_1"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Positive"])
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingA"])
 
-oModule.AssignCoilGroup(
-    ["NAME:A-",
-     "Objects:=", ["Coil_2", "Coil_8"],
+oModule.AssignCoil(
+    ["NAME:A_7",
+     "Objects:=", ["Coil_7"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Negative"])
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingA"])
 
-oModule.AssignCoilGroup(
-    ["NAME:B+",
-     "Objects:=", ["Coil_3", "Coil_9"],
+oModule.AssignCoil(
+    ["NAME:A_2",
+     "Objects:=", ["Coil_2"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Positive"])
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingA"])
 
-oModule.AssignCoilGroup(
-    ["NAME:B-",
-     "Objects:=", ["Coil_4", "Coil_10"],
+oModule.AssignCoil(
+    ["NAME:A_8",
+     "Objects:=", ["Coil_8"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Negative"])
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingA"])
 
-oModule.AssignCoilGroup(
-    ["NAME:C+",
-     "Objects:=", ["Coil_5", "Coil_11"],
+oModule.AssignCoil(
+    ["NAME:B_3",
+     "Objects:=", ["Coil_3"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Positive"])
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingB"])
 
-oModule.AssignCoilGroup(
-    ["NAME:C-",
-     "Objects:=", ["Coil_6", "Coil_12"],
+oModule.AssignCoil(
+    ["NAME:B_9",
+     "Objects:=", ["Coil_9"],
      "Conductor number:=", "40",
-     "PolarityType:=", "Negative"])
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingB"])
 
+oModule.AssignCoil(
+    ["NAME:B_4",
+     "Objects:=", ["Coil_4"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingB"])
 
-# ── Step 3: 把线圈组连到对应相绕组 ──
-oModule.AddWindingCoils("WindingA", ["A+", "A-"])
-oModule.AddWindingCoils("WindingB", ["B+", "B-"])
-oModule.AddWindingCoils("WindingC", ["C+", "C-"])
+oModule.AssignCoil(
+    ["NAME:B_10",
+     "Objects:=", ["Coil_10"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingB"])
+
+oModule.AssignCoil(
+    ["NAME:C_5",
+     "Objects:=", ["Coil_5"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingC"])
+
+oModule.AssignCoil(
+    ["NAME:C_11",
+     "Objects:=", ["Coil_11"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Positive",
+     "Winding:=", "WindingC"])
+
+oModule.AssignCoil(
+    ["NAME:C_6",
+     "Objects:=", ["Coil_6"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingC"])
+
+oModule.AssignCoil(
+    ["NAME:C_12",
+     "Objects:=", ["Coil_12"],
+     "Conductor number:=", "40",
+     "PolarityType:=", "Negative",
+     "Winding:=", "WindingC"])
+
 
 print("Winding assignment complete: 12 slots, 8 poles, 3 phases")
 print(f"  Winding factor kw = 0.8660")
@@ -414,25 +461,37 @@ ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
 oDesktop = ScriptEnv.GetDesktop()
 oProject = oDesktop.GetActiveProject()
 oDesign = oProject.SetActiveDesign("Motor_Design")
+oEditor = oDesign.SetActiveEditor("3D Modeler")
 oModule = oDesign.GetModule("BoundarySetup")
 
 # 零矢势边界（定子外边界）
+# ── G3b 真机修复·边界 1：AssignVectorPotential 只吃 1D 实体（Edges）──
+#   传 `"Objects:=", ["Region"]` 会被拒：
+#   `Boundary 'VectorPotential1' can only be assigned on 1D entities`。
+#   Region 是整圆 sheet，唯一一条边就是外圆；边号必须运行期取。
+edges = [int(e) for e in oEditor.GetEdgeIDsFromObject("Region")]
 oModule.AssignVectorPotential(
     ["NAME:VectorPotential1",
-     "Edges:=", [], "Objects:=", ["Region"],
+     "Edges:=", edges,
      "Value:=", "0",
      "CoordinateSystem:=", ""])
 
 print("Boundary: VectorPotential=0 on Region")
 
 # 运动设置
+# ── G3b 真机修复·边界 2：键名是 "Init Pos:="（带空格）──
+#   实测（m4_build_solve_progress.log: `OK AssignBand A Init Pos`，两轮均通过）：
+#   带空格且**同时给全** Coordinate System / HasRotateLimit / NonCylindrical /
+#   Consider Mechanical Transient 这几个可选键，2021.1 才按旋转带处理；
+#   缺键或写成 "InitPos:=" 会被判成平动，报
+#   `For 2D XY translation problem, only X or Y axis could be used`。
 oDesign.GetModule("ModelSetup").AssignBand(
     ["NAME:BandData",
      "Move Type:=", "Rotate",
      "Coordinate System:=", "Global",
      "Axis:=", "Z",
      "Is Positive:=", True,
-     "InitPos:=", "0deg",
+     "Init Pos:=", "0deg",
      "HasRotateLimit:=", False,
      "NonCylindrical:=", False,
      "Consider Mechanical Transient:=", False,
@@ -453,14 +512,14 @@ oDesign = oProject.SetActiveDesign("Motor_Design")
 oModule = oDesign.GetModule("MeshSetup")
 
 # 气隙网格
-oModule.AssignSurfApproxOp(
-    ["NAME:SurfApprox_Airgap",
+# ── G3b 真机修复·网格 6：2021.1 没有 AssignSurfApproxOp ──
+#   用 AssignLengthOp 控 Band 内最大边长即可（m4_build_solve.py 实机验证的写法）。
+oModule.AssignLengthOp(
+    ["NAME:Mesh_Band",
      "Objects:=", ["Band"],
-     "CurvedSurfaceApproxChoice:=", "ManualSettings",
-     "SurfDevChoice:=", 2,
-     "SurfDev:=", "0.2mm",
-     "NormalDevChoice:=", 2,
-     "NormalDev:=", "15deg"])
+     "MaxLength:=", "0.2mm",
+     "RestrictElem:=", False,
+     "RestrictLength:=", True])
 
 # 定转子网格
 oModule.AssignLengthOp(
