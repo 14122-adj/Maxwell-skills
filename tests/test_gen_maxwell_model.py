@@ -162,11 +162,25 @@ class TestBoundaryTemplate:
         assert '"Objects:=", ["Band"]' in gen.render_scripts()["boundary"]
 
     def test_vector_potential_uses_edges(self, gen) -> None:
-        """实机报错：``can only be assigned on 1D entities`` —— 不能再传 Region sheet。"""
+        """实机报错：``can only be assigned on 1D entities`` —— 不能再传 Region sheet。
+
+        G4（2026-11-13）把这段边界从 ``boundary.py`` 前置进 ``geometry.py``：
+        时机必须早于任何 Subtract，否则 Region 已有孔洞，边集会把孔边一起带上。
+        """
+        geometry = _code(gen.render_scripts()["geometry"])
+        assert "AssignVectorPotential(" in geometry
+        assert '"Edges:=", _region_edges' in geometry
+        assert 'GetEdgeIDsFromObject("Region")' in geometry
+        assert '"Objects:=", ["Region"]' not in geometry
         boundary = _code(gen.render_scripts()["boundary"])
-        assert '"Edges:=", edges' in boundary
-        assert 'GetEdgeIDsFromObject("Region")' in boundary
-        assert '"Objects:=", ["Region"]' not in boundary
+        assert "AssignVectorPotential(" not in boundary
+
+    def test_vector_potential_precedes_booleans(self, gen) -> None:
+        """边界必须先于第一次 ``Subtract`` 赋值（否则 AZ=0 落到材料界面上）。"""
+        geometry = _code(gen.render_scripts()["geometry"])
+        i_vp = geometry.index("AssignVectorPotential(")
+        i_sub = geometry.index("oEditor.Subtract(")
+        assert i_vp < i_sub, "零矢势边界被排到布尔运算之后，磁通会被短路"
 
 
 class TestMeshTemplate:
@@ -180,3 +194,96 @@ class TestMeshTemplate:
     @pytest.mark.parametrize("key", ["winding", "boundary", "mesh", "solver"])
     def test_scripts_compile(self, gen, key: str) -> None:
         compile(gen.render_scripts()[key], f"<{key}>", "exec")
+
+
+class TestG4GeometrySelfConsistency:
+    """G4（2026-11-13）：模板几何必须"真的能解"，而不是"能建出来"。
+
+    背景：G3b 之前的所有护栏只保证**脚本不报错**。但 M2/M3 的模型虽然建成了，
+    `Analyze` 却被 36 条 intersect + 1 条 non-manifold 判死——磁钢平板插进定子、
+    线圈矩形穿出槽壁、Region 从未参与布尔、定转子是真空。本类把这 4 类
+    "能建不能解"的缺陷钉死在**模板输出**上，回退立刻红灯。
+    """
+
+    @staticmethod
+    def _num_list(src: str, marker: str) -> list:
+        """从生成的脚本里抠出 ``marker = [(x, y), ...]`` 的数值点集。"""
+        import re
+
+        idx = src.index(marker)
+        seg = src[idx:src.index("]", src.index("[", idx))]
+        return [(float(a), float(b))
+                for a, b in re.findall(r"\((-?\d+\.\d+), (-?\d+\.\d+)\)", seg)]
+
+    def test_pm_is_annular_sector_not_flat_plate(self, gen) -> None:
+        """磁钢必须是环形扇区（内外两条弧），不能是插进定子的平板弦。"""
+        geometry = _code(gen.render_scripts()["geometry"])
+        assert "pm_pts = [" in geometry
+        assert "CreateRectangle(" not in geometry.split("# PMs")[-1].split("# 转子")[0]
+        pts = self._num_list(geometry, "pm_pts = [")
+        radii = [(x * x + y * y) ** 0.5 for (x, y) in pts]
+        cfg = gen.build_config()
+        r_out = cfg.rotor_od / 2.0
+        r_in = r_out - cfg.pm_thickness
+        assert abs(max(radii) - r_out) < 1e-3, "外弧半径必须等于转子外径/2"
+        assert abs(min(radii) - r_in) < 1e-3, "内弧半径必须等于（转子外径/2 - 磁钢厚）"
+
+    def test_pm_outer_stays_inside_bore(self, gen) -> None:
+        """磁钢外弧必须落在定子内径之内（否则 `StatorOuter and PM_x intersect`）。"""
+        cfg = gen.build_config()
+        assert cfg.rotor_od / 2.0 < cfg.stator_id / 2.0
+
+    def test_rotor_radius_smaller_than_pm_outer(self, gen) -> None:
+        """转子盘半径 = 磁钢内半径 + 0.03 mm，必须严格小于磁钢外弧。"""
+        cfg = gen.build_config()
+        geometry = gen.render_scripts()["geometry"]
+        r_rotor = cfg.rotor_od / 2.0 - cfg.pm_thickness + 0.03
+        assert ('"Radius:=", "%.6fmm"' % r_rotor) in geometry
+        assert r_rotor < cfg.rotor_od / 2.0
+
+    def test_coil_is_inscribed_in_slot(self, gen) -> None:
+        """线圈截面必须由槽轮廓 0.88 内缩得到，且每个顶点都在槽多边形内。"""
+        cfg = gen.build_config()
+        geometry = _code(gen.render_scripts()["geometry"])
+        coil = self._num_list(geometry, "coil_pts = [")
+        assert len(coil) >= 4
+
+        r_bore = cfg.stator_id / 2.0
+        x0, x1, x2 = r_bore - 0.2, r_bore + cfg.slot_Hs0, r_bore + cfg.slot_Hs2
+        b0, b2 = cfg.slot_Bs0, cfg.slot_Bs2
+        slot = [(x0, -b0 / 2), (x1, -b0 / 2), (x2, -b2 / 2),
+                (x2, b2 / 2), (x1, b0 / 2), (x0, b0 / 2)]
+
+        def inside(poly, p) -> bool:
+            """射线法点内判定（槽形在槽肩处是**凹**的，不能用半平面同号判据）。"""
+            x, y = p
+            n = len(poly)
+            hit = False
+            for i in range(n):
+                ax, ay = poly[i]
+                bx, by = poly[(i + 1) % n]
+                if (ay > y) != (by > y):
+                    xin = ax + (y - ay) * (bx - ax) / (by - ay)
+                    if xin > x:
+                        hit = not hit
+            return hit
+
+        for p in coil:
+            assert inside(slot, p), f"线圈顶点 {p} 跑出槽外（会报 StatorOuter/Coil intersect）"
+
+    def test_region_is_boolean_cleaned(self, gen) -> None:
+        """Region 必须与定子/转子/磁钢/线圈/Band 布尔分离，否则网格重复计面积。"""
+        geometry = _code(gen.render_scripts()["geometry"])
+        assert '"Blank Parts:=", "Region"' in geometry
+        idx = geometry.index('"Blank Parts:=", "Region"')
+        tail = geometry[idx:idx + 400]
+        for name in ("StatorOuter", "RotorOuter", "PM_1", "Coil_1", "Band"):
+            assert name in tail
+
+    def test_steel_material_defined_and_bound(self, gen) -> None:
+        """定转子必须绑定铁芯材料——模板此前全是 vacuum，磁路整个落在空气上。"""
+        materials = _code(gen.render_scripts()["materials"])
+        assert "STEEL_MATS" in materials
+        assert '"permeability:=", "1000"' in materials
+        geometry = _code(gen.render_scripts()["geometry"])
+        assert geometry.count('"MaterialValue:=", \'"M270_35A"\'') >= 2  # 定子 + 转子

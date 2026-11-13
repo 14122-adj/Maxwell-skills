@@ -149,8 +149,32 @@ print("Setup done: {c.slots} slots, {c.poles} poles, {c.slot_type.value}, {c.pm_
     def _gen_materials(self):
         c = self.config
         freq = c.pole_pairs * c.rated_speed_rpm / 60.0
+        # ── G4 真机修复·材料：铁芯材料（此前模板从未定义、也从未绑定）──
+        # 2026-11-13：模板路径此前把 StatorOuter / RotorOuter 建成 `vacuum`，
+        # 磁路磁阻全部落在"空气"上，空载 BEMF 只剩解析值的零头，且求解器不报错
+        # （又一个"模型自洽、物理错量级"的静默错误）。
+        # 口径与 m4_build_solve.py 手写工程一致：线性化 mu_r=1000，sigma=2.0e6 S/m，
+        # rho=7650 kg/m³ —— 保证两条路径的差异不来自材料模型。
+        steel_names = []
+        for nm in (c.stator_material, c.rotor_material):
+            if nm not in steel_names:
+                steel_names.append(nm)
+        steel_block = "\n".join([
+            "# 铁芯材料（G4：模板此前从未定义/绑定，定转子默认是 vacuum）",
+            f"STEEL_MATS = {steel_names!r}",
+            "for _m in STEEL_MATS:",
+            "    oDefinitionManager.EditMaterial(",
+            '        _m, ["NAME:" + _m, "CoordinateSystemType:=", "Cartesian",',
+            '             "BulkOrSurfaceType:=", 1,',
+            '             ["NAME:PhysicsTypes", "set:=", ["Electromagnetic", "Thermal",',
+            '                                               "Structural"]],',
+            '             "permittivity:=", "1", "permeability:=", "1000",',
+            '             "conductivity:=", "2000000", "dielectric_loss_tangent:=", "0",',
+            '             "magnetic_loss_tangent:=", "0", "mass_density:=", "7650",',
+            '             "youngs_modulus:=", "200000000000"])',
+        ])
         return f'''#!/usr/bin/env python3
-"""Step 2: 自定义材料定义（N/S极磁钢）"""
+"""Step 2: 自定义材料定义（N/S极磁钢 + 铁芯）"""
 import ScriptEnv
 ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
 oDesktop = ScriptEnv.GetDesktop()
@@ -206,6 +230,7 @@ oDefinitionManager.EditMaterial("{c.pm_material_s}",
     ])
 
 print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
+{steel_block}
 '''
 
     def _gen_geometry(self):
@@ -223,17 +248,27 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
         # ── 槽型绘制块：按 slot_type 生成槽轮廓 IronPython 代码段 ──
         # fixed: 旧版只有梨形槽模板; 现支持 rectangular / pear / trapezoidal / round,
         # 线圈区域参数随槽型推导, 保证线圈始终位于槽内。
-        x0 = c.stator_id / 2.0
+        #
+        # ── G4 真机修复·几何 4：槽口必须比定子内径再深 0.2 mm ──
+        # 槽口第一边与内孔圆弧**严格相切**时，Acis 会生成退化线段并报
+        # `Non-manifold vertices found for "StatorOuter"`（M2/M3 的 36 条 intersect
+        # 报错之一）。x0 取 r_bore - 0.2，其余肩部/槽底仍按 r_bore 起算，
+        # 因此槽深不变、只有开口多切进气隙 0.2 mm（m4_build_solve.py 同口径）。
+        r_bore = c.stator_id / 2.0
+        x0 = r_bore - 0.2
         _bs0, _hs0 = c.slot_Bs0, c.slot_Hs0
+        _slot_pts = None      # 供线圈内缩复用的槽轮廓（mm）；round 槽为 None
         if c.slot_type.value == "pear":
             x1 = x0 + c.slot_Hs0
             x2 = x0 + c.slot_Hs0 + c.slot_Hs1
             x3 = x0 + c.slot_Hs0 + c.slot_Hs1 + c.slot_Rs
             slot_block = "\n".join([
                 f"# Slot creation (pear type)",
-                f"x0 = {x0}", f"bs0 = {c.slot_Bs0}", f"bs1 = {c.slot_Bs1}", f"bs2 = {c.slot_Bs2}",
+                f"r_bore = {r_bore}", f"x0 = r_bore - 0.2",
+                f"bs0 = {c.slot_Bs0}", f"bs1 = {c.slot_Bs1}", f"bs2 = {c.slot_Bs2}",
                 f"hs0 = {c.slot_Hs0}", f"hs1 = {c.slot_Hs1}", f"hs2 = {c.slot_Hs2}", f"rs = {c.slot_Rs}",
-                f"x1 = x0 + hs0", f"x2 = x0 + hs0 + hs1", f"x3 = x0 + hs0 + hs1 + rs",
+                f"x1 = r_bore + hs0", f"x2 = r_bore + hs0 + hs1",
+                f"x3 = r_bore + hs0 + hs1 + rs",
                 "oEditor.CreatePolyline(",
                 '    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,',
                 '     ["NAME:PolylinePoints",',
@@ -257,15 +292,19 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
                 '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
                 '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
             ])
-            _r_in = x0 + c.slot_Hs0
-            _r_out = x0 + c.slot_Hs0 + c.slot_Hs1 + c.slot_Rs
-            _t_max = c.slot_Bs2
-            _rad_factor = 0.55
+            _slot_pts = [(x0, -c.slot_Bs0 / 2.0), (r_bore + c.slot_Hs0, -c.slot_Bs1 / 2.0),
+                         (r_bore + c.slot_Hs0 + c.slot_Hs1, -c.slot_Bs2 / 2.0),
+                         (r_bore + c.slot_Hs0 + c.slot_Hs1 + c.slot_Rs, 0.0),
+                         (r_bore + c.slot_Hs0 + c.slot_Hs1, c.slot_Bs2 / 2.0),
+                         (r_bore + c.slot_Hs0, c.slot_Bs1 / 2.0),
+                         (x0, c.slot_Bs0 / 2.0)]
         elif c.slot_type.value == "rectangular":
             # 槽口(窄) + 槽体(宽), 直角台阶, 单个 6 点 Polyline 闭合
             slot_block = "\n".join([
                 f"# Slot creation (rectangular type)",
-                f"x0 = {x0}", f"x1 = x0 + {c.slot_Hs0}", f"x2 = x0 + {c.slot_Hs2}",
+                f"r_bore = {r_bore}",
+                f"x0 = r_bore - 0.2", f"x1 = r_bore + {c.slot_Hs0}",
+                f"x2 = r_bore + {c.slot_Hs2}",
                 f"b0 = {_bs0}", f"b2 = {c.slot_Bs2}",
                 "oEditor.CreatePolyline(",
                 '    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,',
@@ -289,15 +328,16 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
                 '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
                 '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
             ])
-            _r_in = x0 + c.slot_Hs0
-            _r_out = x0 + c.slot_Hs2
-            _t_max = c.slot_Bs2
-            _rad_factor = 0.80
+            _slot_pts = [(x0, -_bs0 / 2.0), (r_bore + c.slot_Hs0, -_bs0 / 2.0),
+                         (r_bore + c.slot_Hs2, -c.slot_Bs2 / 2.0),
+                         (r_bore + c.slot_Hs2, c.slot_Bs2 / 2.0),
+                         (r_bore + c.slot_Hs0, _bs0 / 2.0), (x0, _bs0 / 2.0)]
         elif c.slot_type.value == "trapezoidal":
             # 开口窄 → 槽底宽, 直线斜坡, 4 点 Polyline
             slot_block = "\n".join([
                 f"# Slot creation (trapezoidal type)",
-                f"x0 = {x0}", f"x1 = x0 + {c.slot_Hs0} + {c.slot_Hs1}",
+                f"r_bore = {r_bore}", f"x0 = r_bore - 0.2",
+                f"x1 = r_bore + {c.slot_Hs0} + {c.slot_Hs1}",
                 f"b0 = {_bs0}", f"b1 = {c.slot_Bs1}",
                 "oEditor.CreatePolyline(",
                 '    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,',
@@ -317,18 +357,16 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
                 '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
                 '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
             ])
-            _r_in = x0 + c.slot_Hs0
-            _r_out = x0 + c.slot_Hs0 + c.slot_Hs1
-            _t_max = c.slot_Bs1
-            _rad_factor = 0.80
+            _slot_pts = [(x0, -_bs0 / 2.0), (r_bore + c.slot_Hs0 + c.slot_Hs1, -c.slot_Bs1 / 2.0),
+                         (r_bore + c.slot_Hs0 + c.slot_Hs1, c.slot_Bs1 / 2.0), (x0, _bs0 / 2.0)]
         else:  # round
             # 槽口矩形 + 圆(直径 Bs2), Unite 合并
             slot_block = "\n".join([
                 f"# Slot creation (round type)",
-                f"x0 = {x0}",
-                f"c_center = x0 + {c.slot_Hs2} / 2.0",
+                f"r_bore = {r_bore}", f"x0 = r_bore - 0.2",
+                f"c_center = r_bore + {c.slot_Hs2} / 2.0",
                 f"cr = {c.slot_Bs2} / 2.0",
-                f"open_w = max(0.01, {c.slot_Hs2} / 2.0 - cr)",
+                f"open_w = max(0.01, c_center - cr - x0)",
                 "oEditor.CreateRectangle(",
                 f'    ["NAME:RectangleParameters", "IsCovered:=", True,',
                 f'     "XStart:=", str(x0) + "mm", "YStart:=", str(-{_bs0}/2) + "mm", "ZStart:=", "0mm",',
@@ -351,47 +389,93 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
                 '      ["NAME:PropServers", "Slot_1_open"],',
                 '      ["NAME:ChangedProps", ["NAME:Name", "Value:=", "Slot_1"]]]])',
             ])
-            _cx = x0 + c.slot_Hs2 / 2.0
-            _r_in = _cx - c.slot_Bs2 / 2.0
-            _r_out = _cx + c.slot_Bs2 / 2.0
-            _t_max = c.slot_Bs2
-            _rad_factor = 0.55
+            _slot_pts = None   # round 槽由矩形+圆 Unite 得到，无单一多边形轮廓
 
-        # ── 线圈截面生成参数（槽内居中；命名 Coil_1..Coil_N 与 WindingBuilder.coil_names 对齐）──
-        # 修复: 旧版 geometry 只建槽不建线圈, 导致 AssignCoilGroup 引用的对象不存在,
-        #       绕组"不在槽内"/无法加激励。此处自动补齐铜线圈截面。
-        _coil_r_mid = (_r_in + _r_out) / 2.0
-        _coil_radial = (_r_out - _r_in) * _rad_factor
-        _coil_tang = _t_max * 0.60
-        _coil_slot_angle = 360.0 / c.slots
-        coil_block = "\n".join([
-            "",
-            "# ── 线圈截面（铜，槽内居中；命名 Coil_1..Coil_N 与绕组脚本对齐）──",
-            f"coil_r_mid = {_coil_r_mid:.3f}",
-            f"coil_radial = {_coil_radial:.3f}",
-            f"coil_tang = {_coil_tang:.3f}",
-            f"coil_slot_angle = {_coil_slot_angle:.6f}",
-            f"for k in range({c.slots}):",
-            "    angle = k * coil_slot_angle",
-            '    cname = f"Coil_{k + 1}"',
-            "    oEditor.CreateRectangle(",
-            '        ["NAME:RectangleParameters", "IsCovered:=", True,',
-            '         "XStart:=", str(coil_r_mid - coil_radial / 2.0) + "mm",',
-            '         "YStart:=", str(-coil_tang / 2.0) + "mm",',
-            '         "ZStart:=", "0mm",',
-            '         "Width:=", str(coil_radial) + "mm",',
-            '         "Height:=", str(coil_tang) + "mm",',
-            '         "WhichAxis:=", "Z"],',
-            '        ["NAME:Attributes", "Name:=", cname, "Flags:=", "", "Color:=", "(255 128 0)",',
-            '         "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
-            '         "MaterialValue:=", \'"copper"\', "SolveInside:=", True])',
-            "    if angle > 0:",
-            "        oEditor.Rotate(",
-            '            ["NAME:Selections", "Selections:=", cname],',
-            '            ["NAME:RotateParameters", "RotateAxis:=", "Z",',
-            '             "RotateAngle:=", str(angle) + "deg",',
-            '             "DuplicateObjects:=", False])',
-        ])
+        # ── 线圈截面（G4 真机修复·几何 5：按槽形内缩，不再用外接矩形）──
+        # 2026-11-13：旧版把 `13.2 × 5.7` 的矩形放在槽中线上；本机槽在 r=49.65 处
+        # 只有 3.2 mm 宽，矩形两侧直接穿出槽壁 ⇒ `StatorOuter and Coil_x intersect`
+        # （M2/M3 阶段 `Analyze` 被 36 条 intersect 判死的主因之一）。
+        # 正确做法：取槽轮廓多边形，按 0.88 向形心收缩（凸多边形收缩必内含），
+        # 与 m4_build_solve.py 的 COIL_PTS 同一口径。
+        _slot_angle = 360.0 / c.slots
+        if _slot_pts:
+            _pcx = sum(p[0] for p in _slot_pts) / len(_slot_pts)
+            _pcy = sum(p[1] for p in _slot_pts) / len(_slot_pts)
+            _coil_pts = [(_pcx + 0.88 * (x - _pcx), _pcy + 0.88 * (y - _pcy))
+                         for (x, y) in _slot_pts]
+            _pts_literal = "["
+            _pts_literal += ", ".join("(%.6f, %.6f)" % (x, y) for (x, y) in _coil_pts)
+            _pts_literal += "]"
+            coil_block = "\n".join([
+                "",
+                "# ── 线圈截面（铜，槽轮廓 0.88 内缩；命名 Coil_1..Coil_N 与绕组脚本对齐）──",
+                "#    矩形截面在高槽满率槽里必然穿出槽壁，线圈必须由槽形收缩得到。",
+                f"coil_pts = {_pts_literal}",
+                f"coil_slot_angle = {_slot_angle:.6f}",
+                f"for k in range({c.slots}):",
+                "    angle = k * coil_slot_angle",
+                '    cname = "Coil_" + str(k + 1)',
+                "    _plpts = []",
+                "    for (_x, _y) in coil_pts + [coil_pts[0]]:",
+                '        _plpts.append(["NAME:PLPoint", "X:=", str(_x) + "mm",',
+                '                       "Y:=", str(_y) + "mm", "Z:=", "0mm"])',
+                '    _segs = ["NAME:PolylineSegments"]',
+                "    for _i in range(len(coil_pts)):",
+                '        _segs.append(["NAME:PLSegment", "SegmentType:=", "Line",',
+                '                      "StartIndex:=", _i, "NoOfPoints:=", 2])',
+                "    oEditor.CreatePolyline(",
+                '        ["NAME:PolylineParameters", "IsPolylineCovered:=", True,',
+                '         "IsPolylineClosed:=", True, ["NAME:PolylinePoints"] + _plpts, _segs],',
+                '        ["NAME:Attributes", "Name:=", cname, "Flags:=", "", "Color:=", "(255 128 0)",',
+                '         "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
+                '         "MaterialValue:=", \'"copper"\', "SolveInside:=", True])',
+                "    if angle > 0:",
+                "        oEditor.Rotate(",
+                '            ["NAME:Selections", "Selections:=", cname],',
+                '            ["NAME:RotateParameters", "RotateAxis:=", "Z",',
+                '             "RotateAngle:=", str(angle) + "deg",',
+                '             "DuplicateObjects:=", False])',
+            ])
+        else:  # round：槽体是圆，线圈取同圆心 0.88 倍半径的圆，必在槽内
+            coil_block = "\n".join([
+                "",
+                "# ── 线圈截面（圆槽：同圆心 0.88 倍半径，必在槽内）──",
+                f"coil_slot_angle = {_slot_angle:.6f}",
+                f"for k in range({c.slots}):",
+                "    angle = k * coil_slot_angle",
+                '    cname = "Coil_" + str(k + 1)',
+                "    oEditor.CreateCircle(",
+                '        ["NAME:CircleParameters", "XCenter:=", str(c_center) + "mm",',
+                '         "YCenter:=", "0mm", "ZCenter:=", "0mm",',
+                '         "Radius:=", str(cr * 0.88) + "mm", "WhichAxis:=", "Z"],',
+                '        ["NAME:Attributes", "Name:=", cname, "Flags:=", "", "Color:=", "(255 128 0)",',
+                '         "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
+                '         "MaterialValue:=", \'"copper"\', "SolveInside:=", True])',
+                "    if angle > 0:",
+                "        oEditor.Rotate(",
+                '            ["NAME:Selections", "Selections:=", cname],',
+                '            ["NAME:RotateParameters", "RotateAxis:=", "Z",',
+                '             "RotateAngle:=", str(angle) + "deg",',
+                '             "DuplicateObjects:=", False])',
+            ])
+
+        # ── G4 几何自洽参数（与 m4_build_solve.py 的冻结口径逐项对齐）──
+        r_pm_out = c.rotor_od / 2.0
+        r_pm_in = r_pm_out - c.pm_thickness
+        r_rotor = r_pm_in + 0.03          # 磁钢内嵌 30 µm
+        r_band = (c.rotor_od + c.stator_id) / 4.0
+        _nseg_pm = 24
+        _half_pm = math.radians(c.pm_pole_arc * pm_pitch) / 2.0
+        _pm_pts = []
+        for _k in range(_nseg_pm + 1):
+            _a = -_half_pm + 2.0 * _half_pm * _k / _nseg_pm
+            _pm_pts.append((r_pm_out * math.cos(_a), r_pm_out * math.sin(_a)))
+        for _k in range(_nseg_pm, -1, -1):
+            _a = -_half_pm + 2.0 * _half_pm * _k / _nseg_pm
+            _pm_pts.append((r_pm_in * math.cos(_a), r_pm_in * math.sin(_a)))
+        _pm_literal = "[" + ", ".join("(%.6f, %.6f)" % p for p in _pm_pts) + "]"
+        _pm_names = ", ".join("PM_%d" % (i + 1) for i in range(c.poles))
+        _coil_names = ", ".join("Coil_%d" % (i + 1) for i in range(c.slots))
 
         s = f'''#!/usr/bin/env python3
 """Step 3: 几何建模"""
@@ -413,13 +497,25 @@ oEditor.CreateCircle(
      "Transparency:=", 1, "PartCoordinateSystem:=", "Global",
      "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
 
+# ── G4 真机修复·边界 9：零矢势边界必须在 Region 还是「单条边的整圆」时赋 ──
+#   2026-11-13：Region 一旦被 Subtract 切出孔洞（定子/线圈/Band），
+#   `GetEdgeIDsFromObject("Region")` 会把外圆**和所有孔边**一起返回，
+#   `VectorPotential=0` 就被强行加到材料界面上 ⇒ 磁通被人为短路。
+#   求解器不报任何错，BEMF 却掉一大截 —— 又一个静默错误。
+#   正确顺序（= m4_build_solve.py 跑出 401 点解的顺序）：先赋边界，再切 Region。
+_region_edges = [int(e) for e in oEditor.GetEdgeIDsFromObject("Region")]
+oDesign.GetModule("BoundarySetup").AssignVectorPotential(
+    ["NAME:VectorPotential1", "Edges:=", _region_edges, "Value:=", "0",
+     "CoordinateSystem:=", ""])
+print("Boundary: VectorPotential=0 on pristine Region (%d edge)" % len(_region_edges))
+
 # Stator outer
 oEditor.CreateCircle(
     ["NAME:CircleParameters", "XCenter:=", "0mm", "YCenter:=", "0mm",
      "ZCenter:=", "0mm", "Radius:=", "{c.stator_od/2}mm", "WhichAxis:=", "Z"],
     ["NAME:Attributes", "Name:=", "StatorOuter", "Flags:=", "", "Color:=", "(132 132 193)",
      "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
-     "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
+     "MaterialValue:=", '"{c.stator_material}"', "SolveInside:=", True])
 
 # Stator inner
 oEditor.CreateCircle(
@@ -453,12 +549,16 @@ oEditor.Subtract(
     ["NAME:SubtractParameters", "KeepOriginals:=", False])
 
 # Rotor outer
+# ── G4 真机修复·几何 6：转子半径 = 磁钢内半径 + 0.03 mm，磁钢"嵌"进转子 ──
+#   磁钢改环形扇区后，转子盘必须小于磁钢外弧（否则转子自己就顶到定子内径），
+#   但又要与磁钢内弧重叠 30 µm，让布尔开出一个闭合浅坑：界面严格互补、
+#   无相切顶点（相切会触发 `Non-manifold vertices`，M2/M3 的死因之一）。
 oEditor.CreateCircle(
     ["NAME:CircleParameters", "XCenter:=", "0mm", "YCenter:=", "0mm",
-     "ZCenter:=", "0mm", "Radius:=", "{c.rotor_od/2}mm", "WhichAxis:=", "Z"],
+     "ZCenter:=", "0mm", "Radius:=", "{r_rotor:.6f}mm", "WhichAxis:=", "Z"],
     ["NAME:Attributes", "Name:=", "RotorOuter", "Flags:=", "", "Color:=", "(132 132 193)",
      "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
-     "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
+     "MaterialValue:=", '"{c.rotor_material}"', "SolveInside:=", True])
 
 # Shaft
 oEditor.CreateCircle(
@@ -473,12 +573,14 @@ oEditor.Subtract(
     ["NAME:SubtractParameters", "KeepOriginals:=", False])
 
 # PMs (N/S alternating)
+# ── G4 真机修复·几何 7：磁钢是**环形扇区**，不是平板弦 ──
+#   旧版用 `CreateRectangle(XStart=rotor_od/2, Width=pm_thickness)`，即把 1.95 mm 厚的
+#   平板放在转子外径**之外** ⇒ 径向跨 45.825..47.775 mm，而定子内径 46.5 mm，
+#   磁钢直接插进定子铁芯 1.275 mm（`StatorOuter and PM_x intersect`）。
+#   0.675 mm 气隙里平板弦几何上不可行。现在内外弧各离散 {_nseg_pm} 段
+#   （弧矢 ~4.5 µm），内弧 {r_pm_in:.4f} / 外弧 {r_pm_out:.4f}，从根上消除相切与穿插。
 pm_pitch = {pm_pitch}
-pa = {c.pm_pole_arc}
-pm_r = {c.rotor_od/2}
-pm_w = {c.pm_thickness}
-pm_h = pm_r * 2 * math.sin(math.radians(pa * pm_pitch / 2))
-
+pm_pts = {_pm_literal}
 for i in range({c.poles}):
     angle = i * pm_pitch
     if i % 2 == 0:
@@ -489,14 +591,17 @@ for i in range({c.poles}):
         color = "(0 0 255)"
     pname = "PM_" + str(i + 1)
 
-    oEditor.CreateRectangle(
-        ["NAME:RectangleParameters", "IsCovered:=", True,
-         "XStart:=", str(pm_r) + "mm",
-         "YStart:=", str(-pm_h/2) + "mm",
-         "ZStart:=", "0mm",
-         "Width:=", str(pm_w) + "mm",
-         "Height:=", str(pm_h) + "mm",
-         "WhichAxis:=", "Z"],
+    _pm_plpts = []
+    for (_x, _y) in pm_pts + [pm_pts[0]]:
+        _pm_plpts.append(["NAME:PLPoint", "X:=", str(_x) + "mm",
+                          "Y:=", str(_y) + "mm", "Z:=", "0mm"])
+    _pm_segs = ["NAME:PolylineSegments"]
+    for _i in range(len(pm_pts)):
+        _pm_segs.append(["NAME:PLSegment", "SegmentType:=", "Line",
+                         "StartIndex:=", _i, "NoOfPoints:=", 2])
+    oEditor.CreatePolyline(
+        ["NAME:PolylineParameters", "IsPolylineCovered:=", True,
+         "IsPolylineClosed:=", True, ["NAME:PolylinePoints"] + _pm_plpts, _pm_segs],
         ["NAME:Attributes", "Name:=", pname, "Flags:=", "", "Color:=", color,
          "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
          "MaterialValue:=", '"' + mat + '"', "SolveInside:=", True])
@@ -508,7 +613,15 @@ for i in range({c.poles}):
              "RotateAngle:=", str(angle) + "deg",
              "DuplicateObjects:=", False])
 
+# 转子 − 8 磁钢（KeepOriginals=True：磁钢本体保留，只在转子上挖出浅坑）
+oEditor.Subtract(
+    ["NAME:Selections", "Blank Parts:=", "RotorOuter", "Tool Parts:=", "{_pm_names}"],
+    ["NAME:SubtractParameters", "KeepOriginals:=", True])
+
 # Band（气隙中心）
+#   半径取 (rotor_od + stator_id)/4 = 气隙中点 {r_band:.4f} mm：
+#   磁钢外弧 {r_pm_out:.4f} 与其内切，转子盘整个落在带内 ⇒ AEDT 的
+#   "objects within the band" 检查能通过（Band 内必须有运动件）。
 band_r = ({c.rotor_od} + {c.stator_id}) / 4.0
 oEditor.CreateCircle(
     ["NAME:CircleParameters", "XCenter:=", "0mm", "YCenter:=", "0mm",
@@ -517,6 +630,16 @@ oEditor.CreateCircle(
      "Transparency:=", 0.75, "PartCoordinateSystem:=", "Global",
      "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
 {coil_block}
+
+# Region 布尔分离
+# ── G4 真机修复·几何 8：Region 必须与所有实体/线圈/运动带布尔分离 ──
+#   旧版 Region 是一个从未参与布尔的整圆 sheet ⇒ 与定子、线圈、Band 全域重叠，
+#   网格在重叠区被重复计入（M2/M3 的 36 条 intersect 中最隐蔽的一类：
+#   求解器不报错，只是场解错）。这里 KeepOriginals=True 只切 Region 本身。
+oEditor.Subtract(
+    ["NAME:Selections", "Blank Parts:=", "Region",
+     "Tool Parts:=", "StatorOuter, RotorOuter, {_pm_names}, {_coil_names}, Band"],
+    ["NAME:SubtractParameters", "KeepOriginals:=", True])
 
 print("Geometry done: {c.slots} slots, {c.poles} PMs, Band, {c.slots} coils")
 '''
@@ -648,18 +771,12 @@ oEditor = oDesign.SetActiveEditor("3D Modeler")
 oModule = oDesign.GetModule("BoundarySetup")
 
 # 零矢势边界（定子外边界）
-# ── G3b 真机修复·边界 1：AssignVectorPotential 只吃 1D 实体（Edges）──
-#   传 `"Objects:=", ["Region"]` 会被拒：
-#   `Boundary 'VectorPotential1' can only be assigned on 1D entities`。
-#   Region 是整圆 sheet，唯一一条边就是外圆；边号必须运行期取。
-edges = [int(e) for e in oEditor.GetEdgeIDsFromObject("Region")]
-oModule.AssignVectorPotential(
-    ["NAME:VectorPotential1",
-     "Edges:=", edges,
-     "Value:=", "0",
-     "CoordinateSystem:=", ""])
-
-print("Boundary: VectorPotential=0 on Region")
+# ── G4 迁移：这段边界已移到 geometry.py，紧跟 Region 建圆之后 ──
+#   原因（2026-11-13 真机分析）：本脚本在 geometry 之后运行，此时 Region 已被
+#   Subtract 切出孔洞，`GetEdgeIDsFromObject("Region")` 会把外圆**和所有孔边**
+#   一起返回，`VectorPotential=0` 就落到材料界面上 ⇒ 磁通被短路。
+#   写法规矩本身没变（G3b：只吃 1D 实体，必须传 Edges，不能传 Region sheet），
+#   只是**时机**必须早于任何布尔运算。见 geometry.py 同位置的注释。
 
 # 运动设置
 # ── G3b 真机修复·边界 2：键名是 "Init Pos:="（带空格）──
@@ -753,7 +870,10 @@ oModule.InsertSetup("Transient",
      "StopTime:=", "{stop_str}s",
      "TimeStep:=", "{step_str}s",
      "SaveFieldsType:=", "Every N Steps",
-     "N:=", "1",
+     # G4：隔步存场（N=2）与 m4_build_solve.py 的全时长口径一致 ——
+     # 报表采样点仍由求解步长决定（20 ms / 5e-5 s = 401 点），存场减半只影响
+     # 磁盘占用与写盘耗时，不影响转矩/磁链曲线。
+     "N:=", "2",
      "UseAdaptiveTimeStep:=", False,
      "NonlinearSolverResidual:=", "0.0001",
      "SmoothBHCurve:=", False])

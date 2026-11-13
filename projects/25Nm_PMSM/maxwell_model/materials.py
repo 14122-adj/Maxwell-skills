@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Step 2: 自定义材料定义（N/S极磁钢）"""
+"""Step 2: 自定义材料定义（N/S极磁钢 + 铁芯）"""
 import ScriptEnv
 ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
 oDesktop = ScriptEnv.GetDesktop()
@@ -55,3 +55,15 @@ oDefinitionManager.EditMaterial("NdFe35_S",
     ])
 
 print("Materials defined: NdFe35_N, NdFe35_S")
+# 铁芯材料（G4：模板此前从未定义/绑定，定转子默认是 vacuum）
+STEEL_MATS = ['M270_35A']
+for _m in STEEL_MATS:
+    oDefinitionManager.EditMaterial(
+        _m, ["NAME:" + _m, "CoordinateSystemType:=", "Cartesian",
+             "BulkOrSurfaceType:=", 1,
+             ["NAME:PhysicsTypes", "set:=", ["Electromagnetic", "Thermal",
+                                               "Structural"]],
+             "permittivity:=", "1", "permeability:=", "1000",
+             "conductivity:=", "2000000", "dielectric_loss_tangent:=", "0",
+             "magnetic_loss_tangent:=", "0", "mass_density:=", "7650",
+             "youngs_modulus:=", "200000000000"])

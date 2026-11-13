@@ -9,18 +9,12 @@ oEditor = oDesign.SetActiveEditor("3D Modeler")
 oModule = oDesign.GetModule("BoundarySetup")
 
 # 零矢势边界（定子外边界）
-# ── G3b 真机修复·边界 1：AssignVectorPotential 只吃 1D 实体（Edges）──
-#   传 `"Objects:=", ["Region"]` 会被拒：
-#   `Boundary 'VectorPotential1' can only be assigned on 1D entities`。
-#   Region 是整圆 sheet，唯一一条边就是外圆；边号必须运行期取。
-edges = [int(e) for e in oEditor.GetEdgeIDsFromObject("Region")]
-oModule.AssignVectorPotential(
-    ["NAME:VectorPotential1",
-     "Edges:=", edges,
-     "Value:=", "0",
-     "CoordinateSystem:=", ""])
-
-print("Boundary: VectorPotential=0 on Region")
+# ── G4 迁移：这段边界已移到 geometry.py，紧跟 Region 建圆之后 ──
+#   原因（2026-11-13 真机分析）：本脚本在 geometry 之后运行，此时 Region 已被
+#   Subtract 切出孔洞，`GetEdgeIDsFromObject("Region")` 会把外圆**和所有孔边**
+#   一起返回，`VectorPotential=0` 就落到材料界面上 ⇒ 磁通被短路。
+#   写法规矩本身没变（G3b：只吃 1D 实体，必须传 Edges，不能传 Region sheet），
+#   只是**时机**必须早于任何布尔运算。见 geometry.py 同位置的注释。
 
 # 运动设置
 # ── G3b 真机修复·边界 2：键名是 "Init Pos:="（带空格）──

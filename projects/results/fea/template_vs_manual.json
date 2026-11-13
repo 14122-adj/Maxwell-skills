@@ -1,0 +1,57 @@
+{
+  "stage": "G4",
+  "manual": {
+    "csvdir": "D:/ANSYS_Run/csv",
+    "bemf_rms_phase": 118.8832,
+    "cogging_pp": 6.84307,
+    "tq_points": 401
+  },
+  "template": {
+    "csvdir": "D:/ANSYS_Run/csv_tpl",
+    "phases": {
+      "A": {
+        "n_samples": 401,
+        "t_end_ms": 20.0,
+        "rms_v": 118.9058,
+        "peak_v": 156.9969,
+        "flux_pp_wb": 0.518813
+      },
+      "B": {
+        "n_samples": 401,
+        "t_end_ms": 20.0,
+        "rms_v": 118.9085,
+        "peak_v": 157.0021,
+        "flux_pp_wb": 0.518829
+      },
+      "C": {
+        "n_samples": 401,
+        "t_end_ms": 20.0,
+        "rms_v": 118.9089,
+        "peak_v": 156.9931,
+        "flux_pp_wb": 0.518833
+      }
+    },
+    "tq_points": 401,
+    "cogging": {
+      "n_samples": 200,
+      "mean_nm": 0.003052,
+      "min_nm": -3.406177,
+      "max_nm": 3.411916,
+      "peak_to_peak_nm": 6.818092
+    },
+    "bemf_rms_phase": 118.9077
+  },
+  "deviation_pct": {
+    "bemf_rms_phase": 0.0206,
+    "cogging_peak_to_peak": -0.365
+  },
+  "tolerance_pct": {
+    "bemf": 10.0,
+    "cogging": 10.0
+  },
+  "pass": {
+    "bemf": true,
+    "cogging": true
+  },
+  "verdict": "EQUIVALENT"
+}

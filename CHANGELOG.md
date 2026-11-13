@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — 2026-11-13（G4：模板路径 9 处"能建不能解"缺陷，空载解与手写路径等价）
+
+模板产出的模型此前只能"建出来"，不能"解对"。今日把 m4 手写工程跑出 401 点解的全部前提
+回灌模板，共 9 处：
+
+- 几何：磁钢由**平板弦**（径向 45.825..47.775，插进定子 1.275 mm）改为**环形扇区**
+  （43.875..45.825，弧 39.15°，内外弧各离散 24 段）；转子半径改为
+  `磁钢内半径 + 0.03 mm` 并挖出磁钢浅坑（界面互补、无相切顶点）；槽口第一边改为
+  `r_bore - 0.2 mm`（消除与内孔圆弧的相切非流形）；线圈由**槽轮廓 0.88 内缩**
+  得到（原 13.2×5.7 矩形在 r=49.65 处穿出 3.2 mm 宽的槽壁）；
+  `Region` 与定子/转子/磁钢/线圈/Band 布尔分离（`KeepOriginals=True`）。
+- 材料：`_gen_materials()` 新增铁芯材料定义（`STEEL_MATS`，线性化 µr=1000 / σ=2.0e6 /
+  ρ=7650），`StatorOuter`/`RotorOuter` 绑定 `stator_material`/`rotor_material`
+  —— 此前定转子建的是 `vacuum`，磁路整个落在空气上且不报错。
+- 边界：`AssignVectorPotential` 从 `_gen_boundary()` **前置进 `_gen_geometry()`**，
+  紧跟 Region 建圆之后。Region 一旦切孔，`GetEdgeIDsFromObject("Region")` 会把外圆
+  与所有孔边一起返回，`AZ=0` 落到材料界面 ⇒ 磁通被短路（求解器不报错）。
+- 求解：存场改 `N=2`（与 m4 全时长口径一致，401 个采样点不变）。
+- 新增 `projects/25Nm_PMSM/maxwell/tpl_solve_noload.py`（同进程 execfile 生成物 →
+  `SaveAs` → `Analyze("Setup1")` → 导出 `FluxLinkage`/`Moving1.Torque` 全时长解，
+  含面积自检与 `data_rows` 非空校验）与 `maxwell/tpl_run.py`（宿主侧清洗脚本、
+  起 `ansysedt -RunScriptAndExit`、抓日志）。
+- 新增 `projects/25Nm_PMSM/template_vs_manual.py`：两条路径逐项对比，含单位换算
+  （`Time [us]` / `Torque [mNewtonMeter]` —— 403 N·m 的来源）与 `e = -dλ/dt` 口径。
+- 真机结果（1 轮 rc=0，`ANALYZE_OK 437.1s`）：`T4_tpl_noload.aedt`（767,290 B，
+  24 sheets，Region 2 faces 面积守恒 11,053.35 mm²）；BEMF 相 RMS **118.9077 V**
+  vs 手写 118.8832 V（**+0.02%**）；齿槽峰峰值 **6.8181 N·m** vs 6.84307（**−0.37%**）；
+  三相磁链峰峰 0.518813/0.518829/0.518833 Wb（不平衡 0.004%）。
+- 回归：新增 `tests/test_gen_maxwell_model.py::TestG4GeometrySelfConsistency`（7 例：
+  磁钢扇区半径、转子内嵌、线圈顶点落在槽内（射线法，槽肩是凹角）、Region 布尔、
+  铁芯材料绑定与边界先于布尔）与 `tests/test_template_vs_manual.py`（6 例单位/求导口径）；
+  pytest **289 passed**、`ruff check scripts tests examples` 全通过。
+
 ### Fixed — 2026-11-12（G3b：建模模板 8 处 API 回灌，真机全链路建模通过）
 
 - `scripts/main.py::_gen_geometry()` 回灌 M2 阶段手改出来的 4 处真机修复：

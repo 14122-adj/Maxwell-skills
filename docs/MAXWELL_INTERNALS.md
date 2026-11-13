@@ -694,3 +694,61 @@ python projects/25Nm_PMSM/gen_maxwell_model.py --check   # 无漂移 rc=0，有�
 第 3 轮产物 `D:\ANSYS_Run\G3b_regen3.aedt`（288,557 B）文本核验：
 `Conductor number'='40'` × **12**、`VectorPotential1` × 2、`MotionSetup1`（`Move Type='Rotate'`）、
 `Setup1` × 8、`ModelDepth='160mm'` × 1、`Sheets=24`、`Solids=0`。
+
+## 14. 模板路径「能建 ≠ 能解」的 9 处缺陷与等价性证明（G4，2026-11-13 实测）
+
+§13 让模板脚本"不报错地把 24 个图元建出来"，但**建出来并不等于能解**，更不等于解的数对。
+本节记录把 m4 手写工程的"可解前提"回灌模板时抓出的 9 处缺陷，以及一次真机 401 点解
+对"两条路径等价"的证明。
+
+### 14.1 三类缺陷（按发现难度从易到难）
+
+| 类 | 缺陷 | 症状 | 判据 |
+|---|---|---|---|
+| 几何 | 磁钢是**平板弦**（XStart=45.825，宽 1.95 ⇒ 径向 45.825..47.775） | 插入定子铁芯 1.275 mm，`StatorOuter and PM_x intersect` | 磁钢任一点半径 > 定子内径 |
+| 几何 | 线圈是 `13.2 × 5.7` 矩形放在槽中线 | r=49.65 处槽仅 3.2 mm 宽，两侧穿出槽壁 | 线圈顶点是否在槽多边形内（**槽肩是凹角，不能用凸多边形判据**） |
+| 几何 | 转子盘半径 = 磁钢外半径 | 转子自己顶到定子内径 | `r_rotor < r_pm_out`，且 `= r_pm_in + 0.03` |
+| 几何 | 槽口第一边与内孔圆弧严格相切 | `Non-manifold vertices found for "StatorOuter"` | 槽口 `x0 = r_bore - 0.2` |
+| 几何 | `Region` 从未参与布尔 | 与定子/线圈/Band 全域重叠，网格重复计面积（**不报错**） | 面积守恒：`Region + 定子 + 12 线圈 + Band = π·R_region²` |
+| 材料 | 定转子建造成 `vacuum` | 磁路磁阻全落在空气上，BEMF 掉到零头（**不报错**） | `.aedt` 里出现 `MaterialValue='M270_35A'` |
+| 边界 | `VectorPotential=0` 写在 Region 切孔**之后** | 边集含外圆 + 所有孔边，AZ=0 落到材料界面 ⇒ 磁通被短路（**不报错**） | `AssignVectorPotential` 的位置必须早于第一次 `Subtract` |
+| 求解 | 存场 `N=1` | 401 次场存盘，磁盘与耗时翻倍（不影响曲线） | 与 m4 全时长口径 `N=2` 对齐 |
+| 建模 | 生成物 `"Tool Parts:=", PM_1, PM_2, ...` 引号丢失 | 运行时 `NameError`；`py_compile` **发现不了** | 生成物必须"编译 + 真机跑"双检 |
+
+### 14.2 关键顺序：边界必须早于布尔
+
+```python
+# geometry.py —— 正确顺序
+oEditor.CreateCircle([... "Name:=", "Region" ...])       # 整圆，只有 1 条边
+oDesign.GetModule("BoundarySetup").AssignVectorPotential(
+    ["NAME:VectorPotential1", "Edges:=", [int(e) for e in oEditor.GetEdgeIDsFromObject("Region")], ...])
+oEditor.CreateCircle([... "StatorOuter" ...])            # 之后才开始切
+oEditor.Subtract(...)                                    # Region / 定子 / 转子 / 线圈 / Band
+```
+
+写在 `boundary.py`（几何之后）时 `GetEdgeIDsFromObject("Region")` 返回的是
+**外圆 + 所有孔边**，`AZ=0` 就把每个材料界面钉成零磁位。求解器不报错，
+只是 BEMF/转矩变小。这类"顺序敏感"的缺陷**无法**用参数级测试发现，
+只能靠与已知正确结果的数值比对。
+
+### 14.3 等价性证明（真机，rc=0，`ANALYZE_OK 437.1s`）
+
+| 量 | 手写路径 `M5_25Nm.aedt` | 模板路径 `T4_tpl_noload.aedt` | 偏差 |
+|---|---|---|---|
+| BEMF 相 RMS | 118.8832 V | **118.9077 V** | +0.02% |
+| 齿槽峰峰值 | 6.84307 N·m | **6.8181 N·m** | −0.37% |
+| 磁链峰峰（A/B/C） | — | 0.518813 / 0.518829 / 0.518833 Wb | 不平衡 0.004% |
+| 采样点 | 401 | 401 | — |
+
+面积核验（模板路径，`.aedt` 存盘后 `GetFaceIDs`+`GetFaceArea`）：
+`Region 11,053.35`（2 faces，已切孔）= `π·95² − 9,645.38(定子) − 12×79.957(线圈) − 6,694.66(Band)`；
+`PM_1 59.751` 对解析扇区 59.79；`Coil_1 79.957` 对 `0.88²×103.25 = 79.95`。
+
+**结论**：模板路径与手写路径在空载工况下等价，此后几何试验只走生成器，不再维护第二套手写模型。
+
+### 14.4 一条副产品结论
+
+手写路径的线圈中心取 `(46.5+64.5)/2 = 55.5`，模板按顶点均值取 53.6（整体偏内 1.9 mm），
+但 BEMF 只差 0.02% ⇒ **空载 BEMF 由匝数与主磁通决定，对线圈径向位置不敏感**；
+线圈位置影响的是槽漏抗与铜耗分布，不是磁链。这也解释了 M2 阶段"线圈穿出槽壁"
+为何没在 BEMF 上暴露，只暴露在 intersect 报错上。
