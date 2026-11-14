@@ -3,6 +3,8 @@
 > 本文件由「Maxwell Skill 每日迭代」自动任务维护。每天只推进**一个阶段的一小步**，完成后勾选并记录产物与关键数值。数字必须来自脚本实算，不得臆造。
 
 > 本周目标见 WEEKLY_GOALS.md
+> 闭环方法见 `docs/DAILY_LOOP.md`；工程判据见 `docs/ENGINEERING_ACCEPTANCE.md`；
+> 问题账本见 `PROBLEM_LEDGER.md`；探索见 `EXPLORATION_LOG.md`。
 >
 > 最近周检：`docs/WEEKLY_AUDIT_2026-11-14.md` —— **技能可用 / 设计不合格**（齿槽 27.37%，M8 未开工）。
 
