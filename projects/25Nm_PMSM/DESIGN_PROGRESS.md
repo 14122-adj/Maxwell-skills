@@ -19,11 +19,10 @@
   ② 新增 `maxwell/tpl_solve_noload.py`（同进程 execfile 生成物 → 存盘 → `Analyze`
   → 导出 `FluxLinkage` / `Moving1.Torque` 全时长解）与 `maxwell/tpl_run.py`（宿主侧清洗 + 起 AEDT + 抓日志）。
   ③ 新增 `template_vs_manual.py`（两条路径逐项对比，含 µs/mN·m 单位换算真机陷阱）。
-- **明日（2026-11-14）**：**M7 —— 模板路径直接跑负载工况**（`MAXWELL_CASE=load` 的等价物：
-  模板绕组 `Current` 表达式 + 9.89 A 三相），与手写 `M5_load_25Nm.aedt` 的
-  `T_avg = 22.3344 N·m` 对比。模板路径已证明"几何/材料/边界等价"，负载只需在
-  `_gen_winding` 增一个 `rated_current` 开关；若 `T_avg` 与手写路径同样落在 ±20% 判据内，
-  则后续 **S10/S11 与全部几何试验都可以只走生成器**，不再维护第二套手写模型。
+- **今日（2026-11-14）**：**M8 梨形槽**（用户指定表 2 尺寸）—— 把 `_gen_geometry` 的
+  `pear` 分支从“浅梨形（8.05 mm）”改成“颈 1.5 → 斜肩 1.8 → 直身到圆心 → 半圆底”的
+  12.5 mm 真梨形；重生成 → 空载 FEA → 与基线（BEMF 118.8832 V / 齿槽 6.84307 N·m）对比。
+  规格见 `docs/PEAR_SLOT_SPEC.md`。M7 模板负载顺延到 M8 几何收敛之后。
 
 ### 今日关键结论（G4）
 
@@ -891,47 +890,39 @@ P_fe 36.824 W、I 10.6635 A、E 122.796 V、R 0.47227 Ω。
 产物：`projects/results/sensitivity_stack_turns.json`（锚点/假设/判据/9 工况/最优/所需叠长/自检）、
 `sensitivity_stack_turns.csv`。
 
-## 下一次应推进（Maxwell 优先）
+## 下一次应推进（Maxwell 优先，2026-11-14）
 
-### 优先级 1 — M4 空载瞬态求解（下一步，桌面会话）
+### 优先级 1 — M8 梨形槽（用户指定表 2 尺寸）
 
-1. 打开 `D:\ANSYS_Run\M4_25Nm.aedt`，先确认：`ModelDepth='160mm'`、`M270_35A`×2、
-   `BoundType='Coil'`×12 + `Winding Group`×3、`VectorPotential1 Edges(7)`、`Setup1`。
-2. `Setup1` 设为空载（绕组 `Current=0A`），Transient 运行 0.02 s / 50 µs。
-3. 导出 `Moving1.Torque`（齿槽）与 `WindingA/B/C.Voltage`（BEMF）到 `D:\ANSYS_Run\csv\`。
-4. `ingest_fea.py` 计算 BEMF RMS/THD、齿槽峰值 → `fea_results.json`。
-5. 验收：BEMF RMS 与解析 132.4 V 同量级；齿槽 ≤5% 额定；CSV 非空。
+目标：把定子槽从当前梯形/矩形改为**真梨形槽**，按表 2 参数化；重建 → 空载 FEA →
+与基线对比（BEMF 118.8832 V / 齿槽 6.84307 N·m / 负载 22.3344 N·m）。规格见
+`docs/PEAR_SLOT_SPEC.md`。
 
-### 已关闭：M3（2026-11-07）
+尺寸：Bs0=0.8、Hs0=1.5、Hs1=1.8、Hs2=12.5、Bs1=6.0、Bs2=9.5（Rs=4.75）；
+`Hs2` 按「内径→槽底最底端」总深（x3=54.25、x4=59.0、轭 16.0）。
 
-- `M4_25Nm.aedt`：`M270_35A`×2、`BoundType='Coil'`×12、`Winding Group`×3、
-  `VectorPotential1 Edges(7)`、`Setup1` 全部落地。
-- 关键坑：AEDT 2021.1 的 `AssignCoilGroup` 参数类型极挑；改用逐个
-  `AssignCoil(["NAME:...", "Objects:=", ["Coil_x"], "Conductor number:=", "40",
-  "PolarityType:=", "...", "Winding:=", "WindingA"])` 一次成功。
+实施顺序：
+1. `scripts/main.py::_gen_geometry` 的 `pear` 分支：x1/x2 从 `r_bore` 起算；
+   新增 x3=`r_bore+Hs2-Rs`、x4=`r_bore+Hs2`；11 点 + 10 段（Arc StartIndex 4）。
+2. `pmsm_config.py` / CLI 设 25 N·m 机型六尺寸；`slot_type=pear`。
+3. 线圈按梨形轮廓 0.88 内缩，弧段加采样点；槽满率 ≤0.78。
+4. 模板重生成 → `tpl_solve_noload.py` 真机空载 → 与手写基线对比。
+5. 若齿槽仍 >5%，在梨形槽基础上继续斜槽/极弧/槽口 FEA 扫描。
 
-### G3 状态（数据层已修，代码层待补）
+验收：槽面积 93.0±2%；线圈 72±5%；无 intersect；BEMF 与基线偏差 ≤10%；
+齿槽 ≤6.843 N·m（目标 ≤1.25 N·m / 5%）；负载 ±20%；pytest/ruff 全绿；
+模板/生成物 `--check` 无漂移。
 
-- **数据层**：`M4_25Nm.aedt` 的 `ModelDepth='160mm'`，不再是默认 `1meter`，M4 求解可直接用。
-- **代码层（代码债，不阻塞 M4）**：`scripts/main.py::_gen_setup` 与
-  `maxwell_model/solve_25Nm_SPMSM.py` 仍需注入 `ModelDepth`，避免下次重建又丢；
-  `MotorConfig.validate()` 断言 `stack_length > 0`。
+### 已关闭：M0–M6 / G3–G4（2026-11-07–11-13）
 
-### 优先级 3 — M4/M5/M6（求解与回填）
-
-- M4 空载瞬态：BEMF + 齿槽，导出 `bemf.csv` / `tq_noload.csv`。
-- M5 负载瞬态：三相电流，导出 `tq_load.csv` / `ia_load.csv`。
-- M6：`ingest_fea.py` → `fea_results.json`，回填报告。
-- 判据：M5 的 `T_avg` 与解析 25 N·m 同量级（±20%），否则先修模型，不要改报告口径。
-
-### 已关闭：M0/M1/M2（2026-11-07）
-
-- 复现命令（本机可直接跑，约 25 s/轮）：
-  ```bat
-  python projects\25Nm_PMSM\maxwell_model\prepare_batch.py --workdir D:\ANSYS_Run
-  "D:\Program Files\AnsysEM\AnsysEM21.1\Win64\ansysedt.exe" -RunScriptAndExit "D:\ANSYS_Run\m2_run.py"
-  ```
-  产物：`D:\ANSYS_Run\M2_25Nm.aedt` + `m2_report.txt`（对象清单）+ `m2_run.log`（AEDT 日志）。
+- M0–M3：`M1_min` → `M2_25Nm` → `M4_25Nm`；M4 以 401 点全时长解为准
+  （BEMF 118.8832 V、齿槽 6.84307 N·m、负载 22.3344 N·m）。
+- M5：负载 `T_avg` 22.3344 N·m（−10.66%）；M6：报告 §11 并入 FEA
+  （491,996 B / 9 图 / 13 表）。
+- G3：`ModelDepth` 注入；G3b：8 处模板 API 回灌；G4：模板路径与手写路径等价
+  （BEMF +0.02% / 齿槽 −0.37%）。
+- 历史误判已由 `6fca72c` 纠正：Band 薄环、`EditSetup` 丢运动、齿槽 1.6% 三条均不成立；
+  真实原因是多余的 `DeleteMotionSetup` 把报表绑到试算解 + 20 导体/槽边使 BEMF 减半。
 
 ## 历史「下一次应推进」计划（G2，已关闭 2026-11-07）
 
@@ -965,13 +956,13 @@ G1 已关闭（建模入口可从零重建 25 N·m 机型）。下一步转 G2�
 ## 每日任务约定
 
 1. 先读本文件 + `git log --oneline -10`，确认进度，避免重复。
-2. 只推进「下一次应推进」所指阶段的一小步（建议 ≤120 行代码）；**优先 M0–M6（Maxwell 实机）**，其次 G3，最后 S10/S11。
+2. 只推进「下一次应推进」所指阶段的一小步（建议 80–200 行或一个完整子能力）；**优先 M8 梨形槽/齿槽优化**，其次 M7 模板负载、G3 代码层，最后 S10/S11。
 3. 所有数值由脚本计算并落盘到 `projects/results/`，禁止编造。
 4. 完成后更新本文件的阶段状态、产物路径、关键结论与新的「下一次应推进」。
 5. 验证：运行本阶段脚本 + `python -m pytest -q`（原有失败不算本次引入）。
 6. 只 `git add` 本阶段相关文件；**不要 `git add -A`**；不提交 `.aedt`/`.asol`/`__pycache__`/大图。
 7. 验证通过后 `git push origin main`；失败或冲突则保留本地提交，禁止 `--force`。
-8. **Maxwell 优先**：每天至少尝试一次 Maxwell 实机启动/建模（M0–M6），记录 rc、日志、`.aedt` 是否生成；沙箱无法启动时标注 blocked 并给出桌面一键命令，**不得用解析仿真替代 Maxwell 验证**。
+8. **Maxwell 优先**：每天至少尝试一次 Maxwell 实机运行（模板路径或 `m4_build_solve.py`），记录 rc、日志、`.aedt`、对象/尺寸、`Analyze` 结果；失败标 blocked 并给桌面命令，**不得用解析仿真替代 Maxwell 验证**。
 9. 只有 M4（Maxwell 求解）通过后，才推进 S10/S11 等非 Maxwell 阶段。
 
 ## 备注
