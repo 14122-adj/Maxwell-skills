@@ -241,6 +241,18 @@ class TestG4GeometrySelfConsistency:
         assert ('"Radius:=", "%.6fmm"' % r_rotor) in geometry
         assert r_rotor < cfg.rotor_od / 2.0
 
+    @staticmethod
+    def _slot_polygon(cfg):
+        """按槽型给出线圈必须落在其中的槽多边形（M8 起 pear 走 slot_profile）。"""
+        if cfg.slot_type.value == "pear":
+            import slot_profile
+            return slot_profile.pear_outline(cfg)
+        r_bore = cfg.stator_id / 2.0
+        x0, x1 = r_bore - 0.2, r_bore + cfg.slot_Hs0
+        x2, b0, b2 = r_bore + cfg.slot_Hs2, cfg.slot_Bs0, cfg.slot_Bs2
+        return [(x0, -b0 / 2), (x1, -b0 / 2), (x2, -b2 / 2),
+                (x2, b2 / 2), (x1, b0 / 2), (x0, b0 / 2)]
+
     def test_coil_is_inscribed_in_slot(self, gen) -> None:
         """线圈截面必须由槽轮廓 0.88 内缩得到，且每个顶点都在槽多边形内。"""
         cfg = gen.build_config()
@@ -248,11 +260,7 @@ class TestG4GeometrySelfConsistency:
         coil = self._num_list(geometry, "coil_pts = [")
         assert len(coil) >= 4
 
-        r_bore = cfg.stator_id / 2.0
-        x0, x1, x2 = r_bore - 0.2, r_bore + cfg.slot_Hs0, r_bore + cfg.slot_Hs2
-        b0, b2 = cfg.slot_Bs0, cfg.slot_Bs2
-        slot = [(x0, -b0 / 2), (x1, -b0 / 2), (x2, -b2 / 2),
-                (x2, b2 / 2), (x1, b0 / 2), (x0, b0 / 2)]
+        slot = self._slot_polygon(cfg)
 
         def inside(poly, p) -> bool:
             """射线法点内判定（槽形在槽肩处是**凹**的，不能用半平面同号判据）。"""
@@ -270,6 +278,16 @@ class TestG4GeometrySelfConsistency:
 
         for p in coil:
             assert inside(slot, p), f"线圈顶点 {p} 跑出槽外（会报 StatorOuter/Coil intersect）"
+
+    def test_coil_vertex_count_matches_slot_outline(self, gen) -> None:
+        """梨形槽的线圈必须与密采样槽轮廓同顶点数（11 点无采样的旧缺陷会少 14 个）。"""
+        import slot_profile
+
+        cfg = gen.build_config()
+        geometry = _code(gen.render_scripts()["geometry"])
+        coil = self._num_list(geometry, "coil_pts = [")
+        assert len(coil) == len(slot_profile.pear_outline(cfg))
+
 
     def test_region_is_boolean_cleaned(self, gen) -> None:
         """Region 必须与定子/转子/磁钢/线圈/Band 布尔分离，否则网格重复计面积。"""

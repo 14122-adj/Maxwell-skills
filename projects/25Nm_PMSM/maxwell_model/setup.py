@@ -55,4 +55,4 @@ oDesign.SetDesignSettings(
      "ModelDepth:=", "160mm",
      "PreserveTransientSolution:=", False,
      "ComputeTransientInductance:=", True])
-print("Setup done: 12 slots, 8 poles, rectangular, SPM, ModelDepth=160mm")
+print("Setup done: 12 slots, 8 poles, pear, SPM, ModelDepth=160mm")

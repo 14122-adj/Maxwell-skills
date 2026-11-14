@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-11-14（M8：表 2 梨形槽落地，齿槽 27.37% → 3.52%）
+
+把 25 N·m 机型的定子槽从「窄口矩形」换成表 2 梨形槽，并第一次把「几何顶点」与
+「线圈轮廓」收敛到**同一个数据源**：
+
+- 新增 `scripts/slot_profile.py`：梨形槽 11 关键点 + 10 段（`Arc` 起点索引 4）+
+  底部半圆 16 段离散（`pear_outline`）+ 鞋带面积/形心内缩/环带实切面积。
+  几何字面量与线圈 `coil_pts` 都从它派生 —— 旧模板把同一组坐标写了两遍，
+  改一处就错位（`StatorOuter and Coil_x intersect` 的来源）。
+- `scripts/main.py::_gen_geometry()` 的 `pear` 分支重写：`x1=r_bore+Hs0`、
+  `x2=+Hs1`、`x3=r_bore+Hs2−Rs`、`x4=r_bore+Hs2`（旧版全部从 `x0=r_bore−0.2` 起算，
+  整槽短 0.2 mm 且只有 7 点、`Arc` 起点错在 3），12 个 `PLPoint`（11 + 闭合）+ 10 段。
+- `scripts/motor_config.py::validate()` 增梨形槽三道闸：`Rs` 必须等于 `Bs2/2`
+  （否则半圆起点不在圆上，Acis 补隐式连线静默变形）、`Hs2−Hs0−Hs1−Rs ≥ 0`
+  （直身段为负即槽形自交）、轭部 <6 mm 告警。
+- `projects/25Nm_PMSM/gen_maxwell_model.py`：`build_config` 切 `PEAR` + 表 2 六尺寸；
+  `pmsm_config.py` 增 M8 梨形块与派生量（x0..x4 / 轭 16.0 / 面积 93.03 / 线圈 71.9 /
+  满率 0.710），旧矩形常量保留供 S7–S9 复现。
+- `template_vs_manual.py` 增 `--tag`：M8 证据落 `fea/m8_pear/` 与
+  `template_vs_manual_m8_pear.json`，不覆盖 G4 的 `fea/tpl/`。
+- 真机（1 轮 rc=0，`ANALYZE_OK 673.6s`，`T4_tpl_noload.aedt` 1,313,661 B / 24 sheets）：
+  `StatorOuter` **9,764.151 mm²**（解析预测 9,764.16，偏差 0.001%）、`Coil_1`
+  **71.863 mm²**（预测 71.863）；BEMF 相 RMS **120.5594 V**（基线 118.8832，**+1.41%**）；
+  齿槽峰峰值 **0.8801 N·m = 3.52% 额定**（基线 6.84307，**−87.1%**），主频 598.5 Hz
+  ≈ 24×25 Hz（槽极 LCM 序），两个 10 ms 窗口的峰峰值一致（0.8801/0.8801）。
+- 回归：新增 `tests/test_pear_slot.py`（23 例：五条基准线、11 点对称性、10 段覆盖、
+  面积三重自洽、弧采样亏损、线圈 72±5% 与不进气隙、满率、validate 闸口）；
+  `test_gen_maxwell_model` 的线圈内缩判据改按槽型取多边形；
+  `test_model_depth` 不再自抄一份机型配置（M8 换槽型后它才是红的根因）。
+  pytest **312 passed**、`ruff` 全通过、`--check` 8/8 无漂移。
+
 ### Fixed — 2026-11-13（G4：模板路径 9 处"能建不能解"缺陷，空载解与手写路径等价）
 
 模板产出的模型此前只能"建出来"，不能"解对"。今日把 m4 手写工程跑出 401 点解的全部前提

@@ -30,11 +30,36 @@ YOKE_THICKNESS_MM = 7.86
 SLOT_AREA_MM2 = 231.6
 SPLIT_RATIO = 0.62              # Dsi / Dso
 
-# Slot geometry (parallel-sided)
+# Slot geometry (parallel-sided) —— M0–M6 基线口径，保留供 S7/S8/S9 冻结分析复现
 SLOT_OPENING_MM = 2.5           # bs0
 SLOT_WEDGE_DEPTH_MM = 1.5       # hs1
 SLOT_BODY_WIDTH_MM = 9.5        # bs2
 SLOT_BODY_DEPTH_MM = 18.0       # hs3
+
+# ============================================================
+# M8 梨形槽（表 2，2026-11-14 用户指定）—— FEA 齿槽优化的当前几何
+# ============================================================
+# 口径：Hs2 按「定子内径 → 槽底**最底端**」的总深理解（docs/PEAR_SLOT_SPEC.md §2）。
+# 若改口为「内径 → 圆心」，则 x3=r_bore+Hs2、x4=x3+Rs，轭部 16.0 → 11.25 mm。
+SLOT_TYPE = "pear"
+SLOT_PEAR_BS0_MM = 0.8          # 槽口宽
+SLOT_PEAR_HS0_MM = 1.5          # 窄颈高
+SLOT_PEAR_HS1_MM = 1.8          # 斜肩高
+SLOT_PEAR_HS2_MM = 12.5         # 槽深（到槽底最底端）
+SLOT_PEAR_BS1_MM = 6.0          # 肩部宽
+SLOT_PEAR_BS2_MM = 9.5          # 槽底直径（半圆底 Rs = 4.75）
+SLOT_PEAR_RS_MM = 4.75
+
+# 派生（与 scripts/slot_profile.py 同源，误差 <1e-3 mm²）
+SLOT_PEAR_X0_MM = STATOR_ID_MM / 2 - 0.2      # 46.3（槽口压进内孔 0.2）
+SLOT_PEAR_X1_MM = STATOR_ID_MM / 2 + SLOT_PEAR_HS0_MM            # 48.0
+SLOT_PEAR_X2_MM = STATOR_ID_MM / 2 + SLOT_PEAR_HS0_MM + SLOT_PEAR_HS1_MM   # 49.8
+SLOT_PEAR_X3_MM = STATOR_ID_MM / 2 + SLOT_PEAR_HS2_MM - SLOT_PEAR_RS_MM    # 54.25
+SLOT_PEAR_X4_MM = STATOR_ID_MM / 2 + SLOT_PEAR_HS2_MM            # 59.0
+SLOT_PEAR_YOKE_MM = STATOR_OD_MM / 2 - SLOT_PEAR_X4_MM           # 16.0
+SLOT_PEAR_AREA_MM2 = 93.03      # 颈 1.36 + 斜肩 13.95 + 直身 42.28 + 半圆 35.44
+SLOT_PEAR_AREA_EFF_MM2 = SLOT_PEAR_AREA_MM2 - 0.2 * SLOT_PEAR_BS0_MM  # 92.87（环带实切）
+COIL_AREA_MM2 = 71.9            # 槽形 0.88 内缩（面积比 0.7744）
 
 # PM geometry
 PM_THICKNESS_MM = 1.95
@@ -70,6 +95,8 @@ WIRE_AWG = 15
 WIRE_DIAMETER_MM = 1.450
 WIRE_AREA_MM2 = 1.652
 SLOT_FILL_FACTOR = 0.40
+# M8 梨形槽：40 根 Ø1.45 的净铜面积 / 槽面积 = 66.05 / 93.03 = 0.710（≤0.78，线径不必改）
+SLOT_FILL_PEAR = CONDUCTORS_PER_SLOT * WIRE_AREA_MM2 / SLOT_PEAR_AREA_MM2
 
 # Winding layout (8p12s, double-layer concentrated)
 # Slot:  1   2   3   4   5   6   7   8   9  10  11  12

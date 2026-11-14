@@ -44,13 +44,26 @@ def _load_pmsm_config():
     return mod
 
 
+def _load_gen():
+    """加载 25 N·m 机型的建模驱动（`build_config()` 是几何口径的唯一来源）。"""
+    spec = importlib.util.spec_from_file_location(
+        "gen_maxwell_model_25nm_depth", PROJ / "gen_maxwell_model.py")
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def _cfg(stack_length: float = STACK_MM):
-    """25 N·m 8p12s 机型配置（几何与 gen_maxwell_model.py 同口径）。"""
-    cfg = create_motor_from_input(
-        f"slots=12 poles=8 stator_od=150 stator_id=93 stack_length={stack_length}"
-    )
-    # gen_maxwell_model.py 用的是平行壁矩形槽，默认 pear 会给出不同的 setup 打印串
-    cfg.update(slot_type=SlotType.RECTANGULAR)
+    """25 N·m 8p12s 机型配置 —— 直接取 ``gen_maxwell_model.build_config()``。
+
+    2026-11-14：旧版自己抄了一份 ``create_motor_from_input(...)`` 并写死
+    ``slot_type=RECTANGULAR``。M8 把机型换成表 2 梨形槽后，``setup.py`` 的打印串
+    从 "rectangular" 变成 "pear"，这个测试当场红 —— 不是缺陷，是测试在抄口径。
+    现在改为派生，槽型/尺寸只存在于驱动一处。
+    """
+    cfg = _load_gen().build_config()
+    cfg.update(stack_length=stack_length)
     return cfg
 
 

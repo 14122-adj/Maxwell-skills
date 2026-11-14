@@ -49,7 +49,7 @@ def build_config() -> MotorConfig:
         dc_bus_voltage_v=537.0,
         phases=3,
 
-        slot_type=SlotType.RECTANGULAR,        # 25Nm 设计为平行壁矩形槽
+        slot_type=SlotType.PEAR,               # M8：表 2 梨形槽（11 点 + 半圆底）
         pm_topology=PMTopology.SPM,
         pole_pairs=4,
         slots=12,
@@ -62,11 +62,16 @@ def build_config() -> MotorConfig:
         airgap=0.675,
         stack_length=160.0,
 
-        # 槽参数 (mm) — 映射自 pmsm_config 的平行壁矩形槽
-        slot_Hs0=1.5,        # 槽口高度（楔部）
-        slot_Bs0=2.5,        # 槽口宽度 bs0
-        slot_Hs2=18.0,       # 槽深 hs3
-        slot_Bs2=9.5,        # 槽身宽度 bs2
+        # 槽参数 (mm) — 表 2「定子槽尺寸」（docs/PEAR_SLOT_SPEC.md）
+        #   Hs2 口径 = 内径 → 槽底**最底端**：x1=48.0 / x2=49.8 / x3=54.25 / x4=59.0，
+        #   轭部 = 75 − 59 = 16.0 mm。解析槽面积 93.03 mm²。
+        slot_Bs0=0.8,        # 槽口宽
+        slot_Hs0=1.5,        # 窄颈高
+        slot_Hs1=1.8,        # 斜肩高
+        slot_Hs2=12.5,       # 槽深（到槽底最底端）
+        slot_Bs1=6.0,        # 肩部宽
+        slot_Bs2=9.5,        # 槽底直径
+        slot_Rs=4.75,        # 槽底半圆半径 = Bs2/2
 
         # 永磁体 (mm)
         pm_thickness=1.95,

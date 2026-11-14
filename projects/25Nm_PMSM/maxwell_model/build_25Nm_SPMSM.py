@@ -65,7 +65,7 @@ oDesign.SetDesignSettings(
      "ModelDepth:=", "160mm",
      "PreserveTransientSolution:=", False,
      "ComputeTransientInductance:=", True])
-print("Setup done: 12 slots, 8 poles, rectangular, SPM, ModelDepth=160mm")
+print("Setup done: 12 slots, 8 poles, pear, SPM, ModelDepth=160mm")
 
 
 # ============ MATERIALS ============
@@ -193,31 +193,35 @@ oEditor.Subtract(
     ["NAME:Selections", "Blank Parts:=", "StatorOuter", "Tool Parts:=", "StatorInner"],
     ["NAME:SubtractParameters", "KeepOriginals:=", False])
 
-# Slot creation (rectangular type)
-r_bore = 46.5
-x0 = r_bore - 0.2
-x1 = r_bore + 1.5
-x2 = r_bore + 18.0
-b0 = 2.5
-b2 = 9.5
+# Slot creation (pear type, Table-2 11 pts + bottom Arc)
+#   解析槽面积 93.026 mm2 / 环带实际切除 92.866 mm2（槽口 0.2 mm 在内孔里）
+#   底弧半径 4.750，圆心 x=54.250，槽底 x=59.000
 oEditor.CreatePolyline(
     ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,
      ["NAME:PolylinePoints",
-      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
-      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"],
-      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-b2/2) + "mm", "Z:=", "0mm"],
-      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(b2/2) + "mm", "Z:=", "0mm"],
-      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
-      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(b0/2) + "mm", "Z:=", "0mm"],
-      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-b0/2) + "mm", "Z:=", "0mm"]],
+      ["NAME:PLPoint", "X:=", "46.3mm", "Y:=", "-0.4mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "48mm", "Y:=", "-0.4mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "48mm", "Y:=", "-3mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "49.8mm", "Y:=", "-4.75mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "54.25mm", "Y:=", "-4.75mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "59mm", "Y:=", "0mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "54.25mm", "Y:=", "4.75mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "49.8mm", "Y:=", "4.75mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "48mm", "Y:=", "3mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "48mm", "Y:=", "0.4mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "46.3mm", "Y:=", "0.4mm", "Z:=", "0mm"],
+      ["NAME:PLPoint", "X:=", "46.3mm", "Y:=", "-0.4mm", "Z:=", "0mm"]],
      ["NAME:PolylineSegments",
       ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],
       ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],
       ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],
       ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 3, "NoOfPoints:=", 2],
-      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 4, "NoOfPoints:=", 2],
-      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],
-      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2]]],
+      ["NAME:PLSegment", "SegmentType:=", "Arc", "StartIndex:=", 4, "NoOfPoints:=", 3],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 7, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 8, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 9, "NoOfPoints:=", 2],
+      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 10, "NoOfPoints:=", 2]]],
     ["NAME:Attributes", "Name:=", "Slot_1", "Flags:=", "", "Color:=", "(0 200 0)",
      "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
      "MaterialValue:=", '"vacuum"', "SolveInside:=", True])
@@ -323,7 +327,8 @@ oEditor.CreateCircle(
 
 # ── 线圈截面（铜，槽轮廓 0.88 内缩；命名 Coil_1..Coil_N 与绕组脚本对齐）──
 #    矩形截面在高槽满率槽里必然穿出槽壁，线圈必须由槽形收缩得到。
-coil_pts = [(47.096000, -1.100000), (48.592000, -1.100000), (63.112000, -4.180000), (63.112000, 4.180000), (48.592000, 1.100000), (47.096000, 1.100000)]
+#    槽多边形 92.799 mm2（25 顶点，梨形底弧已密采样）→ 线圈 71.863 mm2（满率 0.774）
+coil_pts = [(47.246452, -0.352000), (48.742452, -0.352000), (48.742452, -2.640000), (50.326452, -4.180000), (54.242452, -4.180000), (55.057930, -4.099682), (55.842069, -3.861816), (56.564736, -3.475543), (57.198159, -2.955706), (57.717995, -2.322284), (58.104269, -1.599617), (58.342135, -0.815478), (58.422452, 0.000000), (58.342135, 0.815478), (58.104269, 1.599617), (57.717995, 2.322284), (57.198159, 2.955706), (56.564736, 3.475543), (55.842069, 3.861816), (55.057930, 4.099682), (54.242452, 4.180000), (50.326452, 4.180000), (48.742452, 2.640000), (48.742452, 0.352000), (47.246452, 0.352000)]
 coil_slot_angle = 30.000000
 for k in range(12):
     angle = k * coil_slot_angle

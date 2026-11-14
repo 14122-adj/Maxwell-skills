@@ -1,0 +1,79 @@
+{
+  "stage": "M8",
+  "date": "2026-11-14",
+  "slot_type": "pear (Table 2, 11 pts + bottom Arc)",
+  "geometry": {
+    "analytic_slot_area_mm2": 93.026,
+    "effective_ring_area_mm2": 92.866,
+    "stator_face_measured_mm2": 9764.151,
+    "stator_face_predicted_mm2": 9764.16,
+    "coil_area_measured_mm2": 71.863,
+    "coil_area_predicted_mm2": 71.863,
+    "coil_vertices": 25,
+    "arc_segments": 16,
+    "slot_fill_net_copper": 0.71,
+    "checks": {
+      "slot_area_pm2pct": true,
+      "coil_area_pm5pct": true,
+      "bore_overlap_excluded": true
+    }
+  },
+  "aedt": {
+    "file": "D:/ANSYS_Run/T4_tpl_noload.aedt",
+    "size_b": 1313661,
+    "sheets": 24,
+    "rc": 0,
+    "analyze_s": 673.6,
+    "motion": "MotionSetup1 Rotate 1500rpm",
+    "depth": "160mm",
+    "intersect_errors": 0
+  },
+  "bemf": {
+    "phases": {
+      "A": {
+        "n": 401,
+        "rms_v": 120.558,
+        "flux_pp_wb": 0.525075
+      },
+      "B": {
+        "n": 401,
+        "rms_v": 120.5573,
+        "flux_pp_wb": 0.525074
+      },
+      "C": {
+        "n": 401,
+        "rms_v": 120.5629,
+        "flux_pp_wb": 0.525114
+      }
+    },
+    "rms_phase_avg_v": 120.5594,
+    "baseline_v": 118.8832,
+    "deviation_pct": 1.41
+  },
+  "cogging": {
+    "pp_nm": 0.880091,
+    "pct_rated": 3.5204,
+    "mean_nm": 0.004034,
+    "min_nm": -0.437327,
+    "max_nm": 0.442764,
+    "n_samples": 401,
+    "dominant_hz": 598.5,
+    "expected_hz": 600.0,
+    "window_consistency": {
+      "0-10ms": 0.8801,
+      "10-20ms": 0.8801
+    },
+    "baseline_pp_nm": 6.84307,
+    "deviation_pct": -87.1389
+  },
+  "criteria": {
+    "bemf_within_10pct": true,
+    "cogging_le_6p843": true,
+    "cogging_le_1p25_target": true,
+    "slot_area": true,
+    "coil_area": true,
+    "no_intersect": true,
+    "load_case": "pending M7 (template load path not built)"
+  },
+  "verdict": "G6 主体通过（空载）：齿槽 0.8801 N·m = 3.52%，达 ≤1.25 N·m / ≤5% 目标；负载 T_avg 待 M7"
+}

@@ -265,6 +265,23 @@ class MotorConfig:
                 issues.append("WARNING: 梨形槽Bs0应<Bs1<Bs2")
             if self.slot_Rs <= 0:
                 issues.append("ERROR: 梨形槽需要正的圆角Rs")
+            # M8（2026-11-14）：底部是**半圆**（Arc），半径必须等于槽底半宽，
+            # 否则弧的起点 (x3, ±Bs2/2) 不在圆上，轮廓在直身末端断开 ——
+            # Acis 会补一段隐式连线，槽形静默变形（面积对不上解析值）。
+            if self.slot_Rs > 0 and abs(self.slot_Rs - self.slot_Bs2 / 2.0) > 1e-3:
+                issues.append(
+                    "ERROR: 梨形槽 Rs=%.3f 必须等于 Bs2/2=%.3f（底部为半圆）"
+                    % (self.slot_Rs, self.slot_Bs2 / 2.0))
+            # Hs2 口径 = 内径 → 槽底最底端，故 x3 = r_bore + Hs2 − Rs 必须 ≥ x2，
+            # 否则直身段长度为负，半圆圆心跑到斜肩之上（槽形自交）。
+            _straight = self.slot_Hs2 - self.slot_Hs0 - self.slot_Hs1 - self.slot_Rs
+            if _straight < 0:
+                issues.append(
+                    "ERROR: 梨形槽直身段为负（Hs2=%.2f < Hs0+Hs1+Rs=%.2f）"
+                    % (self.slot_Hs2, self.slot_Hs0 + self.slot_Hs1 + self.slot_Rs))
+            _yoke = self.stator_od / 2.0 - (self.stator_id / 2.0 + self.slot_Hs2)
+            if _yoke < 6.0:
+                issues.append("WARNING: 梨形槽轭部仅 %.2f mm，偏薄" % _yoke)
         
         # 永磁体检查
         if self.pm_topology == PMTopology.SPM:

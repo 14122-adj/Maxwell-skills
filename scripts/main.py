@@ -21,6 +21,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from motor_config import MotorConfig, SlotType, PMTopology, MotorType, create_motor_from_input
 from pmsm_winding_builder import WindingBuilder, LayerType
+import slot_profile
+
+
+def _mm(value: float) -> str:
+    """把 mm 长度写成 AEDT 直接可吃的字面量（`46.3` → `"46.3"`，`0.0` → `"0"`）。
+
+    与 `format_mm()` 的区别：这里只产数值部分（调用点自己拼 ``mm``），
+    且用 ``%g`` 保留 6 位有效数字 —— 梨形槽顶点是算出来的，不需要尾部零。
+    """
+    return ("%.6g" % float(value))
+
 
 
 def format_mm(value: float) -> str:
@@ -259,45 +270,45 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
         _bs0, _hs0 = c.slot_Bs0, c.slot_Hs0
         _slot_pts = None      # 供线圈内缩复用的槽轮廓（mm）；round 槽为 None
         if c.slot_type.value == "pear":
-            x1 = x0 + c.slot_Hs0
-            x2 = x0 + c.slot_Hs0 + c.slot_Hs1
-            x3 = x0 + c.slot_Hs0 + c.slot_Hs1 + c.slot_Rs
+            # ── M8（2026-11-14）梨形槽按表 2 参数化：11 点 + 底部半圆 Arc ──
+            # 旧版三处错：① x1/x2/x3 从 x0（=r_bore−0.2）起算，整条槽短 0.2 mm；
+            # ② 只有 7 点，斜肩与半圆被打成一根弦，槽形根本不是梨形；
+            # ③ 槽面积/线圈面积两套坐标各写一遍，改一处就错位。
+            # 现在几何字面量与 `_slot_pts` 同源于 `slot_profile.pear_key_points()`，
+            # 线圈轮廓再用 `pear_outline()`（底部半圆 16 段离散）—— 见 slot_profile 头注。
+            _pear = slot_profile.pear_key_points(c)
+            _pear_area = slot_profile.pear_area_analytic(c)
+            _pear_eff = slot_profile.slot_effective_area(c, _pear_area)
+            _seg_spec = slot_profile.pear_segments()
+            # 逐点/逐段发射：末行要顺手闭合容器（点表 / 段表 + PolylineParameters），
+            # 少一个括号 py_compile 就炸，多一个 AEDT 就报参数结构错误。
+            _pl_lines = [
+                '      ["NAME:PLPoint", "X:=", "%smm", "Y:=", "%smm", "Z:=", "0mm"]%s'
+                % (_mm(v[0]), _mm(v[1]), "," if i < len(_pear) else "],")
+                for i, v in enumerate(_pear + [_pear[0]])   # 11 关键点 + 闭合重复点 = 12
+            ]
+            _seg_lines = [
+                '      ["NAME:PLSegment", "SegmentType:=", "%s", "StartIndex:=", %d, "NoOfPoints:=", %d]%s'
+                % (kind, start, npt, "," if i < len(_seg_spec) - 1 else "]],")
+                for i, (kind, start, npt) in enumerate(_seg_spec)
+            ]
             slot_block = "\n".join([
-                f"# Slot creation (pear type)",
-                f"r_bore = {r_bore}", f"x0 = r_bore - 0.2",
-                f"bs0 = {c.slot_Bs0}", f"bs1 = {c.slot_Bs1}", f"bs2 = {c.slot_Bs2}",
-                f"hs0 = {c.slot_Hs0}", f"hs1 = {c.slot_Hs1}", f"hs2 = {c.slot_Hs2}", f"rs = {c.slot_Rs}",
-                f"x1 = r_bore + hs0", f"x2 = r_bore + hs0 + hs1",
-                f"x3 = r_bore + hs0 + hs1 + rs",
+                "# Slot creation (pear type, Table-2 11 pts + bottom Arc)",
+                "#   解析槽面积 %.3f mm2 / 环带实际切除 %.3f mm2（槽口 0.2 mm 在内孔里）"
+                % (_pear_area, _pear_eff),
+                "#   底弧半径 %.3f，圆心 x=%.3f，槽底 x=%.3f"
+                % (c.slot_Rs, _pear[4][0], _pear[5][0]),
                 "oEditor.CreatePolyline(",
                 '    ["NAME:PolylineParameters", "IsPolylineCovered:=", True, "IsPolylineClosed:=", True,',
                 '     ["NAME:PolylinePoints",',
-                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-bs0/2) + "mm", "Z:=", "0mm"],',
-                f'      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(-bs1/2) + "mm", "Z:=", "0mm"],',
-                f'      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(-bs2/2) + "mm", "Z:=", "0mm"],',
-                f'      ["NAME:PLPoint", "X:=", str(x3) + "mm", "Y:=", "0mm", "Z:=", "0mm"],',
-                f'      ["NAME:PLPoint", "X:=", str(x2) + "mm", "Y:=", str(bs2/2) + "mm", "Z:=", "0mm"],',
-                f'      ["NAME:PLPoint", "X:=", str(x1) + "mm", "Y:=", str(bs1/2) + "mm", "Z:=", "0mm"],',
-                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(bs0/2) + "mm", "Z:=", "0mm"],',
-                f'      ["NAME:PLPoint", "X:=", str(x0) + "mm", "Y:=", str(-bs0/2) + "mm", "Z:=", "0mm"]],',
+            ] + _pl_lines + [
                 '     ["NAME:PolylineSegments",',
-                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 0, "NoOfPoints:=", 2],',
-                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 1, "NoOfPoints:=", 2],',
-                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 2, "NoOfPoints:=", 2],',
-                '      ["NAME:PLSegment", "SegmentType:=", "Arc", "StartIndex:=", 3, "NoOfPoints:=", 3],',
-                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 5, "NoOfPoints:=", 2],',
-                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 6, "NoOfPoints:=", 2],',
-                '      ["NAME:PLSegment", "SegmentType:=", "Line", "StartIndex:=", 7, "NoOfPoints:=", 2]]],',
+            ] + _seg_lines + [
                 '    ["NAME:Attributes", "Name:=", "Slot_1", "Flags:=", "", "Color:=", "(0 200 0)",',
                 '     "Transparency:=", 0, "PartCoordinateSystem:=", "Global",',
                 '     "MaterialValue:=", \'"vacuum"\', "SolveInside:=", True])',
             ])
-            _slot_pts = [(x0, -c.slot_Bs0 / 2.0), (r_bore + c.slot_Hs0, -c.slot_Bs1 / 2.0),
-                         (r_bore + c.slot_Hs0 + c.slot_Hs1, -c.slot_Bs2 / 2.0),
-                         (r_bore + c.slot_Hs0 + c.slot_Hs1 + c.slot_Rs, 0.0),
-                         (r_bore + c.slot_Hs0 + c.slot_Hs1, c.slot_Bs2 / 2.0),
-                         (r_bore + c.slot_Hs0, c.slot_Bs1 / 2.0),
-                         (x0, c.slot_Bs0 / 2.0)]
+            _slot_pts = slot_profile.pear_outline(c)
         elif c.slot_type.value == "rectangular":
             # 槽口(窄) + 槽体(宽), 直角台阶, 单个 6 点 Polyline 闭合
             slot_block = "\n".join([
@@ -398,11 +409,11 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
         # 正确做法：取槽轮廓多边形，按 0.88 向形心收缩（凸多边形收缩必内含），
         # 与 m4_build_solve.py 的 COIL_PTS 同一口径。
         _slot_angle = 360.0 / c.slots
+        _coil_area = _slot_poly_area = None
         if _slot_pts:
-            _pcx = sum(p[0] for p in _slot_pts) / len(_slot_pts)
-            _pcy = sum(p[1] for p in _slot_pts) / len(_slot_pts)
-            _coil_pts = [(_pcx + 0.88 * (x - _pcx), _pcy + 0.88 * (y - _pcy))
-                         for (x, y) in _slot_pts]
+            _slot_poly_area = slot_profile.polygon_area(_slot_pts)
+            _coil_pts = slot_profile.shrink_toward_centroid(_slot_pts, slot_profile.COIL_SHRINK)
+            _coil_area = slot_profile.polygon_area(_coil_pts)
             _pts_literal = "["
             _pts_literal += ", ".join("(%.6f, %.6f)" % (x, y) for (x, y) in _coil_pts)
             _pts_literal += "]"
@@ -410,6 +421,8 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
                 "",
                 "# ── 线圈截面（铜，槽轮廓 0.88 内缩；命名 Coil_1..Coil_N 与绕组脚本对齐）──",
                 "#    矩形截面在高槽满率槽里必然穿出槽壁，线圈必须由槽形收缩得到。",
+                "#    槽多边形 %.3f mm2（%d 顶点，梨形底弧已密采样）→ 线圈 %.3f mm2（满率 %.3f）"
+                % (_slot_poly_area, len(_slot_pts), _coil_area, _coil_area / _slot_poly_area),
                 f"coil_pts = {_pts_literal}",
                 f"coil_slot_angle = {_slot_angle:.6f}",
                 f"for k in range({c.slots}):",

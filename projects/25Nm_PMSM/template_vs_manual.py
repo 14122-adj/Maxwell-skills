@@ -146,8 +146,12 @@ def analyse(csvdir: str) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--csvdir", default=DEFAULT_CSVDIR, help="模板路径 CSV 目录")
-    ap.add_argument("--json", default=os.path.join(FEA, "template_vs_manual.json"))
+    ap.add_argument("--json", default=None, help="结果 JSON（默认按 --tag 推导）")
+    ap.add_argument("--tag", default="", help="证据子目录/文件名后缀（如 m8_pear，避免覆盖 G4）")
     args = ap.parse_args(argv)
+    if args.json is None:
+        name = "template_vs_manual%s.json" % (("_" + args.tag) if args.tag else "")
+        args.json = os.path.join(FEA, name)
 
     manual_json = os.path.join(RESULTS, "fea_results.json")
     if not os.path.exists(manual_json):
@@ -200,6 +204,7 @@ def main(argv=None) -> int:
 
     payload = {
         "stage": "G4",
+        "tag": args.tag,
         "manual": man,
         "template": tpl,
         "deviation_pct": {"bemf_rms_phase": round(d_bemf, 4),
@@ -208,13 +213,15 @@ def main(argv=None) -> int:
         "pass": {"bemf": ok_bemf, "cogging": ok_cog},
         "verdict": verdict,
     }
+    if args.tag:
+        payload["stage"] = "M8" if args.tag.startswith("m8") else args.tag
     os.makedirs(os.path.dirname(args.json), exist_ok=True)
     with open(args.json, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2, ensure_ascii=False)
     print("写入:", args.json)
 
-    # 证据留档：把模板路径的 4 条波形拷进仓库（与 11-10 的 fea/ 同口径）
-    dst = os.path.join(FEA, "tpl")
+    # 证据留档：把本次 4 条波形拷进仓库（G4 走 fea/tpl/，M8 起走 fea/<tag>/）
+    dst = os.path.join(FEA, args.tag) if args.tag else os.path.join(FEA, "tpl")
     os.makedirs(dst, exist_ok=True)
     moved = 0
     for nm in ("tq_noload.csv", "flux_a.csv", "flux_b.csv", "flux_c.csv"):
