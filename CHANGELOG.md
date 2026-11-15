@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   幅值/相位/符号、负载只改 winding、`--check` 拒绝负载、配置闸口）与
   `tests/test_m7_load_check.py`（8 例：`ms`/`mNewtonMeter` 单位、末周期窗口、
   梯形积分、指令电流对表 M5、原生 TrCrv 解析）。pytest **331 passed**、ruff 全通过。
+- **同日 THD 复核（副作用记账）**：用 `ingest_fea.analyse_signal`（跳首周期、2–15 次）
+  同口径复算 M8 梨形槽波形 —— 线 BEMF THD **11.180%**，比矩形槽 **10.595%**
+  高 **0.59 pt**（矩形槽同法复现 10.595%，方法自证）⇒ **窄槽口压齿槽与压 THD 对冲**，
+  G4 的 THD 项仍 FAIL，探索闸门不算"全绿"（`PROBLEM_LEDGER` P11）。
 
 ### Added — 2026-11-14（M8：表 2 梨形槽落地，齿槽 27.37% → 3.52%）
 

@@ -10,7 +10,7 @@
 | 指标 | 值 | 判据 | 状态 |
 |---|---:|---:|---|
 | BEMF 相 RMS | 120.5594 V（模板 M8，+1.41% vs 手写 118.8832） | 118–145 V（±10%） | ✅ |
-| 线 BEMF THD | 10.59%（手写基线；模板未单列） | ≤10% | ⚠️ 略超 |
+| 线 BEMF THD | **11.180%**（梨形槽，同口径复算；矩形槽 10.595%） | ≤10%（下限） | ❌ 略超（+0.59 pt） |
 | 齿槽峰峰值 | **0.8801 N·m / 3.52%**（模板 M8，401 点） | ≤1.25 N·m / 5% | ✅ |
 | 负载 T_avg | **22.6296 N·m（−9.48%）**（模板 M7，401 点） | 25±20% | ✅ |
 | 转矩脉动 | **14.688%**（模板 M7，末周期 201 点） | ≤15%（目标 ≤10%） | ✅ 下限 / ⏳ 目标 |
@@ -33,6 +33,7 @@
 | **P8** | minor | 仓库 | 工作树 11 项未提交；M8 文件也未提交 | `git status` | M8 文件单独提交，不扫入已有脏改动 | open | M8 `fe1de7b`；M7 今日单独提交（代码/测试/结果/文档，逐文件 add）；余 **6** 项历史改动未归属：`mcp-maxwell/server.py`、`output_scripts/36slot_industrial/{coils,winding}.py`、`output_scripts/36slot_v2/{coils,winding}.py`、`scripts/{maxwell_bridge,motor_param_calc,winding_layout}.py`、`references/motor_design_guide.md` —— 未审不动 |
 | **P9** | info | 看板 | M7/M8 行缺失 | 周检 P9 | 已补 | **closed** | — |
 | **P10** | minor | 管线 | M7 首次跑时应用日志与 AEDT「脚本同名 .log」撞名，日志被截断（CSV 完好） | `D:/ANSYS_Run/aedt_msgwin_m7_collision_20261115.log` | 日志改名 `tpl_app_<case>.log`，重跑无截断 | **closed** | 2026-11-15 改 `tpl_solve_noload.py`/`tpl_run.py` 并加注释；本次靠 401 行 CSV + 原生 TrCrv 反证求解完整 |
+| **P11** | major | 电磁 | 线 BEMF THD **11.180% > 10% 下限**；梨形窄槽口把它从 10.595% 推高 0.59 pt（与齿槽改善对冲） | `csv_tpl/flux_*.csv` + `ingest_fea.analyse_signal`（跳首周期、2–15 次）；矩形槽同法复现 10.595% 自证 | 线 THD ≤10%（目标 ≤8%） | open | G7 首选 **斜槽 0.5/1.0 槽距**（同时压 600 Hz 齿槽与 5/7 次谐波）；槽口再收窄不作为首选 |
 | **E1** | major | 数值 | 网格无关性未做 | — | 3 档网格，转矩/BEMF 变化 <2% | open | 粗/中/细三档，记录 401 点 |
 | **E2** | major | 数值 | 时间步无关性未做 | — | 50 µs vs 25 µs，变化 <2% | open | 两档步长对比 |
 | **E3** | major | 材料 | `M270_35A` 目前线性 μ=1000；`NdFe35` 未按 100°C 修正 Br | `.aedt` 材料块 | 非线性 B-H；Br(100°C) 与 Hc 修正 | open | 导入 B-H 曲线/温度系数 |
