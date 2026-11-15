@@ -35,6 +35,26 @@ LOG = r"D:/ANSYS_Run/tpl_solve.log"
 AEDT_OUT = r"D:/ANSYS_Run/T4_tpl_noload.aedt"
 BODY = r"D:/ANSYS_Run/tpl_body.py"
 CSVDIR = r"D:/ANSYS_Run/csv_tpl"
+TQ_NAME = "tq_noload.csv"
+FLUX_FMT = "flux_%s.csv"
+
+# ── M7：同一驱动跑负载工况（2026-11-15）──
+# 只换「读哪个 body / 存哪个 .aedt / 导到哪个目录」，求解与导出逻辑一字不改，
+# 这样两条工况的差异只可能来自激励（body 由 gen_maxwell_model.py --case load 生成）。
+# 空载三处路径保持原样（G4/M8 的 CSV 目录契约不变，历史证据仍可复算）。
+CASE = os.environ.get("TPL_CASE", "noload").strip().lower()
+if CASE != "noload":
+    # 日志名必须与「脚本同名 .log」错开：AEDT 会把自己的 message window 写到
+    # `<驱动文件名>.log`，即 tpl_solve_load.py → tpl_solve_load.log。
+    # 2026-11-15 首次 M7 就撞在这里：两份 writer 互相截断，日志里只剩
+    # "-- Message Window --" 和半行 "(401 rows)"（CSV 本身 401 行完好）。
+    LOG = r"D:/ANSYS_Run/tpl_app_%s.log" % CASE
+    AEDT_OUT = r"D:/ANSYS_Run/T4_tpl_%s.aedt" % CASE
+    BODY = os.environ.get("TPL_BODY", r"D:/ANSYS_Run/tpl_body_%s.py" % CASE)
+    CSVDIR = r"D:/ANSYS_Run/csv_tpl_%s" % CASE
+    TQ_NAME = "tq_%s.csv" % CASE
+    FLUX_FMT = "flux_" + CASE + "_%s.csv"
+
 
 _lines = []
 
@@ -79,7 +99,7 @@ def data_rows(path):
     return n
 
 
-log("=== tpl_solve_noload start ===")
+log("=== tpl_solve_%s start ===" % CASE)
 
 oProject = None
 try:
@@ -169,7 +189,7 @@ else:
             return "%s (%d rows)" % (fname, data_rows(path))
 
         try:
-            log("export tq -> " + export("TqTpl", "Moving1.Torque", "tq_noload.csv"))
+            log("export tq -> " + export("TqTpl", "Moving1.Torque", TQ_NAME))
         except Exception:
             log("EXPORT_TQ_FAIL: " + repr(sys.exc_info()[1]))
         for ph in ("A", "B", "C"):
@@ -177,7 +197,7 @@ else:
                 log("export flux_%s -> %s"
                     % (ph.lower(),
                        export("FluxTpl" + ph, "FluxLinkage(Winding" + ph + ")",
-                              "flux_" + ph.lower() + ".csv")))
+                              FLUX_FMT % ph.lower())))
             except Exception:
                 log("EXPORT_FLUX_%s_FAIL: %s"
                     % (ph, repr(sys.exc_info()[1])))
@@ -201,4 +221,4 @@ else:
     except Exception:
         log("FINAL_SAVE_FAIL: " + repr(sys.exc_info()[1]))
 
-log("=== tpl_solve_noload end ===")
+log("=== tpl_solve_%s end ===" % CASE)

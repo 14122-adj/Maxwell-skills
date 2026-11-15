@@ -40,8 +40,14 @@ from motor_config import MotorConfig, MotorType, PMTopology, SlotType  # noqa: E
 ORDER = ["setup", "materials", "geometry", "winding", "boundary", "mesh", "solver"]
 
 
-def build_config() -> MotorConfig:
-    """25 N·m 8p12s SPMSM 配置（与 pmsm_config.py 冻结值一致）。"""
+def build_config(load: bool = False) -> MotorConfig:
+    """25 N·m 8p12s SPMSM 配置（与 pmsm_config.py 冻结值一致）。
+
+    ``load=False``（默认）→ 空载：三相绕组电流 "0A"，生成物与 G4/M8 基线逐字一致。
+    ``load=True`` → M7 负载：三相 9.89 A rms 正弦，初相 120/240/0° 电角、sign=−1（电动），
+    口径与手写路径 `m4_build_solve.py` 的 `MAXWELL_CASE=load` 完全相同，
+    使两条路径的差异只可能来自建模（几何/网格/线圈），不来自激励。
+    """
     return MotorConfig(
         motor_type=MotorType.PMSM,
         rated_power_kw=3.93,
@@ -88,6 +94,11 @@ def build_config() -> MotorConfig:
         frequency_hz=100.0,
         phase_resistance=0.48,
         phase_inductance=0.0038,
+
+        # 激励工况（M7）：空载 0A / 负载三相正弦（φ_A/B/C = 120/240/0° 电角、电动）
+        load_case=load,
+        current_phase_deg=(120.0, 240.0, 0.0),
+        current_sign=-1,
 
         # 材料
         stator_material="M270_35A",
@@ -162,16 +173,23 @@ def check(out_dir: str, cfg: MotorConfig | None = None) -> list:
 
 def main(argv=None) -> int:
     here = os.path.dirname(os.path.abspath(__file__))
-    default_out = os.path.join(here, "maxwell_model")
     ap = argparse.ArgumentParser(description="25N·m SPMSM Maxwell 建模脚本生成器")
-    ap.add_argument("--out_dir", default=default_out, help="输出目录（默认 maxwell_model/）")
+    ap.add_argument("--out_dir", default=None,
+                    help="输出目录（默认空载 maxwell_model/、负载 maxwell_model_load/）")
+    ap.add_argument("--case", choices=("noload", "load"), default="noload",
+                    help="激励工况：noload=三相 0A（G4/M8 基线）/ load=M7 三相正弦电流")
     ap.add_argument("--check", action="store_true", help="只比对不落盘；有漂移则 rc=1")
     args = ap.parse_args(argv)
 
-    cfg = build_config()
+    if args.check and args.case != "noload":
+        print("[ERR] --check 只对空载基线有意义：负载生成物不入库、不参与漂移门禁")
+        return 2
+    out_dir = args.out_dir or os.path.join(
+        here, "maxwell_model" if args.case == "noload" else "maxwell_model_load")
+    cfg = build_config(load=(args.case == "load"))
     builder = MotorModelBuilder(cfg)
     print("=" * 60)
-    print("25N·m SPMSM — Maxwell 2D 建模脚本生成")
+    print("25N·m SPMSM — Maxwell 2D 建模脚本生成（case=%s）" % args.case)
     print("=" * 60)
     ok = builder.validate()
     print(f"校验结果: {'通过' if ok else '存在错误'}")
@@ -179,7 +197,7 @@ def main(argv=None) -> int:
         return 1
 
     if args.check:
-        drift = check(args.out_dir, cfg)
+        drift = check(args.out_dir or out_dir, cfg)
         if drift:
             print("[DRIFT] 生成物与模板不一致（先修模板或重跑不带 --check）：")
             for name in drift:
@@ -188,11 +206,11 @@ def main(argv=None) -> int:
         print(f"[OK] 无漂移：{len(ORDER) + 1} 个生成物与模板逐字一致")
         return 0
 
-    for path in write_all(args.out_dir, cfg):
+    for path in write_all(out_dir, cfg):
         size = os.path.getsize(path)
         print(f"  ✔ {os.path.basename(path)}  ({size} B)")
     print("=" * 60)
-    print(f"输出目录: {args.out_dir}")
+    print(f"输出目录: {out_dir}")
     return 0
 
 

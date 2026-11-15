@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-11-15（M7：模板路径负载工况，`T_avg` 22.6296 N·m / 脉动 14.688%）
+
+把「负载工况」从手写路径搬到生成器路径，G6 的最后一条验收（负载 `T_avg`）由此关闭。
+关键约束是**空载生成物必须逐字不变** —— 否则 M8 的齿槽证据就不再对应当前仓库模型。
+
+- `scripts/motor_config.py`：新增 `load_case` / `current_phase_deg` / `current_sign`
+  三个字段（默认空载）与三条 validate 闸口（符号只能 ±1、三相初相必须 3 个、
+  负载时电流/频率必须为正）。
+- `scripts/main.py::_gen_winding()`：新增负载分支，把
+  `I = sign·√2·I_rms·sin(2πf_e·Time + φ)` 在**宿主侧**算成字面量再写进生成物
+  （IronPython 2.7 只吃字符串）；**空载分支保持原文本**，`--check` 仍 8/8 无漂移。
+- `projects/25Nm_PMSM/gen_maxwell_model.py`：新增 `--case {noload,load}`；
+  `build_config(load=...)`；负载生成到 `maxwell_model_load/`（派生件，已入 `.gitignore`）；
+  `--check` 拒绝负载工况（不入库、不参与漂移门禁）。
+- `projects/25Nm_PMSM/maxwell/tpl_solve_noload.py`：增 `TPL_CASE` 开关
+  （`T4_tpl_load.aedt` / `csv_tpl_load/` / `tq_load.csv` / `flux_load_*.csv`），
+  求解与导出逻辑一字不改；应用日志改 `tpl_app_<case>.log`，避开 AEDT「脚本同名 .log」。
+- `projects/25Nm_PMSM/maxwell/tpl_run.py`：增 `--case`，并把 `CASE`/`BODY`
+  **写死**进驱动副本（环境变量丢失时不会把负载解覆盖到空载基线）。
+- 新增 `projects/25Nm_PMSM/m7_load_check.py`：末周期（10 ms / 201 点）梯形积分 +
+  `ingest_fea.load_block` 双法互校；电流用原生 `WindingX_TrCrv.txt` 逐点比对并与
+  指令表达式对表；输出 `projects/results/fea/m7_load_summary.json`，
+  证据波形落 `projects/results/fea/m7_load/`。
+- 真机（1 轮 rc=0，19:05:21→19:17:27，**726 s**，`T4_tpl_load.aedt` 1,046,651 B / 24 sheets）：
+  **`T_avg` 22.6296 N·m**（手写 M5 22.3344，**+1.32%**；vs 25 N·m **−9.48%**）、
+  **脉动 14.688%**（手写 32.389%）、末周期 DFT 600 Hz 分量 2.04 N·m 独占主导、
+  电流逐点最大偏差 7e-5 A（0.001%）、Σ(v·i)=+37367.58（电动）、
+  功率平衡 `T·ω` vs `3EI` **−0.62%**；导出 4 个 CSV 各 401 行。
+- 回归：新增 `tests/test_load_winding.py`（11 例：空载零电流、基线不漂移、
+  幅值/相位/符号、负载只改 winding、`--check` 拒绝负载、配置闸口）与
+  `tests/test_m7_load_check.py`（8 例：`ms`/`mNewtonMeter` 单位、末周期窗口、
+  梯形积分、指令电流对表 M5、原生 TrCrv 解析）。pytest **331 passed**、ruff 全通过。
+
 ### Added — 2026-11-14（M8：表 2 梨形槽落地，齿槽 27.37% → 3.52%）
 
 把 25 N·m 机型的定子槽从「窄口矩形」换成表 2 梨形槽，并第一次把「几何顶点」与

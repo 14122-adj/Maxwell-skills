@@ -183,6 +183,42 @@ Phase:    A+   A-   A+   A-   B+   B-   B+   B-   C+  C-   C+   C-
 - 电流密度：6 A/mm²(自然)、8(风冷)、12(水冷)
 - 转矩密度TRV：8 kN·m/m³(自然冷却500W)，大电机可至20
 
+#### 🤖 Agent 参数补全执行模板（照此逐步做，每一步可追溯公式出处）
+
+> 适用：用户只给了 1~2 个参数。**不要隐藏推导**——逐步输出公式与中间值，单位齐全。
+
+```text
+Step 0  采集输入: [功率][转速][电压][外径][长度] 中用户给到的项
+
+Step 1  参数推导（1~2 参数 → 全参）
+        python scripts/motor_param_calc.py --power 500 --speed 3000
+        # 20 步公式出处: motor_param_calc.compute_parameters() docstring 的 § 对照表
+        # 关键: δ=0.3+D/400 | 裂比 0.58~0.62 | Bg=Br/(1+μr·δ/hm·Cφ·k) | E=√2·π·f·Nph·Kw·φ
+        #       每相匝数由此反解 → Nph = E_target/(√2·π·f·Kw·φ)
+
+Step 2  槽尺寸反推（得到 Bs/Hs/Rs，用于 main.py --params）
+        公式: references/motor_design_guide.md §4 "Slot size back-calculation"
+        顺序: A_cu = Ns·a·A_wire → A_slot = A_cu/(η·kf)
+             → h_total=(Dso−Dsi)/2−hy−1, hy=Bg·τp/(2Bsat·kfe), wt=Bg·τs/(Bsat·kfe)
+             → bs2=τs−wt (≤0.7τs) → 分配 hs0/hs1/hs2, Rs≈bs2/2
+        校验: bs0<bs1<bs2, bs0≤5δ, kf∈[0.3,0.5]
+
+Step 3  极槽配合/绕组
+        查 references/motor_design_guide.md §6 或 scripts/winding_layout.py <slots> <poles> --list
+        不要心算槽-相-极性（真值表优先, references/winding_layouts.md）
+
+Step 4  生成完整脚本（4 槽型任选, 默认 pear）
+        # ⚠ 机型别混：下面这组梨形尺寸属于「210 mm 外径 / 36 槽」教程机，
+        #   不是 25 N·m 8p12s 那台。25 N·m 的表 2 尺寸见 docs/PEAR_SLOT_SPEC.md
+        #   （Bs0=0.8 / Hs0=1.5 / Hs1=1.8 / Hs2=12.5 / Bs1=6.0 / Bs2=9.5 / Rs=4.75），
+        #   两者唯一共同的硬约束是 Rs 必须等于 Bs2/2（底部为半圆，否则 Acis 静默补弦）。
+        python scripts/main.py --params "slots=36 poles=4 stator_od=210 stator_id=136 slot_type=pear slot_Hs0=0.8 slot_Hs1=1.5 slot_Hs2=11.5 slot_Bs0=3.5 slot_Bs1=6.2 slot_Bs2=8.3 slot_Rs=4.15" \
+               --output_dir out/ --validate_only     # 先校验
+        python scripts/main.py --params "..." --output_dir out/   # 再生成
+
+Step 5  向用户汇报: 每个设计量给出 数值 + 单位 + 公式出处(§x.x)；校验 10 项 checks 全过再继续
+```
+
 ### 2. 多目标优化
 
 支持4目标Pareto前沿搜索：
@@ -572,7 +608,7 @@ SYSTEM: 你是Maxwell电机设计和FEA自动化智能体。
 
 | 文档 | 内容 |
 |------|------|
-| `references/motor_design_guide.md` | 设计理论、公式、材料库、绕组拓扑、冷却限制、BOM成本模型 |
+| `references/motor_design_guide.md` | 设计理论、公式、材料库、绕组拓扑、冷却限制、BOM成本模型；**§4 含槽尺寸反推公式（电负荷/槽满率 → Bs/Hs/Rs）** |
 | `references/mcp_tools_reference.md` | Maxwell MCP工具完整目录（全部工具）含参数签名和用法 |
 | `references/troubleshooting.md` | 调试指南：连接、几何、求解器、多物理场故障 |
 | `references/optimization_guide.md` | 优化算法（NSGA-II/PSO/Grid/Bayesian）、目标函数、约束处理 |
@@ -671,6 +707,22 @@ conn.close()
 python scripts/mcp_connector.py          # 连接器自检（无需 Maxwell）
 python debug/test_bridge_mcp.py          # bridge 三后端集成测试
 ```
+
+### ⚠️ AI 连接工作流（必读，防空白文件堆积）
+
+每次会话开始驱动 Maxwell 时，**先调 `ensure_project`，不要反复 `new_project`**：
+
+```
+connect_to_maxwell        # 连 AEDT（一次）
+ensure_project(project_name="Motor_Project", design_name="Motor_Design",
+               design_type="Maxwell 2D", solution_type="Transient")
+# → 已有同名项目/设计则复用（幂等），没有才新建；重复调用不会产生新空白文件
+list_projects / get_maxwell_status   # 需要时再查
+```
+
+- `new_project`/`create_design` 已改为**幂等**（v4.4）：已有打开项目时自动激活复用，只有完全没有项目时才 `NewProject`。
+- 禁止：每轮循环里无条件 `new_project()` —— 那是历史上一堆空白 `.aedt` 堆积的根因。
+- `bridge.ensure_project(...)` 同样可用（mcp 后端直通 server 工具）。
 
 ---
 

@@ -1,0 +1,83 @@
+{
+  "stage": "M7",
+  "date": "2026-11-15",
+  "case": "load (template path, gen_maxwell_model --case load)",
+  "csvdir": "D:/ANSYS_Run/csv_tpl_load",
+  "native_dir": "D:/ANSYS_Run/T4_tpl_load.aedtresults\\Motor_Design.results\\DV72_SOL71_V0.Data",
+  "torque": {
+    "T_avg_nm": 22.6296,
+    "T_min_nm": 20.9522,
+    "T_max_nm": 24.2761,
+    "T_pp_nm": 3.3239,
+    "n_samples": 201,
+    "t_window_ms": [
+      10.0,
+      20.0
+    ],
+    "T_ripple_pct": 14.688
+  },
+  "bemf_noload_v": 120.5594,
+  "manual_m5": {
+    "T_avg_nm": 22.3344,
+    "T_ripple_pct": 32.389,
+    "source": "projects/results/fea_results.json:load"
+  },
+  "two_method": {
+    "independent_trapezoid_nm": 22.6296,
+    "ingest_fea_simple_mean_nm": 22.6296,
+    "dev_pct": 0.0
+  },
+  "power_balance": {
+    "P_mech_w": 3554.6,
+    "P_emf_w": 3577.0,
+    "dev_pct": -0.62,
+    "note": "P_emf 用空载 BEMF；差值含电枢反应与齿槽"
+  },
+  "currents": {
+    "A": {
+      "samples": 10,
+      "t_window_ms": [
+        19.55,
+        20.0
+      ],
+      "max_dev_a": 7e-05,
+      "max_dev_pct_of_peak": 0.001,
+      "peak_measured_a": 13.5829
+    },
+    "B": {
+      "samples": 10,
+      "t_window_ms": [
+        19.55,
+        20.0
+      ],
+      "max_dev_a": 6e-05,
+      "max_dev_pct_of_peak": 0.0,
+      "peak_measured_a": 12.1127
+    },
+    "C": {
+      "samples": 10,
+      "t_window_ms": [
+        19.55,
+        20.0
+      ],
+      "max_dev_a": 1e-05,
+      "max_dev_pct_of_peak": 0.0,
+      "peak_measured_a": 3.9021
+    },
+    "_sum_vi": 37367.58,
+    "_motoring": true
+  },
+  "deviation_pct": {
+    "vs_manual_m5": 1.322,
+    "vs_rated_25nm": -9.482
+  },
+  "criteria": {
+    "dual_path_10pct": true,
+    "rated_20pct": true,
+    "ripple_15pct": true,
+    "two_method_0p5pct": true,
+    "current_5pct": true,
+    "motoring_sign": true
+  },
+  "verdict": "PASS"
+}

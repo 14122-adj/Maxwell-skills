@@ -30,3 +30,8 @@ Desktop.ini
 
 # ===== ANSYS Maxwell 仿真缓存/结果目录 =====
 *.aedtresults/
+
+# ===== 派生生成物（由模板一键再生，不入库）=====
+# 空载 maxwell_model/ 入库并受 --check 门禁；负载是同一模板 + 不同激励，
+# 用 `gen_maxwell_model.py --case load` 再生即可，不重复存一份。
+projects/25Nm_PMSM/maxwell_model_load/

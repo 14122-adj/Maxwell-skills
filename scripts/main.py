@@ -730,6 +730,57 @@ print("Geometry done: {c.slots} slots, {c.poles} PMs, Band, {c.slots} coils")
         phase_belt_prints.append('print("  同一相 +/- 的槽边共用同一个 WindingX，靠 PolarityType 定方向")')
         phase_belt_py = "\n".join(phase_belt_prints)
 
+        # ── 三相绕组电流口径（M7 负载路径）──
+        # 空载分支必须是**逐字不变**的老文本：G4/M8 的 `T4_tpl_noload.aedt` 就是由它
+        # 生成的，改一个字都会让 `gen_maxwell_model.py --check` 漂移，
+        # 进而无法用「生成物逐字一致」证明基线模型没被改动。
+        # 负载分支把电流表达式在**宿主侧**算成字符串（IronPython 2.7 只收字面量），
+        # 相位/符号口径见 motor_config 的 load_case 注释与 docs/MAXWELL_INTERNALS.md §11.3。
+        f_elec = c.pole_pairs * c.rated_speed_rpm / 60.0
+        i_pk = c.rated_current_rms * math.sqrt(2.0)
+
+        def _cur_expr(ph_deg: float) -> str:
+            rad = math.radians(float(ph_deg))
+            body = "%.4f*sin(2*pi*%g*Time%s)" % (
+                i_pk, f_elec, ("+%.6f" % rad) if abs(rad) > 1e-9 else "")
+            return body if c.current_sign > 0 else "-" + body
+
+        if c.load_case:
+            cur_map = {ph: _cur_expr(d) for ph, d in zip(("A", "B", "C"), c.current_phase_deg)}
+            winding_group_py = (
+                "# 负载工况（M7）：三相正弦电流 I = %.4f·sin(2π·%g·Time + φ)，φ = %s（电角）\n"
+                "# 符号 %+d ⇒ %s；幅值 = √2 × %.4f A rms\n"
+                "CURRENTS = %r\n"
+                "for phase in [\"A\", \"B\", \"C\"]:\n"
+                "    oModule.AssignWindingGroup(\n"
+                "        [\"NAME:Winding\" + phase,\n"
+                "         \"Type:=\", \"Current\",\n"
+                "         \"IsSolid:=\", False,\n"
+                "         \"Current:=\", CURRENTS[phase],\n"
+                "         \"Resistance:=\", \"0.1ohm\",\n"
+                "         \"Inductance:=\", \"0.001H\",\n"
+                "         \"Voltage:=\", \"0V\",\n"
+                "         \"ParallelBranchesNum:=\", \"1\"])\n"
+            ) % (i_pk, f_elec, list(c.current_phase_deg), c.current_sign,
+                 "电动（与 e 反相）" if c.current_sign < 0 else "发电（与 e 同相）",
+                 c.rated_current_rms, cur_map)
+        else:
+            winding_group_py = (
+                "for phase in [\"A\", \"B\", \"C\"]:\n"
+                "    oModule.AssignWindingGroup(\n"
+                "        [\"NAME:Winding\" + phase,\n"
+                "         \"Type:=\", \"Current\",\n"
+                "         \"IsSolid:=\", False,\n"
+                "         \"Current:=\", \"0A\",\n"
+                "         \"Resistance:=\", \"0.1ohm\",\n"
+                "         \"Inductance:=\", \"0.001H\",\n"
+                "         \"Voltage:=\", \"0V\",\n"
+                "         \"ParallelBranchesNum:=\", \"1\"])\n"
+            )
+        # 模板里 {winding_group_py} 后已有空行 ⇒ 这里去掉尾随换行，
+        # 否则空载生成物会比 G4/M8 基线多一个空行（--check 立刻报漂移）。
+        winding_group_py = winding_group_py.rstrip("\n")
+
         return f'''#!/usr/bin/env python3
 """Step 4: 线圈组与绕组定义 — 修复 v2: 真正用 builder.compute_winding() 的输出"""
 import ScriptEnv
@@ -750,16 +801,7 @@ oModule = oDesign.GetModule("BoundarySetup")
 {phase_belt_py}
 
 # ── Step 1: 定义三相绕组 ──
-for phase in ["A", "B", "C"]:
-    oModule.AssignWindingGroup(
-        ["NAME:Winding" + phase,
-         "Type:=", "Current",
-         "IsSolid:=", False,
-         "Current:=", "0A",
-         "Resistance:=", "0.1ohm",
-         "Inductance:=", "0.001H",
-         "Voltage:=", "0V",
-         "ParallelBranchesNum:=", "1"])
+{winding_group_py}
 
 # ── Step 2: 逐槽边 AssignCoil（每对象一个，直接挂 Winding:=）──
 {coil_groups_py}

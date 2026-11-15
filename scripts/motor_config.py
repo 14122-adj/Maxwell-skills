@@ -171,6 +171,15 @@ class MotorConfig:
     frequency_hz: float = 100.0           # 电频率 (Hz)
     phase_resistance: float = 0.957       # 相电阻 (Ω)
     phase_inductance: float = 0.0038      # 相电感 (H)
+
+    # --- 激励工况（M7 负载路径）---
+    # 空载（load_case=False）→ 三相 "0A"，与 G4/M8 的生成物逐字一致；
+    # 负载（True）→ 三相正弦电流 I = sign·√2·I_rms·sin(2πf_e·t + φ)，φ 为电角初相。
+    # 相位与符号口径来自 M4 空载磁链拟合（docs/MAXWELL_INTERNALS.md §11.3）：
+    #   λ_A = 0.26610·cos(ωt+120.005°) ⇒ 电动需 i 与 e=-dλ/dt 反相 ⇒ sign=-1。
+    load_case: bool = False
+    current_phase_deg: tuple = (120.0, 240.0, 0.0)   # A/B/C 电流初相（电角，deg）
+    current_sign: int = -1                           # -1 电动 / +1 发电（仅 load_case=True 生效）
     
     # --- 材料 ---
     stator_material: str = "M270_35A"
@@ -295,6 +304,18 @@ class MotorConfig:
         # 绕组检查
         if self.slot_fill_factor > 0.65:
             issues.append("WARNING: 槽满率>0.65可能无法嵌线")
+
+        # 激励工况（M7）：负载工况的电流表达式由这三项唯一确定，
+        # 写错任何一个都会让「电流幅值/相位」静默偏移（转矩跟着按 cos 误差掉）。
+        if self.load_case:
+            if self.current_sign not in (-1, 1):
+                issues.append("ERROR: current_sign 只能是 -1（电动）或 +1（发电）")
+            if len(tuple(self.current_phase_deg)) != 3:
+                issues.append("ERROR: current_phase_deg 必须是 3 个电角（A/B/C）")
+            if self.rated_current_rms <= 0:
+                issues.append("ERROR: 负载工况要求 rated_current_rms > 0")
+            if self.frequency_hz <= 0:
+                issues.append("ERROR: 负载工况要求 frequency_hz > 0（电流是时间函数）")
         
         # 极槽配合检查
         lcm_val = self._lcm(self.slots, self.poles)
