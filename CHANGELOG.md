@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-11-15 夜（G7 斜槽：线 THD 11.180% → 1.998%，齿槽 → 0.002%）
+
+P11（THD 超下限）的单变量实验。结论先行：**斜槽 0.5 槽距把齿槽与 THD 同时打下来，
+但基波同比例降额**，BEMF 出窗，必须与匝数重配（P12）一起落地。
+
+- 新增 `projects/25Nm_PMSM/skew_multislice.py`：2D 多切片等效评估。取一个电周期
+  （10 ms / 200 点）的 DFT，按 `(1/N)Σ exp(j2πh·Δt_j/T)` 在**谐波域**做平移平均；
+  齿槽、BEMF/THD、负载转矩/脉动一次算完，并给「时域平移 vs 频域 `sinc` 因子」双法互校。
+- 新增 `projects/25Nm_PMSM/skew_slice_check.py`：真机 N 切片与后处理的独立对照
+  （齿槽 / BEMF / THD / 基波降额比 k1 四项），并显式列出**未覆盖**项。
+- `scripts/motor_config.py`：新增 `rotor_init_deg` + 三道 validate 闸口（非数值 / 非有限 /
+  超一圈告警）。`scripts/main.py::_gen_geometry`：`_ang_off` 把 8 块磁钢绕 Z 转该角度，
+  guard 改 `abs(angle) > 1e-9`；默认 0.0 时生成物**逐字不变**（`--check` 仍 8/8）。
+- `gen_maxwell_model.py`：新增 `--init-deg`；`maxwell/tpl_run.py`：`--case` 支持任意
+  切片名（`maxwell_model_<case>/`）；`maxwell/tpl_solve_noload.py`：新增
+  `GetFaceCenter` 形心日志（`.aedt` 几何加密，形心是多切片唯一的几何证据）。
+- 结果（连续多切片）：0.25 槽距 → 齿槽 0.537% / THD 7.2741% / BEMF 118.7097 V；
+  **0.5 槽距 → 齿槽 0.00058 N·m（0.002%）/ THD 1.9983% / 脉动 4.285% /
+  `T_avg` 21.6056 N·m / BEMF 114.3847 V（−5.10%，低于 118 V 下限）**；
+  1.0 槽距 → k1=0.827，`T_avg` −25.2%，不划算。证据 `projects/results/fea/skew_scan*`。
+- 真机复核（`ANALYZE_OK` 706.5 / 651.7 / 537.0 s，12×401 行入 `fea/skew_slices/`）：
+  3 片平均 vs 后处理 —— 齿槽差 **0.0012 N·m**、BEMF 差 **0.0015%**、THD 差 **0.0007 pt**、
+  基波降额比差 **0.0033%** ⇒ 多切片等价性成立。
+- 回归：新增 `tests/test_skew_multislice.py`（16 例，含 skew=0 逐位复现基线的恒等校验）
+  与 `tests/test_rotor_init_deg.py`（12 例，几何偏置只改 2 行）。
+
+### Fixed — 2026-11-15 夜（斜槽实现路上的 4 个静默错误）
+
+- `AssignBand` 的 `Init Pos="7.5deg"` **不旋转几何**：401 点解决与基线逐点相同
+  （max 3e-5 N·m、互相关滞后 0），白跑 726 s。改几何旋转磁钢扇区（径向磁化对绕 Z
+  旋转不变），并把判据改成"波形必须变化"。
+- 斜槽**不能**作用在转矩波形上：`T_load(t)` 的时间依赖含转子角与电流相位，直接平移
+  等于重复移相，会得到"`T_avg` 与斜槽无关"的假不变量（首版三水平全为 22.6296 N·m）。
+  正解：平均 `e_ph(θ)` 与 `T_cog(θ)`，电流不移相；skew=0 时与 FEA 负载转矩差 −0.02%。
+- 2D 后处理的三个数值陷阱（均能被"跑通且结果漂亮"掩盖）：线性插值重采样（齿槽
+  600 Hz 仅 33 点/周期）使恒等校验差 **4.67%**；单周期含重复端点使 THD 虚高
+  **1.24 pt**（11.180% → 12.422%）；双边谱按 `h/T` 乘相位使基波掉到 **47.6%**。
+  详见 `docs/MAXWELL_INTERNALS.md` §15.3。
+
 ### Added — 2026-11-15（M7：模板路径负载工况，`T_avg` 22.6296 N·m / 脉动 14.688%）
 
 把「负载工况」从手写路径搬到生成器路径，G6 的最后一条验收（负载 `T_avg`）由此关闭。

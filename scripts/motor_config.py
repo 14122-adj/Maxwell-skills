@@ -180,6 +180,12 @@ class MotorConfig:
     load_case: bool = False
     current_phase_deg: tuple = (120.0, 240.0, 0.0)   # A/B/C 电流初相（电角，deg）
     current_sign: int = -1                           # -1 电动 / +1 发电（仅 load_case=True 生效）
+
+    # --- 运动初始位置（G7 斜槽多切片，2026-11-15）---
+    # Maxwell 2D 没有轴向斜槽自由度，工程近似是「多切片」：同一模型跑 N 个不同
+    # 转子初始角，再对转矩/磁链取平均。本字段写进 `AssignBand` 的 `Init Pos`。
+    # 0.0 是基线（与 G4/M8 生成物逐字一致，"0deg"）。
+    rotor_init_deg: float = 0.0
     
     # --- 材料 ---
     stator_material: str = "M270_35A"
@@ -317,6 +323,21 @@ class MotorConfig:
             if self.frequency_hz <= 0:
                 issues.append("ERROR: 负载工况要求 frequency_hz > 0（电流是时间函数）")
         
+        # 初始位置（G7 多切片）：只接受有限值，且换算到 [0, 槽距) 内比较，
+        # 因为 8p12s 几何对槽距 30° 周期对称 —— 写成 37.5° 与 7.5° 是同一个物理位置，
+        # 但会让日志/文件名对不上，故只告警不改值。
+        try:
+            init_deg = float(self.rotor_init_deg)
+        except (TypeError, ValueError):
+            issues.append("ERROR: rotor_init_deg 必须是数值（机械 deg）")
+            init_deg = 0.0
+        if init_deg != init_deg or abs(init_deg) == float("inf"):
+            issues.append("ERROR: rotor_init_deg 非有限值")
+        elif abs(init_deg) >= 360.0:
+            issues.append(
+                "WARNING: rotor_init_deg=%.2f° 超过一圈，等价角为 %.2f°"
+                % (init_deg, init_deg % 360.0))
+
         # 极槽配合检查
         lcm_val = self._lcm(self.slots, self.poles)
         if lcm_val < 12:

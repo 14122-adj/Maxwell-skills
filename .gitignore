@@ -35,3 +35,7 @@ Desktop.ini
 # 空载 maxwell_model/ 入库并受 --check 门禁；负载是同一模板 + 不同激励，
 # 用 `gen_maxwell_model.py --case load` 再生即可，不重复存一份。
 projects/25Nm_PMSM/maxwell_model_load/
+
+# G7 斜槽多切片：`gen_maxwell_model.py --init-deg <deg> --out_dir maxwell_model_sXXX`
+# 生成物（同一模板 + 一个角度），切片 CSV 已归档到 projects/results/fea/skew_slices/
+projects/25Nm_PMSM/maxwell_model_s*/

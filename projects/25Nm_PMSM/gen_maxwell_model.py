@@ -40,13 +40,15 @@ from motor_config import MotorConfig, MotorType, PMTopology, SlotType  # noqa: E
 ORDER = ["setup", "materials", "geometry", "winding", "boundary", "mesh", "solver"]
 
 
-def build_config(load: bool = False) -> MotorConfig:
+def build_config(load: bool = False, init_deg: float = 0.0) -> MotorConfig:
     """25 N·m 8p12s SPMSM 配置（与 pmsm_config.py 冻结值一致）。
 
     ``load=False``（默认）→ 空载：三相绕组电流 "0A"，生成物与 G4/M8 基线逐字一致。
     ``load=True`` → M7 负载：三相 9.89 A rms 正弦，初相 120/240/0° 电角、sign=−1（电动），
     口径与手写路径 `m4_build_solve.py` 的 `MAXWELL_CASE=load` 完全相同，
     使两条路径的差异只可能来自建模（几何/网格/线圈），不来自激励。
+    ``init_deg`` → `AssignBand` 的 `Init Pos`（机械 deg），G7 多切片用；0.0 时生成物
+    与历史基线**逐字一致**（格式化成 "0deg"），这是 `--check` 8/8 的前提。
     """
     return MotorConfig(
         motor_type=MotorType.PMSM,
@@ -99,6 +101,7 @@ def build_config(load: bool = False) -> MotorConfig:
         load_case=load,
         current_phase_deg=(120.0, 240.0, 0.0),
         current_sign=-1,
+        rotor_init_deg=float(init_deg),
 
         # 材料
         stator_material="M270_35A",
@@ -178,6 +181,8 @@ def main(argv=None) -> int:
                     help="输出目录（默认空载 maxwell_model/、负载 maxwell_model_load/）")
     ap.add_argument("--case", choices=("noload", "load"), default="noload",
                     help="激励工况：noload=三相 0A（G4/M8 基线）/ load=M7 三相正弦电流")
+    ap.add_argument("--init-deg", type=float, default=0.0,
+                    help="AssignBand 的 Init Pos（机械 deg）；G7 斜槽多切片用，0=基线")
     ap.add_argument("--check", action="store_true", help="只比对不落盘；有漂移则 rc=1")
     args = ap.parse_args(argv)
 
@@ -186,7 +191,7 @@ def main(argv=None) -> int:
         return 2
     out_dir = args.out_dir or os.path.join(
         here, "maxwell_model" if args.case == "noload" else "maxwell_model_load")
-    cfg = build_config(load=(args.case == "load"))
+    cfg = build_config(load=(args.case == "load"), init_deg=args.init_deg)
     builder = MotorModelBuilder(cfg)
     print("=" * 60)
     print("25N·m SPMSM — Maxwell 2D 建模脚本生成（case=%s）" % args.case)

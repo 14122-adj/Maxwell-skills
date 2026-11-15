@@ -40,20 +40,26 @@ from prepare_batch import to_batch_script  # noqa: E402
 
 ANSYS_EXE = r"D:/Program Files/AnsysEM/AnsysEM21.1/Win64/ansysedt.exe"
 RUNDIR = r"D:/ANSYS_Run"
+# noload/load 是冻结的两条历史路径；其余（如 s075 = 斜槽切片 7.5°）走
+# `maxwell_model_<case>/`，由 `gen_maxwell_model.py --init-deg ... --out_dir` 落盘。
 MODEL_DIRS = {"noload": "maxwell_model", "load": "maxwell_model_load"}
+
+
+def model_dir(case: str) -> str:
+    return MODEL_DIRS.get(case, "maxwell_model_%s" % case)
 
 
 def paths(case: str) -> dict:
     """按工况返回 (源生成物, body, 求解驱动, 日志)。空载沿用历史路径不变。"""
     if case == "noload":
         return {
-            "src": os.path.join(PROJ, MODEL_DIRS[case], "build_25Nm_SPMSM.py"),
+            "src": os.path.join(PROJ, model_dir(case), "build_25Nm_SPMSM.py"),
             "body": os.path.join(RUNDIR, "tpl_body.py").replace("\\", "/"),
             "solver": os.path.join(RUNDIR, "tpl_solve_noload.py").replace("\\", "/"),
             "log": os.path.join(RUNDIR, "tpl_solve.log").replace("\\", "/"),
         }
     return {
-        "src": os.path.join(PROJ, MODEL_DIRS[case], "build_25Nm_SPMSM.py"),
+        "src": os.path.join(PROJ, model_dir(case), "build_25Nm_SPMSM.py"),
         "body": os.path.join(RUNDIR, "tpl_body_%s.py" % case).replace("\\", "/"),
         "solver": os.path.join(RUNDIR, "tpl_solve_%s.py" % case).replace("\\", "/"),
         # 不能叫 tpl_solve_<case>.log：AEDT 会把 message window 写进「脚本同名 .log」，
@@ -66,7 +72,10 @@ def stage(case: str = "noload") -> dict:
     """把生成物清洗成可批跑的 body，并把求解驱动拷到运行目录。"""
     p = paths(case)
     if not os.path.exists(p["src"]):
-        hint = ("python projects/25Nm_PMSM/gen_maxwell_model.py --case %s" % case)
+        hint = ("python projects/25Nm_PMSM/gen_maxwell_model.py --case %s" % case
+                if case in ("noload", "load") else
+                "python projects/25Nm_PMSM/gen_maxwell_model.py --init-deg <deg> "
+                "--out_dir projects/25Nm_PMSM/maxwell_model_%s" % case)
         raise SystemExit("缺生成物 %s\n先跑：%s" % (p["src"], hint))
     with open(p["src"], encoding="utf-8") as fh:
         body = to_batch_script(fh.read())
@@ -117,8 +126,9 @@ def run(case: str = "noload", p: dict | None = None) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--case", choices=("noload", "load"), default="noload",
-                    help="激励工况：noload（默认）/ load（M7 三相正弦电流）")
+    ap.add_argument("--case", default="noload",
+                    help="工况：noload（默认）/ load（M7）/ 其它任意名（G7 斜槽切片，"
+                         "需先 gen_maxwell_model.py --init-deg ... --out_dir maxwell_model_<case>）")
     ap.add_argument("--stage", action="store_true", help="只清洗脚本，不启动 AEDT")
     ap.add_argument("--no-run", action="store_true", help="同 --stage")
     args = ap.parse_args(argv)

@@ -78,6 +78,16 @@ def dump_area(oEditor, name):
         return "%s: AREA_FAIL %s" % (name, repr(traceback.format_exc().splitlines()[-1]))
 
 
+def dump_center(oEditor, name):
+    """磁钢形心 —— G7 多切片的**唯一**几何证据（.aedt 几何块是加密的，事后不能查）。"""
+    try:
+        ids = list(oEditor.GetFaceIDs(name))
+        c = oEditor.GetFaceCenter(ids[0])
+        return "%s: center=(%.4f, %.4f) mm" % (name, float(c[0]), float(c[1]))
+    except Exception:
+        return "%s: CENTER_FAIL %s" % (name, repr(traceback.format_exc().splitlines()[-1]))
+
+
 def data_rows(path):
     """数数据行（跳过表头/单位/空行）—— 导出「只给警告不给异常」是常见坑。"""
     n = 0
@@ -121,6 +131,8 @@ try:
         log("%s=%d %s" % (grp, len(objs), ",".join(objs)))
     for nm in ["Region", "StatorOuter", "RotorOuter", "Band", "PM_1", "Coil_1"]:
         log(dump_area(oEditor, nm))
+    for nm in ["PM_1", "PM_2"]:
+        log(dump_center(oEditor, nm))
     for mod, meth in (("BoundarySetup", "GetBoundaries"),
                       ("AnalysisSetup", "GetSetups"),
                       ("ModelSetup", "GetMotionSetupNames")):

@@ -488,6 +488,17 @@ print("Materials defined: {c.pm_material_n}, {c.pm_material_s}")
             _pm_pts.append((r_pm_in * math.cos(_a), r_pm_in * math.sin(_a)))
         _pm_literal = "[" + ", ".join("(%.6f, %.6f)" % p for p in _pm_pts) + "]"
         _pm_names = ", ".join("PM_%d" % (i + 1) for i in range(c.poles))
+        # G7 斜槽多切片：把**整个转子**（8 块磁钢 + 它们从 RotorOuter 挖出的坑）
+        # 绕 Z 转 rotor_init_deg。为什么这样等价于转子转 Δ：
+        #   · RotorOuter 是轴对称环带（面积 = π(45.825²−20²)），Band/Region 也是整圆，
+        #     转动它们不改变任何东西；
+        #   · 磁化方向由材料定义里的 **Cylindrical + DirComp1=±1** 给出，是绕全局 Z 的
+        #     径向 —— 绕该轴旋转不变量，故转了几何不需要改材料；
+        #   · 槽/绕组在定子上，不动。
+        # 2026-11-15 实测：`AssignBand` 的 `Init Pos="7.5deg"` **不会**旋转几何
+        # （波形与基线逐点相同，互相关滞后 0），所以只能改几何。
+        _ang_off = "" if abs(float(c.rotor_init_deg)) < 1e-12 else " + %.6g" % c.rotor_init_deg
+        _ang_guard = "angle > 0" if not _ang_off else "abs(angle) > 1e-9"
         _coil_names = ", ".join("Coil_%d" % (i + 1) for i in range(c.slots))
 
         s = f'''#!/usr/bin/env python3
@@ -595,7 +606,7 @@ oEditor.Subtract(
 pm_pitch = {pm_pitch}
 pm_pts = {_pm_literal}
 for i in range({c.poles}):
-    angle = i * pm_pitch
+    angle = i * pm_pitch{_ang_off}
     if i % 2 == 0:
         mat = "{c.pm_material_n}"
         color = "(255 0 0)"
@@ -619,7 +630,7 @@ for i in range({c.poles}):
          "Transparency:=", 0, "PartCoordinateSystem:=", "Global",
          "MaterialValue:=", '"' + mat + '"', "SolveInside:=", True])
 
-    if angle > 0:
+    if {_ang_guard}:
         oEditor.Rotate(
             ["NAME:Selections", "Selections:=", pname],
             ["NAME:RotateParameters", "RotateAxis:=", "Z",
@@ -815,6 +826,10 @@ print(f"  Polarity convention = {builder.polarity_convention}  (A+→Positive, A
 
     def _gen_boundary(self, freq):
         c = self.config
+        # G7 斜槽多切片（2026-11-15 实测）：`AssignBand` 的 `Init Pos` 在 2021.1
+        # **不会**旋转几何 —— 写成 "7.5deg" 跑 401 点，转矩波形与基线逐点相同
+        # （max 差 3e-5 N·m、互相关滞后 0）。转子初始角只能靠几何生成时旋转磁钢，
+        # 见 `_gen_geometry` 里的 `_ang_off`。故此处 `Init Pos` 固定 "0deg"。
         return f'''#!/usr/bin/env python3
 """Step 5: 边界条件与运动设置"""
 import ScriptEnv

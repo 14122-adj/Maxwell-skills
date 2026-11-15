@@ -1,0 +1,80 @@
+{
+  "stage": "G7 skew — real-FEA 3-slice verification",
+  "skew_slot_pitch": 0.5,
+  "method": "three independent 401-point noload runs with AssignBand Init Pos offset",
+  "fea": {
+    "tags": [
+      "s025",
+      "s075",
+      "s125"
+    ],
+    "n_slices": 3,
+    "per_slice": {
+      "s025": {
+        "cogging_pp_nm": 0.8893,
+        "T_mean_nm": -0.00822,
+        "rows": 200
+      },
+      "s075": {
+        "cogging_pp_nm": 0.88673,
+        "T_mean_nm": 0.00211,
+        "rows": 200
+      },
+      "s125": {
+        "cogging_pp_nm": 0.88836,
+        "T_mean_nm": 0.00826,
+        "rows": 200
+      }
+    },
+    "slice_spread_nm": 0.64209,
+    "slice_rotation_effective": true,
+    "cogging_pp_nm": 0.23303,
+    "cogging_pct": 0.9321,
+    "T_mean_of_slices_nm": 0.00072,
+    "bemf_phase_rms_v": 115.0286,
+    "bemf_line_rms_v": 199.2374,
+    "thd_line_pct": 2.4743
+  },
+  "postprocess": {
+    "skew_mech_deg": 15.0,
+    "skew_elec_deg": 60.0,
+    "cogging_pp_nm": 0.23182,
+    "bemf_phase_rms_v": 115.0269,
+    "thd_line_pct": 2.475,
+    "T_avg_nm": 21.7154,
+    "T_avg_no_realign_nm": 18.8026,
+    "T_ripple_pct": 6.271
+  },
+  "compare": {
+    "cogging_pp_nm": {
+      "fea": 0.23303,
+      "post": 0.23182,
+      "gap": 0.00121,
+      "tol": 0.02
+    },
+    "bemf_phase_rms_v": {
+      "fea": 115.0286,
+      "post": 115.0269,
+      "gap_pct": 0.0014,
+      "tol_pct": 2.0
+    },
+    "thd_line_pct": {
+      "fea": 2.4743,
+      "post": 2.475,
+      "gap_pt": -0.0007,
+      "tol_pt": 0.5
+    },
+    "k1_fundamental_ratio": {
+      "fea": 0.95983,
+      "post": 0.9598,
+      "gap_pct": 0.0033,
+      "tol_pct": 1.0,
+      "note": "T ∝ E1（同一电流）⇒ 该比值即转矩降额比；斜槽代价由此侧给出"
+    },
+    "not_covered": {
+      "load_torque_3slice_fea": "未做：3 片都是空载工程，负载侧需另跑 3×726 s；T_avg 斜槽降额由「时域合成 + k_sk(1)」两法互证，未过真机",
+      "continuous_vs_3slice": "3 片是连续斜槽的离散近似：连续极限齿槽→0、THD→2.00%%，3 片分别 0.233 N·m / 2.47%%；两者都正确，别混用"
+    }
+  },
+  "pass": true
+}
