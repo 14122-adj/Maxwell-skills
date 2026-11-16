@@ -1,0 +1,272 @@
+{
+  "stage": "P12 turns 80→84 (cps 40→42) on skewed design point",
+  "single_variable": {
+    "changed_lines": 12,
+    "only_conductor_number": true
+  },
+  "n_turns_per_phase": 84,
+  "conductors_per_slot": 42,
+  "ratio_expected": 1.05,
+  "n84_identity_check": {
+    "cogging_pp_skew0": 0.88008,
+    "cogging_pp_baseline": 0.88008,
+    "cogging_gap_pct": 0.0003,
+    "thd_skew0": 11.1798,
+    "T_avg_skew0": 23.756,
+    "T_ripple_skew0": 14.644,
+    "bemf_phase_skew0": 126.5856
+  },
+  "n84_composition_checks": {
+    "0.0": {
+      "T_avg_composed": 23.756,
+      "T_avg_fea": 23.7607,
+      "gap_pct": -0.0201,
+      "T_pp_composed": 3.4789,
+      "T_pp_fea": 3.4829,
+      "T_pp_gap_pct": -0.1133
+    }
+  },
+  "design_point_skew_slot_pitch": 0.5,
+  "verdict": "PASS",
+  "load_fea_last_period": {
+    "base": 22.62961,
+    "n84": 23.76074,
+    "ratio": 1.04998,
+    "expected": 23.76109,
+    "gap_vs_expected_pct": -0.0015
+  },
+  "levels": [
+    {
+      "skew_slot_pitch": 0.0,
+      "base": {
+        "bemf_phase_rms_v": 120.5577,
+        "cogging_pp_nm": 0.88009,
+        "cogging_pct": 3.5204,
+        "thd_line_pct": 11.1798,
+        "T_avg_nm": 22.6248,
+        "T_ripple_pct": 14.675
+      },
+      "n84": {
+        "bemf_phase_rms_v": 126.5856,
+        "cogging_pp_nm": 0.88008,
+        "cogging_pct": 3.5203,
+        "thd_line_pct": 11.1798,
+        "T_avg_nm": 23.756,
+        "T_ripple_pct": 14.644
+      },
+      "expected_linear": {
+        "bemf_phase_rms_v": 126.58559,
+        "T_avg_nm": 23.75604
+      },
+      "ratio": {
+        "bemf_phase_rms_v": 1.05,
+        "T_avg_nm": 1.05
+      },
+      "delta": {
+        "thd_pt": 0.0,
+        "cogging_nm": -1e-05
+      },
+      "criteria": {
+        "bemf_118_145": {
+          "value": 126.5856,
+          "pass": true
+        },
+        "thd_le_10": {
+          "value": 11.1798,
+          "pass": false
+        },
+        "cogging_le_1p25": {
+          "value": 0.88008,
+          "pass": true
+        },
+        "cogging_le_5pct": {
+          "value": 3.5203,
+          "pass": true
+        },
+        "t_avg_25_pm20": {
+          "value": 23.756,
+          "pass": true
+        },
+        "ripple_le_15": {
+          "value": 14.644,
+          "pass": true
+        }
+      },
+      "verdict": "FAIL"
+    },
+    {
+      "skew_slot_pitch": 0.25,
+      "base": {
+        "bemf_phase_rms_v": 118.7097,
+        "cogging_pp_nm": 0.13415,
+        "cogging_pct": 0.5366,
+        "thd_line_pct": 7.2741,
+        "T_avg_nm": 22.3674,
+        "T_ripple_pct": 13.175
+      },
+      "n84": {
+        "bemf_phase_rms_v": 124.6452,
+        "cogging_pp_nm": 0.13414,
+        "cogging_pct": 0.5366,
+        "thd_line_pct": 7.2741,
+        "T_avg_nm": 23.4856,
+        "T_ripple_pct": 13.172
+      },
+      "expected_linear": {
+        "bemf_phase_rms_v": 124.64518,
+        "T_avg_nm": 23.48577
+      },
+      "ratio": {
+        "bemf_phase_rms_v": 1.05,
+        "T_avg_nm": 1.04999
+      },
+      "delta": {
+        "thd_pt": 0.0,
+        "cogging_nm": -1e-05
+      },
+      "criteria": {
+        "bemf_118_145": {
+          "value": 124.6452,
+          "pass": true
+        },
+        "thd_le_10": {
+          "value": 7.2741,
+          "pass": true
+        },
+        "cogging_le_1p25": {
+          "value": 0.13414,
+          "pass": true
+        },
+        "cogging_le_5pct": {
+          "value": 0.5366,
+          "pass": true
+        },
+        "t_avg_25_pm20": {
+          "value": 23.4856,
+          "pass": true
+        },
+        "ripple_le_15": {
+          "value": 13.172,
+          "pass": true
+        }
+      },
+      "verdict": "PASS"
+    },
+    {
+      "skew_slot_pitch": 0.5,
+      "base": {
+        "bemf_phase_rms_v": 114.3847,
+        "cogging_pp_nm": 0.00058,
+        "cogging_pct": 0.0023,
+        "thd_line_pct": 1.9983,
+        "T_avg_nm": 21.6056,
+        "T_ripple_pct": 4.285
+      },
+      "n84": {
+        "bemf_phase_rms_v": 120.1039,
+        "cogging_pp_nm": 0.00058,
+        "cogging_pct": 0.0023,
+        "thd_line_pct": 1.9983,
+        "T_avg_nm": 22.6857,
+        "T_ripple_pct": 4.285
+      },
+      "expected_linear": {
+        "bemf_phase_rms_v": 120.10394,
+        "T_avg_nm": 22.68588
+      },
+      "ratio": {
+        "bemf_phase_rms_v": 1.05,
+        "T_avg_nm": 1.04999
+      },
+      "delta": {
+        "thd_pt": 0.0,
+        "cogging_nm": 0.0
+      },
+      "criteria": {
+        "bemf_118_145": {
+          "value": 120.1039,
+          "pass": true
+        },
+        "thd_le_10": {
+          "value": 1.9983,
+          "pass": true
+        },
+        "cogging_le_1p25": {
+          "value": 0.00058,
+          "pass": true
+        },
+        "cogging_le_5pct": {
+          "value": 0.0023,
+          "pass": true
+        },
+        "t_avg_25_pm20": {
+          "value": 22.6857,
+          "pass": true
+        },
+        "ripple_le_15": {
+          "value": 4.285,
+          "pass": true
+        }
+      },
+      "verdict": "PASS"
+    },
+    {
+      "skew_slot_pitch": 1.0,
+      "base": {
+        "bemf_phase_rms_v": 99.0636,
+        "cogging_pp_nm": 0.00027,
+        "cogging_pct": 0.0011,
+        "thd_line_pct": 2.0014,
+        "T_avg_nm": 18.7121,
+        "T_ripple_pct": 4.289
+      },
+      "n84": {
+        "bemf_phase_rms_v": 104.0168,
+        "cogging_pp_nm": 0.00027,
+        "cogging_pct": 0.0011,
+        "thd_line_pct": 2.0014,
+        "T_avg_nm": 19.6476,
+        "T_ripple_pct": 4.289
+      },
+      "expected_linear": {
+        "bemf_phase_rms_v": 104.01678,
+        "T_avg_nm": 19.64771
+      },
+      "ratio": {
+        "bemf_phase_rms_v": 1.05,
+        "T_avg_nm": 1.04999
+      },
+      "delta": {
+        "thd_pt": 0.0,
+        "cogging_nm": 0.0
+      },
+      "criteria": {
+        "bemf_118_145": {
+          "value": 104.0168,
+          "pass": false
+        },
+        "thd_le_10": {
+          "value": 2.0014,
+          "pass": true
+        },
+        "cogging_le_1p25": {
+          "value": 0.00027,
+          "pass": true
+        },
+        "cogging_le_5pct": {
+          "value": 0.0011,
+          "pass": true
+        },
+        "t_avg_25_pm20": {
+          "value": 19.6476,
+          "pass": false
+        },
+        "ripple_le_15": {
+          "value": 4.289,
+          "pass": true
+        }
+      },
+      "verdict": "FAIL"
+    }
+  ]
+}

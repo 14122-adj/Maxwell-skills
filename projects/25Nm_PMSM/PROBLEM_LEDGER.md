@@ -5,9 +5,9 @@
 > 状态：`open` / `in_progress` / `blocked` / `closed`。
 > 判据见 `docs/ENGINEERING_ACCEPTANCE.md`；探索见 `EXPLORATION_LOG.md`。
 
-## 当前基线（2026-11-15 真机，模板路径 M8 梨形槽 + M7 负载）
+## 当前基线（2026-11-16 真机，模板路径 M8 梨形槽 + M7 负载 + P12 匝数 84 设计点）
 
-| 指标 | 值 | 判据 | 状态 |
+| 指标（**80 匝基线**，G4/M8/M7 冻结口径，`--check` 8/8 可复现） | 值 | 判据 | 状态 |
 |---|---:|---:|---|
 | BEMF 相 RMS | 120.5594 V（模板 M8，+1.41% vs 手写 118.8832） | 118–145 V（±10%） | ✅ |
 | 线 BEMF THD | **11.180%**（梨形槽，同口径复算；矩形槽 10.595%） | ≤10%（下限） | ❌ 略超（+0.59 pt） |
@@ -18,7 +18,13 @@
 | 功率平衡 | P_mech 3554.6 W vs 3·E·I 3577.0 W = −0.62% | <10% | ✅ |
 | 效率（解析） | 93.87% | ≥93.8% | 待 FEA 损耗复核（E8） |
 | 报告 | 491,996 B / 13 表 / 7 内嵌图 | — | ✅（数值口径见 P6） |
-| 斜槽候选（0.5 槽距，连续多切片） | 齿槽 0.00058 N·m/0.002%、THD 1.9983%、脉动 4.285%、T_avg 21.6056 N·m、BEMF **114.3847 V** | 同左 + BEMF 118–145 V | 齿槽/THD/脉动/转矩 ✅；**BEMF ❌（P12）** |
+| 斜槽候选（0.5 槽距，连续多切片） | 齿槽 0.00058 N·m/0.002%、THD 1.9983%、脉动 4.285%、T_avg 21.6056 N·m、BEMF **114.3847 V** | 同左 + BEMF 118–145 V | BEMF ❌（P12，11-16 已闭） |
+| **设计点（0.5 槽距 + 84 匝，401 点）** | BEMF **120.1039 V**、THD **1.9983%**、齿槽 **0.00058 N·m/0.0023%**、`T_avg` **22.6857 N·m（−9.26%）**、脉动 **4.285%**；η 仍为解析 93.87%（E8） | 电磁五项 + η ≥93.8% | 电磁 5/5 ✅（6 条判据，齿槽拆绝对+相对）；η 待 FEA 损耗（E8） |
+
+> **匝数记账口径（P12，全部为 analytic，未替换任何 FEA 值）**：R ∝ N²；同转矩 I ∝ 1/N
+> ⇒ P_cu = I²R **近似不变**（138.6 W）；若维持 9.89 A 不变，则 `T_avg` +5%、P_cu ×1.1025
+> ⇒ **152.8 W**（≤160 W 下限内，超 ≤140 W 目标）。两条口径不得混用；账本 11-15 版写的
+> "同转矩电流 +4.7%"方向错，已改。
 
 ## 问题表
 
@@ -34,8 +40,9 @@
 | **P8** | minor | 仓库 | 工作树 11 项未提交；M8 文件也未提交 | `git status` | M8 文件单独提交，不扫入已有脏改动 | open | M8 `fe1de7b`；M7 今日单独提交（代码/测试/结果/文档，逐文件 add）；余 **9** 项历史改动未归属：`mcp-maxwell/server.py`、`output_scripts/36slot_industrial/{winding.py + 未跟踪 coils.py}`、`output_scripts/36slot_v2/{coils,winding}.py`、`scripts/{maxwell_bridge,motor_param_calc,winding_layout}.py`、`references/motor_design_guide.md` —— 未审不动；`.workbuddy/`（自动化记忆）有意不入库 |
 | **P9** | info | 看板 | M7/M8 行缺失 | 周检 P9 | 已补 | **closed** | — |
 | **P10** | minor | 管线 | M7 首次跑时应用日志与 AEDT「脚本同名 .log」撞名，日志被截断（CSV 完好） | `D:/ANSYS_Run/aedt_msgwin_m7_collision_20261115.log` | 日志改名 `tpl_app_<case>.log`，重跑无截断 | **closed** | 2026-11-15 改 `tpl_solve_noload.py`/`tpl_run.py` 并加注释；本次靠 401 行 CSV + 原生 TrCrv 反证求解完整 |
-| **P11** | major | 电磁 | 线 BEMF THD **11.180% > 10% 下限**；梨形窄槽口把它从 10.595% 推高 0.59 pt（与齿槽改善对冲） | `csv_tpl/flux_*.csv` + `ingest_fea.analyse_signal`（跳首周期、2–15 次）；矩形槽同法复现 10.595% 自证 | 线 THD ≤10%（目标 ≤8%） | **in_progress** | 斜槽已完成（11-15 夜）：**0.5 槽距 → THD 1.9983%**、0.25 → 7.2741%（`fea/skew_scan_summary.json`）；但 0.5 槽距把 BEMF 打到 114.38 V ⇒ 与 **P12** 绑定后才能关闭 |
-| **P12** | major | 电磁 | 斜槽 0.5 槽距的基波降额 **k1=0.95493** 使 BEMF 120.5577 → **114.3847 V（−5.12%）< 118 V 下限** | `fea/skew_scan_summary.json` 的 `bemf_phase_rms_v`；k1 由 3 片真机 FEA 复核 **0.95983 vs 0.95980（0.0033%）**（`fea/skew_slice_check.json`） | 配 N=85 后 BEMF 回到 118–145 V，且 T_avg/齿槽/THD 不退化 | open | N 81→85（+4.94%）**解析推算** 114.3847×85/81 = **120.03 V**；代价：同转矩电流 +4.7%、P_cu 138.6→**152 W**（≤160 下限内，超 ≤140 目标）、η 约 −0.3 pt（**analytic，待 E8 FEA 损耗复核**）。下一步：`--turns 85` 跑一组 401 点 |
+| **P11** | major | 电磁 | 线 BEMF THD **11.180% > 10% 下限**；梨形窄槽口把它从 10.595% 推高 0.59 pt（与齿槽改善对冲） | `csv_tpl/flux_*.csv` + `ingest_fea.analyse_signal`（跳首周期、2–15 次）；矩形槽同法复现 10.595% 自证 | 线 THD ≤10%（目标 ≤8%） | **closed** | 设计点（0.5 槽距 + 84 匝）**1.9983%**（≤8% 目标也达标）；频域因子法 1.9969%（差 0.0014 pt）。**未斜槽基线 11.180% 保留为已记录 FAIL**，不改口径、不删数据。证据 `fea/n84_skew_summary.json` |
+| **P12** | major | 电磁 | 斜槽 0.5 槽距的基波降额 **k1=0.95493** 使 BEMF 120.5577 → **114.3847 V（−5.12%）< 118 V 下限** | `fea/skew_scan_summary.json` 的 `bemf_phase_rms_v`；k1 由 3 片真机 FEA 复核 **0.95983 vs 0.95980（0.0033%）**（`fea/skew_slice_check.json`） | 配 N=85 后 BEMF 回到 118–145 V，且 T_avg/齿槽/THD 不退化 | **closed** | 11-16 真机：cps 40→42（80→84 匝，+5.00%）两次 401 点（空载 475.9 s / 负载 538.6 s）。BEMF **120.1039 V** ✅；THD 变化 **0.0 pt**、齿槽变化 **−1e-5 N·m**（不退化 ✅）；`T_avg` 22.6857（比 21.6056 升 5%）。负载 FEA 直接平均 22.62961→23.76074（比 1.04998，线性预测 23.76109，差 −0.0015%）。证据 `fea/p12_turns84_summary.json`、`fea/n84/`、`fea/n84_load/`（各 4×401 行） |
+| **P15** | minor | 制造/口径 | 槽满率三处口径不一致：`slot_fill_factor=0.40`（config）；φ1.45 mm 单根实算 40 导体 **71.2%**（cps=42 → **74.7%**）；`param_validator.calc_slot_fill_factor` 若按 `num_strands=4` 会得 4 倍面积（**285%**，明显错口径） | `scripts/motor_config.py:167`、`scripts/param_validator.py:116-118` | E9 前统一口径（单根/并绕/含漆膜），再判 ≤0.78 | open | 不阻塞电磁结论；cps=42 的 74.7% 仍在 0.78 内，但需写清是"裸铜/单根"口径 |
 | **P13** | minor | 复核 | 3 片真机 FEA 只覆盖**空载**（齿槽/BEMF/THD），负载侧斜槽降额未过真机 | `fea/skew_slice_check.json` 的 `not_covered` | 负载 3 片 FEA（约 3×726 s）或其它独立验证 | open | 现由「时域合成 + k_sk(1)」两法互证（差 1e-3）；若周检要求，再跑 3 个负载切片 |
 | **P14** | minor | API | `AssignBand` 的 `Init Pos="7.5deg"` **不旋转几何**：401 点解与基线逐点相同（max 3e-5 N·m、互相关滞后 0），白跑 726 s | `D:/ANSYS_Run/tpl_app_s075.log`（`Init Pos` 版）+ `docs/MAXWELL_INTERNALS.md` §15.1 | 改 `Init Pos` 后转矩波形必须变化 | **closed** | 改用几何旋转磁钢扇区（`_gen_geometry` 的 `_ang_off`）；形心证据 PM_1 = (43.9447, 1.9187) @ 2.5°、(43.6102, 5.7414) @ 7.5° |
 | **E1** | major | 数值 | 网格无关性未做 | — | 3 档网格，转矩/BEMF 变化 <2% | open | 粗/中/细三档，记录 401 点 |

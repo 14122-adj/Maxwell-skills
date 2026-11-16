@@ -40,7 +40,8 @@ from motor_config import MotorConfig, MotorType, PMTopology, SlotType  # noqa: E
 ORDER = ["setup", "materials", "geometry", "winding", "boundary", "mesh", "solver"]
 
 
-def build_config(load: bool = False, init_deg: float = 0.0) -> MotorConfig:
+def build_config(load: bool = False, init_deg: float = 0.0,
+                 conductors_per_slot: int = 40) -> MotorConfig:
     """25 N·m 8p12s SPMSM 配置（与 pmsm_config.py 冻结值一致）。
 
     ``load=False``（默认）→ 空载：三相绕组电流 "0A"，生成物与 G4/M8 基线逐字一致。
@@ -49,6 +50,12 @@ def build_config(load: bool = False, init_deg: float = 0.0) -> MotorConfig:
     使两条路径的差异只可能来自建模（几何/网格/线圈），不来自激励。
     ``init_deg`` → `AssignBand` 的 `Init Pos`（机械 deg），G7 多切片用；0.0 时生成物
     与历史基线**逐字一致**（格式化成 "0deg"），这是 `--check` 8/8 的前提。
+    ``conductors_per_slot`` → **唯一**影响磁链的绕组旋钮（P12）。Maxwell 的
+    ``Conductor number`` 是**单个槽边**的导体数，每相匝数 = 12 槽×cps÷3 相÷2 = **2·cps**：
+      * cps=40（默认）⇒ 80 匝。文档里的「81 匝」是名义值（差 1.25%），历史口径不动；
+      * cps=42 ⇒ **84 匝（+5.00%）**，即 P12 用来补斜槽 k1=0.95493 的那一档
+        （账本写「N=85」= +4.94%，除数取整后 84 匝是唯一可实现的整数值，差 0.06 pt）。
+    几何/材料/网格与 cps 无关，故这一旋钮满足「单变量」。
     """
     return MotorConfig(
         motor_type=MotorType.PMSM,
@@ -85,9 +92,10 @@ def build_config(load: bool = False, init_deg: float = 0.0) -> MotorConfig:
         pm_thickness=1.95,
         pm_pole_arc=0.87,
 
-        # 绕组
-        turns_per_phase=81,
-        conductors_per_slot=40,
+        # 绕组：turns_per_phase 只作元数据（main.py 不消费），但必须与 cps 自洽，
+        # 否则报告里的「81 匝」会和 Maxwell 里的 40 导体/槽边对不上（P12 记账用）。
+        turns_per_phase=2 * conductors_per_slot,
+        conductors_per_slot=conductors_per_slot,
         wire_diameter_mm=1.45,
         slot_fill_factor=0.40,
 
@@ -183,18 +191,26 @@ def main(argv=None) -> int:
                     help="激励工况：noload=三相 0A（G4/M8 基线）/ load=M7 三相正弦电流")
     ap.add_argument("--init-deg", type=float, default=0.0,
                     help="AssignBand 的 Init Pos（机械 deg）；G7 斜槽多切片用，0=基线")
+    ap.add_argument("--conductors-per-slot", type=int, default=40,
+                    help="每槽边导体数（P12 匝数旋钮）；40=基线 80 匝，42=84 匝")
     ap.add_argument("--check", action="store_true", help="只比对不落盘；有漂移则 rc=1")
     args = ap.parse_args(argv)
 
-    if args.check and args.case != "noload":
-        print("[ERR] --check 只对空载基线有意义：负载生成物不入库、不参与漂移门禁")
+    if args.check and (args.case != "noload" or args.conductors_per_slot != 40):
+        print("[ERR] --check 只对空载基线（cps=40）有意义：其它生成物不入库、不参与漂移门禁")
+        return 2
+    if args.conductors_per_slot < 2:
+        print("[ERR] --conductors-per-slot 必须 ≥2（每相匝数 = 2·cps）")
         return 2
     out_dir = args.out_dir or os.path.join(
         here, "maxwell_model" if args.case == "noload" else "maxwell_model_load")
-    cfg = build_config(load=(args.case == "load"), init_deg=args.init_deg)
+    cfg = build_config(load=(args.case == "load"), init_deg=args.init_deg,
+                       conductors_per_slot=args.conductors_per_slot)
     builder = MotorModelBuilder(cfg)
     print("=" * 60)
     print("25N·m SPMSM — Maxwell 2D 建模脚本生成（case=%s）" % args.case)
+    print("绕组: %d 导体/槽边 → 每相 %d 匝（名义 81）" % (cfg.conductors_per_slot,
+                                                        cfg.turns_per_phase))
     print("=" * 60)
     ok = builder.validate()
     print(f"校验结果: {'通过' if ok else '存在错误'}")

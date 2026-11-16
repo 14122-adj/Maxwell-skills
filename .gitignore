@@ -39,3 +39,8 @@ projects/25Nm_PMSM/maxwell_model_load/
 # G7 斜槽多切片：`gen_maxwell_model.py --init-deg <deg> --out_dir maxwell_model_sXXX`
 # 生成物（同一模板 + 一个角度），切片 CSV 已归档到 projects/results/fea/skew_slices/
 projects/25Nm_PMSM/maxwell_model_s*/
+
+# P12 匝数旋钮（cps 42 / 84 匝）：同一模板 + 一个 cps，同理不入库；
+# CSV 已归档到 projects/results/fea/n84/ 与 n84_load/。
+projects/25Nm_PMSM/maxwell_model_n84/
+projects/25Nm_PMSM/maxwell_model_load_n84/
