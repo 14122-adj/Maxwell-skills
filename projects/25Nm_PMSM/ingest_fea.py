@@ -193,13 +193,28 @@ def thd_percent(t, y, f0: float = F_ELEC, n_harm: int = 15):
 
 
 def analyse_signal(t, y, skip_first_period: bool = True):
-    """RMS/峰值/THD；默认跳过第一个工频周期以排除启动暂态。"""
+    """RMS/峰值/THD；默认跳过第一个工频周期以排除启动暂态。
+
+    窗口口径（2026-11-18 E2 修根因）
+    --------------------------------
+    1. 跳周期用**整数索引** `round(T/dt)`，不用 `t[i] >= t0` 的浮点比较：
+       0.01 在二进制里不可精确表示，50 µs 网格会被判成 0.01005（少 1 点），
+       25 µs 网格却判成 0.010000（含重复端点）⇒ 同一物理两个窗口，THD 差 0.55 pt。
+    2. 单周期 DFT **不得含重复端点**：若窗口跨度恰为整数个电周期，丢弃最后一个点。
+    这两条合起来保证 50 µs（200 点）与 25 µs（400 点）落在**同一个 10 ms 整周期**上。
+    """
     if skip_first_period and len(t) > 2:
-        t0 = t[0] + 1.0 / F_ELEC
-        sel = [i for i in range(len(t)) if t[i] >= t0]
-        if len(sel) > 10:
-            t = [t[i] for i in sel]
-            y = [y[i] for i in sel]
+        diffs = sorted(t[i + 1] - t[i] for i in range(min(len(t) - 1, 50)))
+        dt = diffs[len(diffs) // 2] if diffs else 0.0
+        n_skip = int(round((1.0 / F_ELEC) / dt)) if dt > 0 else 0
+        if n_skip > 0 and len(t) - n_skip > 10:
+            t = t[n_skip:]
+            y = y[n_skip:]
+            span = t[-1] - t[0]
+            periods = span * F_ELEC
+            if round(periods) >= 1 and abs(periods - round(periods)) < 1e-6:
+                t = t[:-1]
+                y = y[:-1]
     rms = math.sqrt(_mean([v * v for v in y])) if y else 0.0
     return {
         "rms": rms,

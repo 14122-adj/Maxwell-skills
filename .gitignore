@@ -49,3 +49,8 @@ projects/25Nm_PMSM/maxwell_model_load_n84/
 # 只改 mesh.py 四个 MaxLength，其余生成物逐字相同 ⇒ 不入库；
 # 12 个 401 行 CSV 已归档到 projects/results/fea/e1_{m,c,f}/。
 projects/25Nm_PMSM/maxwell_model_e1*/
+
+# E2 时间步无关性：`gen_maxwell_model.py --time-step-us <µs> --out_dir maxwell_model_e2t25`
+# 只改 solver.py 的 TimeStep（StopTime 不变）⇒ 不入库；801 行 CSV 归档到
+# projects/results/fea/e2_t25/。
+projects/25Nm_PMSM/maxwell_model_e2*/

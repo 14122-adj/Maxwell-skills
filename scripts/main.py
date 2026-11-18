@@ -921,7 +921,12 @@ print("Mesh configured")
     def _gen_solver(self, freq):
         c = self.config
         stop_time = max(2.0 / freq, 0.02) if freq > 0 else 0.02
-        time_step = max(1.0 / (freq * 200), 5e-5) if freq > 0 else 5e-5
+        # E2：`sim_time_step_override` 给值时只替换步长（StopTime 不变），
+        # None 时保持历史口径 max(1/(f·200), 5e-5) —— 基线生成物逐字不变。
+        if getattr(c, "sim_time_step_override", None):
+            time_step = float(c.sim_time_step_override)
+        else:
+            time_step = max(1.0 / (freq * 200), 5e-5) if freq > 0 else 5e-5
 
         stop_str = f"{stop_time:.4f}"
         step_str = f"{time_step:.6f}"

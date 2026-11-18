@@ -1,0 +1,109 @@
+{
+ "stage": "E2",
+ "date": "2026-11-18",
+ "criterion": "§3：50 µs vs 25 µs，同一工况（空载 20 ms），相 BEMF RMS 与齿槽峰峰值变化 <2%",
+ "variable": "TimeStep（50→25 µs，StopTime 0.02 s 不变 ⇒ 401→801 点；几何/材料/网格/绕组/边界逐字相同）",
+ "levels": {
+  "t50": {
+   "case": "e1m",
+   "csvdir": "D:/ANSYS_Run/csv_tpl_e1m",
+   "analyze_s": 479.4,
+   "bemf": {
+    "rms_by_phase_v": {
+     "A": 120.5574,
+     "B": 120.558,
+     "C": 120.5629
+    },
+    "rms_phase_avg_v": 120.5594,
+    "n_samples": 401,
+    "files": {
+     "A": "flux_e1m_a.csv",
+     "B": "flux_e1m_b.csv",
+     "C": "flux_e1m_c.csv"
+    },
+    "line_thd_pct": 11.1797
+   },
+   "cogging": {
+    "pp_full_nm": 0.880087,
+    "pp_last_period_nm": 0.880078,
+    "pct_of_rated": 3.5203,
+    "mean_nm": 0.004111,
+    "dominant_hz": 608.0,
+    "dominant_amp_nm": 0.126765,
+    "n_samples": 401,
+    "file": "tq_e1m.csv",
+    "unit_raw": "mnewtonmeter"
+   },
+   "status": "OK",
+   "time_step_us": 50.0,
+   "level": "t50"
+  },
+  "t25": {
+   "case": "e2t25",
+   "csvdir": "D:/ANSYS_Run/csv_tpl_e2t25",
+   "analyze_s": 1321.4,
+   "bemf": {
+    "rms_by_phase_v": {
+     "A": 120.5871,
+     "B": 120.5877,
+     "C": 120.5926
+    },
+    "rms_phase_avg_v": 120.5891,
+    "n_samples": 801,
+    "files": {
+     "A": "flux_e2t25_a.csv",
+     "B": "flux_e2t25_b.csv",
+     "C": "flux_e2t25_c.csv"
+    },
+    "line_thd_pct": 11.2532
+   },
+   "cogging": {
+    "pp_full_nm": 0.883719,
+    "pp_last_period_nm": 0.883719,
+    "pct_of_rated": 3.5349,
+    "mean_nm": 0.004033,
+    "dominant_hz": 608.0,
+    "dominant_amp_nm": 0.126466,
+    "n_samples": 801,
+    "file": "tq_e2t25.csv",
+    "unit_raw": "mnewtonmeter"
+   },
+   "status": "OK",
+   "time_step_us": 25.0,
+   "level": "t25"
+  }
+ },
+ "deviation": {
+  "bemf_dev_pct": 0.0246,
+  "cogging_dev_pct": 0.4137,
+  "thd_delta_pt": 0.0735,
+  "pass_bemf": true,
+  "pass_cogging": true,
+  "pass": true
+ },
+ "decimated_cross_check": {
+  "stride": 2,
+  "bemf_rms_phase_avg_v": 120.5594,
+  "bemf_rms_by_phase_v": {
+   "A": 120.5574,
+   "B": 120.558,
+   "C": 120.5629
+  },
+  "cogging_pp_last_period_nm": 0.880091,
+  "n_samples": 401,
+  "status": "OK",
+  "bemf_dev_vs_t50_pct": 0.0,
+  "cogging_dev_vs_t50_pct": 0.0015
+ },
+ "resolution_floor_e1": {
+  "bemf_pct": 0.0053,
+  "cogging_pct": 0.5279,
+  "source": "e1_mesh_summary.json convergence (medium->fine)"
+ },
+ "verdict": "PASS_TIMESTEP_CONVERGED",
+ "notes": [
+  "t50 用 E1 的 medium 重跑（同一冻结模型第二次独立求解），不是 11-14 的历史 CSV，这样 50/25 µs 两次解在同一机器负载条件下产生，差异只可能来自步长。",
+  "降采样校验把 25 µs 的磁链每 2 点取 1 再求导；它若与 50 µs 基线同量级，说明差异来自时间离散而非另一个物理。",
+  "THD 窗口根因（本日修复）：`analyse_signal` 原用 `t[i] >= t0` 浮点比较跳首周期，50 µs 网格被判成 0.01005（少 1 点、窗口 9.95 ms），25 µs 网格判成 0.010000（含重复端点、窗口 10.0 ms）⇒ 同一物理两个窗口，THD 假差 0.5474 pt。改为整数索引 skip=round(T/dt) + 单周期去重复端点后，两档都落在 10 ms 整周期：11.1797% vs 11.2532%（Δ +0.0735 pt / +0.66%）。50 µs 历史数值不变。"
+ ]
+}

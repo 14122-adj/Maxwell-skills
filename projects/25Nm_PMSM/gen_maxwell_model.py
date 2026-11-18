@@ -47,7 +47,8 @@ MESH_BASE = {"airgap": 0.2, "teeth": 1.5, "pm": 0.5, "yoke": 3.0}
 
 def build_config(load: bool = False, init_deg: float = 0.0,
                  conductors_per_slot: int = 40,
-                 mesh_scale: float = 1.0) -> MotorConfig:
+                 mesh_scale: float = 1.0,
+                 time_step_us: float = 0.0) -> MotorConfig:
     """25 N·m 8p12s SPMSM 配置（与 pmsm_config.py 冻结值一致）。
 
     ``load=False``（默认）→ 空载：三相绕组电流 "0A"，生成物与 G4/M8 基线逐字一致。
@@ -65,6 +66,9 @@ def build_config(load: bool = False, init_deg: float = 0.0,
     ``mesh_scale`` → **唯一**影响网格密度的旋钮（E1）。四个 `AssignLengthOp` 的
     `MaxLength` 同时乘以该因子：1.0 = 冻结基线（`--check` 逐字一致），1.5 = 粗，
     0.6 = 细。网格只改 mesh.py，几何/材料/边界/激励与基线逐字相同。
+    ``time_step_us`` → **唯一**影响时间离散的旋钮（E2，单位 µs）。0 = 历史口径
+    `max(1/(f·200), 5e-5)` = 50 µs；25 ⇒ `TimeStep=0.000025s`，`StopTime` 仍 0.02 s
+    ⇒ 801 点。只差 solver.py 一行，几何/材料/网格/激励逐字不变。
     """
     return MotorConfig(
         motor_type=MotorType.PMSM,
@@ -125,6 +129,9 @@ def build_config(load: bool = False, init_deg: float = 0.0,
         mesh_teeth=round(MESH_BASE["teeth"] * mesh_scale, 4),
         mesh_pm=round(MESH_BASE["pm"] * mesh_scale, 4),
         mesh_yoke=round(MESH_BASE["yoke"] * mesh_scale, 4),
+
+        # 时间步（E2 时间步无关性旋钮；0 → None = 历史口径 50 µs，逐字不变）
+        sim_time_step_override=(time_step_us * 1e-6) if time_step_us else None,
 
         # 材料
         stator_material="M270_35A",
@@ -211,16 +218,22 @@ def main(argv=None) -> int:
     ap.add_argument("--mesh-scale", type=float, default=1.0,
                     help="网格尺寸缩放因子（E1）：1.0=冻结基线，1.5=粗，0.6=细；"
                          "四个 MaxLength 同比缩放，其它文件逐字不变")
+    ap.add_argument("--time-step-us", type=float, default=0.0,
+                    help="时间步长（µs，E2）：0=历史口径 50 µs；25=25 µs（StopTime 仍 0.02 s "
+                         "⇒ 801 点）。只改 solver.py 一行")
     ap.add_argument("--check", action="store_true", help="只比对不落盘；有漂移则 rc=1")
     args = ap.parse_args(argv)
 
     if args.check and (args.case != "noload" or args.conductors_per_slot != 40
-                       or args.mesh_scale != 1.0):
-        print("[ERR] --check 只对空载基线（cps=40, mesh_scale=1.0）有意义："
+                       or args.mesh_scale != 1.0 or args.time_step_us != 0.0):
+        print("[ERR] --check 只对空载基线（cps=40, mesh_scale=1.0, time_step=50µs）有意义："
               "其它生成物不入库、不参与漂移门禁")
         return 2
     if args.mesh_scale <= 0:
         print("[ERR] --mesh-scale 必须 >0")
+        return 2
+    if args.time_step_us < 0 or args.time_step_us > 200:
+        print("[ERR] --time-step-us 必须在 (0, 200] µs 区间（0 = 默认 50 µs）")
         return 2
     if args.conductors_per_slot < 2:
         print("[ERR] --conductors-per-slot 必须 ≥2（每相匝数 = 2·cps）")
@@ -229,7 +242,8 @@ def main(argv=None) -> int:
         here, "maxwell_model" if args.case == "noload" else "maxwell_model_load")
     cfg = build_config(load=(args.case == "load"), init_deg=args.init_deg,
                        conductors_per_slot=args.conductors_per_slot,
-                       mesh_scale=args.mesh_scale)
+                       mesh_scale=args.mesh_scale,
+                       time_step_us=args.time_step_us)
     builder = MotorModelBuilder(cfg)
     print("=" * 60)
     print("25N·m SPMSM — Maxwell 2D 建模脚本生成（case=%s）" % args.case)
@@ -238,6 +252,8 @@ def main(argv=None) -> int:
     print("网格: scale=%g → 气隙 %g / 齿 %g / 磁钢 %g / 轭 %g mm"
           % (args.mesh_scale, cfg.mesh_airgap, cfg.mesh_teeth,
              cfg.mesh_pm, cfg.mesh_yoke))
+    print("时间步: %s µs（0 = 历史口径 50 µs）"
+          % ("50" if not args.time_step_us else "%g" % args.time_step_us))
     print("=" * 60)
     ok = builder.validate()
     print(f"校验结果: {'通过' if ok else '存在错误'}")

@@ -207,6 +207,9 @@ class MotorConfig:
     # --- 仿真参数 ---
     sim_stop_time: float = 0.02           # 停止时间 (s)
     sim_time_step: float = 5e-5           # 时间步长 (s)
+    # E2 时间步无关性旋钮：None = 按电频率自适应（历史口径 max(1/(f·200), 5e-5)）；
+    # 显式给值则**只**改 TimeStep，StopTime 不变 ⇒ 点数随步长反比变化（25 µs → 801 点）。
+    sim_time_step_override: float | None = None
     fractions: int = 4                    # 周期分数
     
     # --- 网格参数 (mm) ---
