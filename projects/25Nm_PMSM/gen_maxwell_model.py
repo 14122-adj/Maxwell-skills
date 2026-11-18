@@ -39,9 +39,15 @@ from motor_config import MotorConfig, MotorType, PMTopology, SlotType  # noqa: E
 #  的 test_materials_before_geometry 冲突，本次一并纠正。）
 ORDER = ["setup", "materials", "geometry", "winding", "boundary", "mesh", "solver"]
 
+# 网格尺寸基线（mm，scale=1.0，即 G4/M8 冻结口径）：气隙 / 齿部 / 磁钢 / 轭部。
+# E1 网格无关性的三个水平都从这里按**同一因子**缩放（粗 1.5 / 中 1.0 / 细 0.6），
+# 这样几何/材料/边界/激励逐字不变，差异只可能来自网格密度。
+MESH_BASE = {"airgap": 0.2, "teeth": 1.5, "pm": 0.5, "yoke": 3.0}
+
 
 def build_config(load: bool = False, init_deg: float = 0.0,
-                 conductors_per_slot: int = 40) -> MotorConfig:
+                 conductors_per_slot: int = 40,
+                 mesh_scale: float = 1.0) -> MotorConfig:
     """25 N·m 8p12s SPMSM 配置（与 pmsm_config.py 冻结值一致）。
 
     ``load=False``（默认）→ 空载：三相绕组电流 "0A"，生成物与 G4/M8 基线逐字一致。
@@ -56,6 +62,9 @@ def build_config(load: bool = False, init_deg: float = 0.0,
       * cps=42 ⇒ **84 匝（+5.00%）**，即 P12 用来补斜槽 k1=0.95493 的那一档
         （账本写「N=85」= +4.94%，除数取整后 84 匝是唯一可实现的整数值，差 0.06 pt）。
     几何/材料/网格与 cps 无关，故这一旋钮满足「单变量」。
+    ``mesh_scale`` → **唯一**影响网格密度的旋钮（E1）。四个 `AssignLengthOp` 的
+    `MaxLength` 同时乘以该因子：1.0 = 冻结基线（`--check` 逐字一致），1.5 = 粗，
+    0.6 = 细。网格只改 mesh.py，几何/材料/边界/激励与基线逐字相同。
     """
     return MotorConfig(
         motor_type=MotorType.PMSM,
@@ -110,6 +119,12 @@ def build_config(load: bool = False, init_deg: float = 0.0,
         current_phase_deg=(120.0, 240.0, 0.0),
         current_sign=-1,
         rotor_init_deg=float(init_deg),
+
+        # 网格（E1 网格无关性旋钮；scale=1.0 时与历史基线逐字一致）
+        mesh_airgap=round(MESH_BASE["airgap"] * mesh_scale, 4),
+        mesh_teeth=round(MESH_BASE["teeth"] * mesh_scale, 4),
+        mesh_pm=round(MESH_BASE["pm"] * mesh_scale, 4),
+        mesh_yoke=round(MESH_BASE["yoke"] * mesh_scale, 4),
 
         # 材料
         stator_material="M270_35A",
@@ -193,11 +208,19 @@ def main(argv=None) -> int:
                     help="AssignBand 的 Init Pos（机械 deg）；G7 斜槽多切片用，0=基线")
     ap.add_argument("--conductors-per-slot", type=int, default=40,
                     help="每槽边导体数（P12 匝数旋钮）；40=基线 80 匝，42=84 匝")
+    ap.add_argument("--mesh-scale", type=float, default=1.0,
+                    help="网格尺寸缩放因子（E1）：1.0=冻结基线，1.5=粗，0.6=细；"
+                         "四个 MaxLength 同比缩放，其它文件逐字不变")
     ap.add_argument("--check", action="store_true", help="只比对不落盘；有漂移则 rc=1")
     args = ap.parse_args(argv)
 
-    if args.check and (args.case != "noload" or args.conductors_per_slot != 40):
-        print("[ERR] --check 只对空载基线（cps=40）有意义：其它生成物不入库、不参与漂移门禁")
+    if args.check and (args.case != "noload" or args.conductors_per_slot != 40
+                       or args.mesh_scale != 1.0):
+        print("[ERR] --check 只对空载基线（cps=40, mesh_scale=1.0）有意义："
+              "其它生成物不入库、不参与漂移门禁")
+        return 2
+    if args.mesh_scale <= 0:
+        print("[ERR] --mesh-scale 必须 >0")
         return 2
     if args.conductors_per_slot < 2:
         print("[ERR] --conductors-per-slot 必须 ≥2（每相匝数 = 2·cps）")
@@ -205,12 +228,16 @@ def main(argv=None) -> int:
     out_dir = args.out_dir or os.path.join(
         here, "maxwell_model" if args.case == "noload" else "maxwell_model_load")
     cfg = build_config(load=(args.case == "load"), init_deg=args.init_deg,
-                       conductors_per_slot=args.conductors_per_slot)
+                       conductors_per_slot=args.conductors_per_slot,
+                       mesh_scale=args.mesh_scale)
     builder = MotorModelBuilder(cfg)
     print("=" * 60)
     print("25N·m SPMSM — Maxwell 2D 建模脚本生成（case=%s）" % args.case)
     print("绕组: %d 导体/槽边 → 每相 %d 匝（名义 81）" % (cfg.conductors_per_slot,
                                                         cfg.turns_per_phase))
+    print("网格: scale=%g → 气隙 %g / 齿 %g / 磁钢 %g / 轭 %g mm"
+          % (args.mesh_scale, cfg.mesh_airgap, cfg.mesh_teeth,
+             cfg.mesh_pm, cfg.mesh_yoke))
     print("=" * 60)
     ok = builder.validate()
     print(f"校验结果: {'通过' if ok else '存在错误'}")

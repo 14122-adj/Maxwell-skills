@@ -1,0 +1,161 @@
+{
+ "stage": "E1",
+ "date": "2026-11-18",
+ "criterion": "§3 收敛判据：基线再细化一档，相 BEMF RMS 与齿槽峰峰值变化 <2%；严格三档口径（粗/中/细全部 <2%）单列，不合并",
+ "variable": "mesh_scale（四个 MaxLength 同比缩放；其余生成物逐字不变）",
+ "frozen_baseline": {
+  "bemf_rms_phase_v": 120.5577,
+  "cogging_pp_nm": 0.880091
+ },
+ "levels": {
+  "m": {
+   "case": "e1m",
+   "csvdir": "D:/ANSYS_Run/csv_tpl_e1m",
+   "analyze_s": 479.4,
+   "bemf": {
+    "rms_by_phase_v": {
+     "A": 120.558,
+     "B": 120.5573,
+     "C": 120.5629
+    },
+    "rms_phase_avg_v": 120.5594,
+    "n_samples": 401,
+    "files": {
+     "A": "flux_e1m_a.csv",
+     "B": "flux_e1m_b.csv",
+     "C": "flux_e1m_c.csv"
+    },
+    "line_thd_pct": 11.1797
+   },
+   "cogging": {
+    "pp_full_nm": 0.880087,
+    "pp_last_period_nm": 0.880078,
+    "pct_of_rated": 3.5203,
+    "mean_nm": 0.004111,
+    "dominant_hz": 608.0,
+    "dominant_amp_nm": 0.126765,
+    "n_samples": 401,
+    "file": "tq_e1m.csv",
+    "unit_raw": "mnewtonmeter"
+   },
+   "status": "OK",
+   "level": "m",
+   "mesh_scale": 1.0
+  },
+  "c": {
+   "case": "e1c",
+   "csvdir": "D:/ANSYS_Run/csv_tpl_e1c",
+   "analyze_s": 278.6,
+   "bemf": {
+    "rms_by_phase_v": {
+     "A": 120.5506,
+     "B": 120.5566,
+     "C": 120.5511
+    },
+    "rms_phase_avg_v": 120.5527,
+    "n_samples": 401,
+    "files": {
+     "A": "flux_e1c_a.csv",
+     "B": "flux_e1c_b.csv",
+     "C": "flux_e1c_c.csv"
+    },
+    "line_thd_pct": 11.1702
+   },
+   "cogging": {
+    "pp_full_nm": 0.945881,
+    "pp_last_period_nm": 0.945773,
+    "pct_of_rated": 3.7831,
+    "mean_nm": -0.000641,
+    "dominant_hz": 608.0,
+    "dominant_amp_nm": 0.141525,
+    "n_samples": 401,
+    "file": "tq_e1c.csv",
+    "unit_raw": "mnewtonmeter"
+   },
+   "status": "OK",
+   "level": "c",
+   "mesh_scale": 1.5
+  },
+  "f": {
+   "case": "e1f",
+   "csvdir": "D:/ANSYS_Run/csv_tpl_e1f",
+   "analyze_s": 702.5,
+   "bemf": {
+    "rms_by_phase_v": {
+     "A": 120.5533,
+     "B": 120.55,
+     "C": 120.5557
+    },
+    "rms_phase_avg_v": 120.553,
+    "n_samples": 401,
+    "files": {
+     "A": "flux_e1f_a.csv",
+     "B": "flux_e1f_b.csv",
+     "C": "flux_e1f_c.csv"
+    },
+    "line_thd_pct": 11.1786
+   },
+   "cogging": {
+    "pp_full_nm": 0.87545,
+    "pp_last_period_nm": 0.875432,
+    "pct_of_rated": 3.5017,
+    "mean_nm": -0.0011,
+    "dominant_hz": 608.0,
+    "dominant_amp_nm": 0.12586,
+    "n_samples": 401,
+    "file": "tq_e1f.csv",
+    "unit_raw": "mnewtonmeter"
+   },
+   "status": "OK",
+   "level": "f",
+   "mesh_scale": 0.6
+  }
+ },
+ "checks": {
+  "m": {
+   "bemf_dev_pct": 0.0,
+   "cogging_dev_pct": 0.0,
+   "pass_bemf": true,
+   "pass_cogging": true,
+   "pass": true
+  },
+  "c": {
+   "bemf_dev_pct": -0.0056,
+   "cogging_dev_pct": 7.4647,
+   "pass_bemf": true,
+   "pass_cogging": false,
+   "pass": false
+  },
+  "f": {
+   "bemf_dev_pct": -0.0053,
+   "cogging_dev_pct": -0.5279,
+   "pass_bemf": true,
+   "pass_cogging": true,
+   "pass": true
+  }
+ },
+ "convergence": {
+  "pair": "medium->fine",
+  "bemf_dev_pct": -0.0053,
+  "cogging_dev_pct": -0.5279,
+  "pass": true
+ },
+ "strict_3level": {
+  "pass": false,
+  "failed_levels": [
+   "c"
+  ]
+ },
+ "g0_repeatability": {
+  "bemf_dev_pct": 0.0014,
+  "cogging_dev_pct": -0.0015,
+  "pass": true
+ },
+ "missing_or_failed_levels": [],
+ "verdict": "PASS_BASELINE_CONVERGED",
+ "summary_zh": "基线（medium）已收敛：细化到 fine 齿槽 -0.528%、BEMF -0.0053%；粗档（coarse）齿槽 +7.46% 超出 2%，判为齿槽类结论不可用，严格三档口径 FAIL 记录在案。",
+ "notes": [
+  "三档齿槽主频同为 608 Hz（同法同窗、2 Hz 扫描步长）；绝对峰位受窗长与步长影响（M8 全窗口径为 598.5 Hz），只作「同一个齿槽现象」的一致性证据，不作物理量。",
+  "齿槽对气隙网格最敏感：coarse 的 0.3 mm 在 0.675 mm 气隙里只有 2.25 层单元，槽口谐波被抹平 ⇒ +7.46%；fine 的 0.12 mm ≈ 5.6 层 ⇒ 与 medium 差 −0.53%。"
+ ]
+}
