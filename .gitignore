@@ -28,6 +28,11 @@ Desktop.ini
 *.auto
 *.semaphore
 
+# ===== 临时测试区（docs/FILE_LIFECYCLE.md，周检每周清理）=====
+# 新项目临时脚本/试探参数只进这里，不入库；README.md 是说明文件，保留。
+projects/*/TEMP/*
+!projects/*/TEMP/README.md
+
 # ===== ANSYS Maxwell 仿真缓存/结果目录 =====
 *.aedtresults/
 

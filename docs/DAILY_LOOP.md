@@ -103,7 +103,8 @@ Standard 失败?
 3. **失败记录**：`PROBLEM_LEDGER` 的 fail 是否保留？`EXPLORATION_LOG` 是否只报好案例？
 4. **提交纪律**：是否每天 commit/push？是否 `git add -A` 扫入脏文件？
 5. **探索闸门**：G0–G4 未绿 / 未批准就探索 → **流程违规**，暂停探索并纠正 daily prompt。
-6. **纠偏输出**：用 `automation_update` 更新每日任务 prompt（保留 23:00），写入 top 3 + 下周**单一焦点**；连续 2 天无进展的问题标 `blocked` 并换路径。
+6. **文件分类与清理**：是否按 `docs/FILE_LIFECYCLE.md` 给新增文件打 KEEP/TEMP/ARCHIVE 标记？临时脚本是否只进 `projects/IPM_8p48s/TEMP/` 或 `D:/ANSYS_Run/`？周检是否每周清理一次 TEMP 并出 `docs/CLEANUP_REPORT_YYYY-MM-DD.md`（清理前后账本 fail 条目只增不减）？
+7. **纠偏输出**：用 `automation_update` 更新每日任务 prompt（**保留 22:30，用户设定，勿改**），写入 top 3 + 下周**单一焦点**；连续 2 天无进展的问题标 `blocked` 并换路径。
 
 周检 scorecard（写入报告）：
 
@@ -114,8 +115,23 @@ Standard 失败?
 | 进度 | 0–2 | 账本关闭/推进、无连续卡死 |
 | 探索就绪 | 0–1 | G0–G4 green + 批准；未就绪必须写 LOCKED |
 
+## 文件生命周期（2026-11-19 新增）
+
+每日**创建即打标**，周检**每周清一次 TEMP**，权威分类见 `docs/FILE_LIFECYCLE.md`：
+
+| 类 | 例子 | 处理 |
+|---|---|---|
+| **KEEP 长期保存** | 契约/账本/判据/方法文档、`scripts/`+`tests/`、`projects/results/fea/**/*.csv` 与汇总 JSON、报告 | 入库，绝不清理 |
+| **TEMP 临时测试** | `D:/ANSYS_Run/*.log`、试算脚本（`g4b_test*.py`/`tpl_body_*.py`/`try_*.py`）、`.aedt`/`.aedtresults`、空 CSV、`maxwell_model_*` 派生目录、`debug/`、缓存 | 不入库，周检清理；临时脚本只进 `projects/IPM_8p48s/TEMP/` 或 `D:/ANSYS_Run/` |
+| **ARCHIVE 归档** | `archive/`、冻结的 SPM 旧产物 | 入库，只读，只进不出 |
+
+- **证据先迁后清**：临时产物里被账本/报告引用的数字，先把证据迁到 KEEP 区才允许标"可清理"。
+- **每日交付记一行**：`新增：<路径> [KEEP|TEMP|ARCHIVE] <理由>`。
+- **周检清理安全**：先列 `docs/CLEANUP_REPORT_YYYY-MM-DD.md` → 判定 → 只清 TEMP；有 Maxwell 进程时不删 `.aedt`/`.lock`；优先移 `_trash_` 留 7 天；fail 条目只增不减。
+
 ## 硬约束
-- **时间不改**：每日 23:00（用户设定），不要调整 rrule。
+- **时间不改**：每日 **22:30**（用户设定，实际 rrule），不要调整 rrule；周检周日 22:00。
 - **不上传假数据**：无证据的数字不写；不用解析填 FEA 空缺；不用试算/单点下结论。
-- **不重复误判**：Band 薄环 / `EditSetup` 丢运动 / 齿槽 1.6% 已被 `6fca72c` 推翻。
-- **不跳过验收**：技能可用 ≠ 设计合格；齿槽 27.37% 仍是 fail。
+- **不重复误判**：Band 薄环 / `EditSetup` 丢运动 / 齿槽 1.6% / `Init Pos` 能斜槽 已被推翻。
+- **不跳过验收**：技能可用 ≠ 设计合格；G4b 场探针 blocked，G4 未全绿，**不得用解析填 FEA**。
+- **项目状态**：SPM 8p12s 冻结为 baseline；当前项目 IPM 8p48s（双层 V 型 + 双层三相绕组），探索 LOCKED。
