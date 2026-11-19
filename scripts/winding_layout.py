@@ -15,6 +15,12 @@ winding_layout.py — 独立绕组位置速查工具
     python winding_layout.py --compare 8 12 8 36   # 对比两个极槽配合
 
 与 pmsm_winding_builder.py 共享 CANONICAL_LAYOUTS 真值表, 数据源唯一。
+
+溯源（agent 汇报时引用）:
+  - 槽-相-极性真值表: references/winding_layouts.md（canonical 优先; 未覆盖组合走电角 fallback 算法）
+  - 绕组系数/节距/相位带理论: references/motor_design_guide.md §6 Winding Topology
+  - Maxwell 命名与极性约定 (A+→Positive): references/winding_layouts.md §17.2
+  - 所有输出均标注 source=canonical|computed, computed 需人工核对。
 """
 import sys
 import io
@@ -28,12 +34,23 @@ except ImportError:
     from scripts.pmsm_winding_builder import WindingBuilder, CANONICAL_LAYOUTS
 
 
+def _trace_footer(config) -> str:
+    """溯源尾部: 数据源 + 公式章节, agent 汇报时一并抄送。"""
+    src = ("references/winding_layouts.md 真值表" if config.source == "canonical"
+           else "电角 fallback 算法（需人工核对）")
+    return (
+        "# 溯源: 槽-相-极性 ← " + src
+        + " | 绕组理论 ← motor_design_guide.md §6"
+        + " | 极性约定 A+→Positive ← winding_layouts.md §17.2"
+    )
+
+
 def render_md(slots, poles, layer="double", pattern="AABBCC"):
     """Markdown 格式 (适合贴入 SKILL.md / 报告)"""
     b = WindingBuilder(slots=slots, poles=poles, pattern=pattern)
     c = b.compute_winding()
     out = []
-    out.append(f"## {poles}p/{slots}s {b.winding_type.value} (q={b.q:.3f}, k_w={c.winding_factor:.3f})")
+    out.append(f"## {poles}p/{slots}s {b.winding_type.value} (q={b.q:.3f}, k_w={c.winding_factor:.3f}, source={c.source})")
     out.append("")
     out.append("```")
     out.append(b.render_slot_map(c))
@@ -46,6 +63,8 @@ def render_md(slots, poles, layer="double", pattern="AABBCC"):
     out.append("```")
     out.append(b.render_summary(c))
     out.append("```")
+    out.append("")
+    out.append(_trace_footer(c))
     return "\n".join(out)
 
 
@@ -54,13 +73,15 @@ def render_list(slots, poles, pattern="AABBCC"):
     b = WindingBuilder(slots=slots, poles=poles, pattern=pattern)
     c = b.compute_winding()
     out = []
-    out.append(f"# {poles}p/{slots}s — source={c.source}")
+    out.append(f"# {poles}p/{slots}s — source={c.source} (k_w={c.winding_factor:.3f})")
     out.append("")
     # 表格形式: slot | phase | coil
     out.append("| Slot | Phase+Pol | Coil |")
     out.append("|------|-----------|------|")
     for i, (p, pol) in enumerate(c.slot_map, 1):
         out.append(f"| {i} | {p}{pol} | Coil_{i} |")
+    out.append("")
+    out.append(_trace_footer(c))
     return "\n".join(out)
 
 

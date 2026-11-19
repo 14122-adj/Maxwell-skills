@@ -314,6 +314,46 @@ $$A_{slot} = \frac{(b_{s1} + b_{s2})}{2} \cdot h_{s2} + b_{s1} \cdot h_{s1}$$
 
 $$A_{cu} = A_{slot} - A_{insulation} - A_{wedge} - A_{liner}$$
 
+### Slot size back-calculation（Agent 反推用）
+
+正推：给定 Bs/Hs/Rs → 槽面积 → 槽满率。反推（本 skill 常用路径）：给定电流、匝数、槽满率目标 → 求 Bs/Hs/Rs。**反推顺序**：
+
+**1) 槽面积需求（目标）**
+
+$$A_{slot} = \frac{A_{cu}}{\eta_{liner} \cdot k_f}, \quad A_{cu} = N_s \cdot a \cdot A_{wire}$$
+
+- $N_s$ 每槽导体数（= 线圈匝数 × 层数 × 支路 $a$），$A_{wire} = \pi d_{wire}^2/4$
+- $\eta_{liner}$ 绝缘材占位系数：槽宽 <8mm 取 0.82，≥8mm 取 0.85
+- $k_f$ 槽满率目标：0.30~0.50（min_slot_fill / max_slot_fill，自然散热取小）
+
+**2) 定子径向空间（上限）**
+
+$$h_{total} = \frac{D_{so} - D_{si}}{2} - h_y - 1.0,\qquad h_y = \frac{B_{g,avg}\,\tau_{p}}{2\,B_{sat}\,k_{fe}},\qquad w_t = \frac{B_{g,avg}\,\tau_{s}}{B_{sat}\,k_{fe}}$$
+
+**3) 槽宽（齿宽约束）**
+
+$$\tau_s = \frac{\pi D_{si}}{Q},\qquad b_{s2} = \tau_s - w_t,\qquad b_{s2} \le 0.7\,\tau_s$$
+
+**4) 三段高度分配（经验比例，再进位到标准值）**
+
+| 段 | 含义 | 经验范围 |
+|---|---|---|
+| $h_{s0}$ 槽口高 | 开口缝深度 | 0.5 ~ 1.2 mm |
+| $h_{s1}$ 槽楔高 | 过渡段 | 1.0 ~ 2.5 mm |
+| $h_{s2}$ 槽体深 | 主体 | $h_{total} - h_{s0} - h_{s1}$ |
+| $b_{s1}$ 槽楔宽 | 过渡宽 | $(b_{s0}+b_{s2})/2$ 或独立指定 |
+| $R_s$ 槽底圆角 | 梨形/圆槽 | $R_s \approx b_{s2}/2$，且 $R_s \le b_{s2}/2$ |
+
+**5) 校验闭环（与 scripts/param_validator.py 一致）**
+
+$$b_{s0} < b_{s1} < b_{s2},\quad b_{s0} \le 5\,\delta,\quad b_{s2} \le 0.7\,\tau_s,\quad R_s \le \frac{b_{s2}}{2},\quad h_{s0}+h_{s1}+h_{s2} < h_{total}$$
+
+$$k_f = \frac{N_s \, a \, A_{wire}}{\eta_{liner}\,(b_{s2}-w_{ins})\,h_{s2}} \in [0.30,\,0.50]$$
+
+**顶层选择速查**：齿宽 $w_t \approx \tau_s/2$；轭厚 $h_y = \tau_p B_g/(2B_{sat})$；槽口 $b_{s0} = 3{\sim}5\,\delta$（齿槽转矩与漏磁权衡）。
+
+> 例：36s/4p、$D_{si}$=136、$B_{g,avg}$=0.75、$B_{sat}$=1.8、$k_{fe}$=0.95、$N_s$=35、$a$=1、$d$=0.644mm(AWG22) → $A_{cu}$≈35×0.326=11.4mm²，$A_{slot}$≈11.4/(0.85×0.45)≈29.8mm²；$w_t$≈0.75×11.87/(1.8×0.95)≈5.2mm，$b_{s2}$≈11.87−5.2≈6.7mm（≤0.7τs ✓），即对应 preset 的 Ba2≈8.3/梨形槽量级。
+
 ---
 
 ## §5 Material Database

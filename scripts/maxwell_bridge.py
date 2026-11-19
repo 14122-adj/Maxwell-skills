@@ -156,7 +156,16 @@ def _a_get_maxwell_status(a, k, u):
 
 
 def _a_new_project(a, k, u):
-    return {}
+    return {"project_name": k.get("project_name", "")}
+
+
+def _a_ensure_project(a, k, u):
+    # bridge: (project_name, design_name, design_type, solution_type)
+    pn, dn, dt, st = _kw(
+        a, k, "project_name", "design_name", "design_type", "solution_type",
+        defaults=("Motor_Project", "Motor_Design", "Maxwell 2D", "Magnetostatic"))
+    return {"project_name": pn, "design_name": dn,
+            "design_type": dt, "solution_type": st}
 
 
 def _a_open_project(a, k, u):
@@ -569,6 +578,7 @@ MCP_ADAPTERS: dict = {
     "save_project": _a_save_project,
     "close_project": _a_close_project,
     "list_projects": _a_list_projects,
+    "ensure_project": _a_ensure_project,
     "create_design": _a_create_design,
     "set_active_design": _a_set_active_design,
     "list_designs": _a_list_designs,
@@ -763,7 +773,11 @@ class MaxwellBridge:
     def connect_to_maxwell(self, version: str = ""): return self._mock("connect_to_maxwell", version)
     def disconnect_from_maxwell(self): return self._mock("disconnect_from_maxwell")
     def get_maxwell_status(self): return self._mock("get_maxwell_status", result="[DryRun] connected")
-    def new_project(self): return self._mock("new_project")
+    def new_project(self, project_name: str = ""): return self._mock("new_project", project_name)
+    def ensure_project(self, project_name: str = "Motor_Project", design_name: str = "Motor_Design",
+                       design_type: str = "Maxwell 2D", solution_type: str = "Magnetostatic"):
+        """幂等确保项目+设计存在（mcp 后端直通 server.ensure_project；dry_run/text 走 mock/脚本）。"""
+        return self._mock("ensure_project", project_name, design_name, design_type, solution_type)
     def open_project(self, file_path: str): return self._mock("open_project", file_path)
     def save_project(self, file_path: str = ""): return self._mock("save_project", file_path)
     def close_project(self, name: str = ""): return self._mock("close_project", name)

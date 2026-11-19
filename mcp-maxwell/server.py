@@ -225,13 +225,81 @@ def get_maxwell_status() -> str:
 #  2. 项目管理
 # ────────────────────────────────────────────────────────────
 @mcp.tool()
-def new_project() -> str:
-    """在 ANSYS Maxwell 中创建一个新项目。"""
+def new_project(project_name: str = "") -> str:
+    """
+    创建（或复用）一个项目。
+    幂等修复: 若已有打开的项目, 优先复用最后一个（同名优先）, 不再每次 NewProject
+    产生一堆未保存的空白 .aedt。只有确实无任何项目时才新建。
+    project_name: 可选项目名。已打开同名项目时直接激活它。
+    """
     def _():
+        count = maxwell.desktop.GetProjectCount()
+        if count > 0:
+            if project_name:
+                for i in range(count):
+                    pj = maxwell.desktop.GetProject(i)
+                    if pj.GetName() == project_name:
+                        maxwell.project = maxwell.desktop.SetActiveProject(project_name)
+                        maxwell.design = None
+                        maxwell.editor = None
+                        return f"已复用现有项目（未新建）: {maxwell.project.GetName()}"
+            last = maxwell.desktop.GetProject(count - 1)
+            maxwell.project = maxwell.desktop.SetActiveProject(last.GetName())
+            maxwell.design = None
+            maxwell.editor = None
+            return f"已复用现有项目（未新建）: {maxwell.project.GetName()}"
         maxwell.project = maxwell.desktop.NewProject()
         maxwell.design = None
         maxwell.editor = None
+        if project_name:
+            try:
+                maxwell.project.Rename(project_name, True)
+            except Exception:
+                pass  # 部分版本不支持重命名, 忽略
         return f"已创建新项目: {maxwell.project.GetName()}"
+    return _safe(_)
+
+
+@mcp.tool()
+def ensure_project(
+    project_name: str = "Motor_Project",
+    design_name: str = "Motor_Design",
+    design_type: str = "Maxwell 2D",
+    solution_type: str = "Magnetostatic",
+) -> str:
+    """
+    幂等确保「项目 + 设计」存在：没有就创建，已有就复用。
+    会话开始时调用一次即可；重复调用不会产生空白项目/设计。
+    project_name: 项目名；design_name: 设计名；
+    design_type: "Maxwell 2D"/"Maxwell 3D"；solution_type: "Magnetostatic"/"Transient"/...
+    """
+    def _():
+        count = maxwell.desktop.GetProjectCount()
+        proj = None
+        for i in range(count):
+            pj = maxwell.desktop.GetProject(i)
+            if pj.GetName() == project_name:
+                proj = maxwell.desktop.SetActiveProject(project_name)
+                break
+        if proj is None:
+            maxwell.project = maxwell.desktop.NewProject()
+            try:
+                maxwell.project.Rename(project_name, True)
+            except Exception:
+                pass
+            proj = maxwell.project
+        maxwell.project = proj
+        maxwell.editor = None
+        try:
+            design_names = list(proj.GetDesignNames())
+        except Exception:
+            design_names = []
+        if design_name in design_names:
+            maxwell.design = proj.SetActiveDesign(design_name)
+            return f"已复用项目 {project_name} + 设计 {design_name}（未新建）"
+        proj.InsertDesign(design_type, design_name, solution_type, "")
+        maxwell.design = proj.SetActiveDesign(design_name)
+        return f"项目 {project_name}/{design_name} 就绪 ({design_type}/{solution_type})"
     return _safe(_)
 
 

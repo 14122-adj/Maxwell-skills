@@ -27,10 +27,14 @@ for k in range(36):
     cx = r_mid * math.cos(theta)
     cy = r_mid * math.sin(theta)
     nm = names[k]
+    # 修复: 起点用矩形中心 (cx, cy) 折算的左下角, 使线圈绕槽中心线对称,
+    # 避免旧版以 (cx, cy) 为左下角导致线圈偏心 2mm、部分伸出槽外。
+    x_start = cx - coil_w / 2.0   # 径向居中 (coil_w 为径向厚, 与 CreateRectangle Width 对应)
+    y_start = cy - coil_h / 2.0   # 周向居中 (coil_h 为周向宽, 与 CreateRectangle Height 对应)
     oEditor.CreateRectangle(
         ["NAME:RectangleParameters", "IsCovered:=", True,
-         "XStart:=", str(cx) + "mm",
-         "YStart:=", str(cy) + "mm",
+         "XStart:=", str(x_start) + "mm",
+         "YStart:=", str(y_start) + "mm",
          "ZStart:=", "0mm",
          "Width:=", str(coil_w) + "mm",
          "Height:=", str(coil_h) + "mm",

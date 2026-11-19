@@ -115,7 +115,30 @@ class MotorParams:
 
 
 def compute_parameters(spec: MotorSpec) -> MotorParams:
-    """Main calculation routine."""
+    """Main calculation routine.
+
+    § 公式来源对照（references/motor_design_guide.md）—— agent 排查/改算式时按此对齐:
+      Step 1  (气隙 δ)         → §3.1 气隙磁路    δ = 0.3 + D/400，截断 [0.35, 1.2]
+      Step 2  (裂比 Dsi/Dso)    → SKILL 设计规则速查（0.58~0.62，此处取 0.60）
+      Step 3  (磁钢厚度 hm)     → §3.1  Bg = Br/(1 + μr·Cφ·ksat·δ/hm) → 反解 hm
+      Step 4  (极距/槽距)       → §3.1  τp/τs 几何定义
+      Step 5  (Bg)             → §3.1  温漂 Br(T) + 漏磁系数 k_leakage
+      Step 6  (每极磁通)        → §3.1  φ = Bg_avg · τp · L
+      Step 7  (电频率)          → §3.2  f = p·n/60
+      Step 8  (绕组系数 Kw)     → §6 Winding Topology + compute_winding_factor()
+      Step 9  (每相匝数 Nph)    → §3.2 BEMF + §3.4  E=√2·π·f·Nph·Kw·φ 反解
+      Step 10 (磁链 λpm)        → §3.2
+      Step 11 (转矩/电流)       → §3.3  T = 1.5·p·λpm·Iq
+      Step 12 (每槽导体 Ns)     → §3.4  Ns = 2·Nph·m/Q（双层）
+      Step 13 (线径 AWG)        → §5.3 线规表 + §3.9 电流密度
+      Step 14 (电流密度 J)      → §3.9
+      Step 15 (槽面积/槽满率)   → §4 槽面积 + §3.5 kf；反推见 §4 Slot size back-calculation
+      Step 16 (电负荷 A)        → §3.9
+      Step 17 (AJ 积)           → §3.9 热负荷判据
+      Step 18 (铜耗/铁耗)       → §3.6 铜耗 I²R + §3.7 铁耗 Bertotti 简化
+      Step 19 (效率)            → §3.6/§3.7 汇总（杂散/机械损耗经验值）
+      Step 20 (校验)            → param_validator.py / SKILL 设计规则速查
+    """
     p = MotorParams()
 
     # ── Step 1: Airgap default ──
