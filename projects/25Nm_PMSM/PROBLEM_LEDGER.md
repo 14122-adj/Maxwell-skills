@@ -5,7 +5,14 @@
 > 状态：`open` / `in_progress` / `blocked` / `closed`。
 > 判据见 `docs/ENGINEERING_ACCEPTANCE.md`；探索见 `EXPLORATION_LOG.md`。
 
-## 当前基线（2026-11-16 真机，模板路径 M8 梨形槽 + M7 负载 + P12 匝数 84 设计点）
+## 🔄 2026-11-19 阶段切换：SPM 8p12s 账本冻结 / 新项目 IPM 8p48s 启用
+
+> SPM 8p12s 项目（P1–P16/E1–E13/G4b）**整体冻结为 baseline**，open 项（P4/P5/P15/E3–E12/G4b）
+> 保留不删，作为后续工程验证的存量清单，**不再由每日任务优先推进**。
+> 新项目契约：`projects/IPM_8p48s/PROJECT_SPEC.md`，新问题 ID 从 **I1** 起编，本表下方 SPM 记录存档。
+> 交付次序：IPM 8p48s G0–G4 全绿 + 周检确认 → 自动切 36 槽工业机。探索 LOCKED。
+
+## 当前基线（2026-11-16 真机，模板路径 M8 梨形槽 + M7 负载 + P12 匝数 84 设计点；**SPM baseline，已冻结**）
 
 | 指标（**80 匝基线**，G4/M8/M7 冻结口径，`--check` 8/8 可复现） | 值 | 判据 | 状态 |
 |---|---:|---:|---|
