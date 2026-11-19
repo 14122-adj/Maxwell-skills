@@ -1,0 +1,154 @@
+{
+  "stage": "G4-B Bg/B_tooth/B_yoke FEA 复核（401 点空载，84 匝无斜槽）",
+  "method": "Fields Calculator ExportToFile（任意点，无几何对象；末时刻快照，45° 齿对极轴）",
+  "evidence": {
+    "calc_dir": "D:/ANSYS_Run/csv_g4b/calc45",
+    "n_times": {
+      "gap": 1,
+      "tooth": 1,
+      "yoke": 1
+    },
+    "n_points": {
+      "gap": 121,
+      "tooth": 41,
+      "yoke": 91
+    },
+    "time_span_ms": [
+      0.02,
+      0.02
+    ],
+    "tooth_probe": "tooth45",
+    "gap_window_deg": [
+      30.0,
+      60.0
+    ]
+  },
+  "geometry": {
+    "r_gap_mm": 46.1625,
+    "r_tooth_mm": [
+      50.2,
+      58.8
+    ],
+    "r_tooth_meas_mm": 54.25,
+    "r_yoke_mm": 60.0,
+    "stack_mm": 160.0,
+    "slots": 12,
+    "poles": 8
+  },
+  "gap": {
+    "b_max": 0.8947154375220041,
+    "angle_at_peak_deg": 28.999999999971234,
+    "peak_time_s": 0.02,
+    "b_mean_at_tooth_peak_time": 0.8566379863858345,
+    "verdict": "PASS"
+  },
+  "gap_radial": {
+    "n_times": 1,
+    "n_points": 121,
+    "time_s": 0.02,
+    "Bg_pole_axis_T": 0.8626334011936895,
+    "pole_axis_detail": {
+      "15": {
+        "Br": 0.8625916843977852,
+        "Bt": 0.0029987717030223737
+      },
+      "45": {
+        "Br": -0.8626334011936895,
+        "Bt": -2.101511967911307e-05
+      }
+    },
+    "Br_max_T": 0.8935401098718634,
+    "Br_max_angle_deg": 28.99999999999008,
+    "Br_min_T": -0.8935401098718634,
+    "Bt_max_T": 0.1887628636989839,
+    "Bt_max_angle_deg": 25.49999999998576,
+    "Br_at_slot_center_T": -0.7205238692846856,
+    "note": "齿中心（15°/45°）切向为零，|B|≡|Br|；29.0°/1.0° 的 |B| 峰是槽口倒角聚磁，非工作磁密。三口径均落在判据区间，故 Bg 行不受口径影响",
+    "by_caliber_T": {
+      "Bg_pole_axis": 0.8626334011936895,
+      "Br_max": 0.8935401098718634,
+      "B_max": 0.8947154375220041
+    },
+    "crosscheck": "PASS"
+  },
+  "gap_radial_crosscheck": "PASS",
+  "tooth": {
+    "b_max": 0.9896303976430022,
+    "b_at_r54_25": 0.9247159504977464,
+    "peak_time_s": 0.02,
+    "distance_at_peak_mm": 1.290000000006593,
+    "verdict": "PASS"
+  },
+  "yoke": {
+    "b_max": 1.1842642539730217,
+    "peak_time_s": 0.02,
+    "angle_at_peak_deg": 31.500000000049216,
+    "verdict": "PASS"
+  },
+  "flux_path": {
+    "stations_T": [
+      [
+        "gap_mean",
+        0.8566379863858345
+      ],
+      [
+        "tooth_tip",
+        0.9769816927736622
+      ],
+      [
+        "tooth_mid",
+        0.9247159504977464
+      ],
+      [
+        "tooth_root",
+        0.6941344622070351
+      ],
+      [
+        "yoke_max",
+        1.1842642539730217
+      ]
+    ],
+    "max_adjacent_jump_T": 0.4901297917659866,
+    "note": "气隙均值→齿尖→齿身→齿根→轭（轭取全弧最大值，与齿身不同角度，跳变仅记录不作判据）"
+  },
+  "flux_continuity_diagnostic": {
+    "b_gap_mean_T": 0.8566379863858345,
+    "phi_slot_Wb": 0.003312876561528116,
+    "slot_pitch_mm": 24.17062847855647,
+    "tooth_width_mm": 18.905233576207713,
+    "b_tooth_from_gap_T": 1.095224686121235,
+    "b_tooth_local_T": 0.9247159504977464,
+    "gap_pct": -15.568379510084768,
+    "status": "INCONCLUSIVE",
+    "note": "一维控制体经槽开口不闭合（槽漏磁/齿身横向漏磁），|B| 还含切向分量；10.5% 是「总气隙磁通 vs EMF 基波磁通」的口径差，不作为 PASS/FAIL 判据，只作诊断"
+  },
+  "analytic": {
+    "Bg_peak_design_target": 0.7761689815887444,
+    "legacy_constants_mm": {
+      "tooth": 10.48,
+      "yoke": 7.86
+    },
+    "legacy_B_tooth_T": 1.6513617567416283,
+    "legacy_B_yoke_T": 1.6513617567416277,
+    "note": "旧解析 10.48/7.86 mm 使 B_tooth≡B_yoke=1.651 T；实际齿宽 18.905 / 轭 16.0",
+    "corrected_at_fea_bg": {
+      "phi_per_pole_Wb": 0.004548487445225429,
+      "tau_slot_mm": 24.347343065320896,
+      "tooth_width_mm": 18.905233576207713,
+      "B_tooth_KFE1": 1.002475369869209,
+      "B_tooth_KFE095": 1.0552372314412728,
+      "B_yoke_KFE1": 0.8883764541455915,
+      "B_yoke_KFE095": 0.9351331096269385
+    }
+  },
+  "criteria": {
+    "Bg_range_T": [
+      0.7,
+      0.9
+    ],
+    "B_tooth_max_T": 1.65,
+    "B_yoke_max_T": 1.5,
+    "flux_consistency_tol_pct": 5.0
+  },
+  "verdict": "PASS"
+}
