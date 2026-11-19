@@ -12,10 +12,13 @@ oModule.InsertSetup("Transient",
      "StopTime:=", "0.0200s",
      "TimeStep:=", "0.000050s",
      "SaveFieldsType:=", "Every N Steps",
-     # G4：隔步存场（N=2）与 m4_build_solve.py 的全时长口径一致 ——
-     # 报表采样点仍由求解步长决定（20 ms / 5e-5 s = 401 点），存场减半只影响
-     # 磁盘占用与写盘耗时，不影响转矩/磁链曲线。
-     "N:=", "2",
+     # G4-B 实测（2026-11-19）：21.1 落盘的存场真值是
+     #   SaveFieldsType='Every N Steps' + 'N Steps'='0'
+     # 即"仅末时刻存场"（t=0.02 s 可查场，0.0105 s 查不到）。
+     # 旧版这里写的 "N:=", "2" 是无效键：它既不报错也不生效，
+     # 注释里"隔步存场 N=2"的说法与落盘值不符，已删除。
+     # 正确键名未测出（已求解的工程上 InsertSetup 全部 raise，无法在解后改 setup），
+     # 见 PROBLEM_LEDGER P17；改成多快照存场属未验证变更，须重解确认报表仍 401 行。
      "UseAdaptiveTimeStep:=", False,
      "NonlinearSolverResidual:=", "0.0001",
      "SmoothBHCurve:=", False])
