@@ -63,6 +63,8 @@
 | **P16** | minor | 复核/代码 | `ingest_fea.analyse_signal` 用 `t[i] >= t0` 浮点比较跳首周期：50 µs 网格被判成 10.05 ms（9.95 ms 窗），25 µs 网格判成 10.000 ms 且**含重复端点**（N+1 点）⇒ 同一物理两个 DFT 窗，E2 首跑 THD 假差 **0.5474 pt**（11.1797% vs 11.7271%） | E2 首跑 `e2_timestep_summary.json` 初版；`analyse_signal` 返回 `n_samples` 200 vs 401 | 跳周期改整数索引 `round(T/dt)`；窗口跨度为整数个电周期时丢弃重复端点 | **closed** | 11-18 修复 + `tests/test_analyse_window.py` 5 例。修复后 50 µs / 25 µs 均落在 10 ms 整周期（200 / 400 点）：THD **11.1797% vs 11.2532%（Δ +0.0735 pt / +0.66%）**；50 µs 历史数值不变（E1 三档复算逐位相同，仅粗档 THD 11.1702→11.1703） |
 
 
+| **G4b** | major | 复核/场 | Bg / B_tooth / B_yoke 三项 FEA 场探针始终无数据；G4 电磁五项虽全绿，但磁密三行仍只有解析值（且 tooth/yoke 的 1.6514/1.6514 T 是 10.48/7.86=4/3 口径巧合，非物理相等） | `D:/ANSYS_Run/csv_g4b/{bg_gap,b_tooth,b_yoke}.csv` 从 11-19 22:34 至今恒为 2 行（表头+空值）；`g4b_probe.log` TRY_A~F 六种导出变体全部 `no data for export`；`g4b_solve.log` 求解 567.6s 成功、tq/flux 401 行但 `Btry_G has no data`；`g4b_test6.log` 明确 `Solutions have been invalidated` | 三项 FEA 场值 + 磁通连续性偏差 ≤5% | **blocked** | 11-19 夜 v1（解后加探针）与 v2（解前建 72 段 Line 探针）均失败：`T4_g4b3.aedt` 只到 `SAVED_OK`、无 `ANALYZE_OK`，卡死的 PID 37056 已终止。根因：AEDT 2021.1 批处理下瞬态解对几何/报告变更极敏感。下一步三选一：①另建静磁场工程单独布探针；②解后纯 `FieldsReporter` 后处理、不碰几何；③用已有 401 点 FEA 磁通/磁链做磁通连续性替代校验。**严禁用解析值填 FEA 空缺**；G4 维持「未全绿」 |
+
 ## 优先级规则
 
 1. `blocker` 先于 `major`，`major` 先于 `minor`；同级别按“影响工程交付”排序。
