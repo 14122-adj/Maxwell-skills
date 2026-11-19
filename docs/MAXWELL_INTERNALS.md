@@ -838,3 +838,61 @@ T(t) = T_cog(θ) − (1/ω)·Σ_ph e_ph(θ)·i_ph(t)
 若驱动器沿用未斜槽的换相角，还会额外损失 `cos(γ_e/2)`：γ=0.5 槽距
 （60° 电角）时 0.866，`T_avg` 从 21.61 掉到 18.71 N·m（−13.4%）。
 这是「没重新标定」的代价，不是斜槽本身的代价 —— 报告里必须分开写。
+
+### 15.5 取任意点场值：**别建几何，用 Fields Calculator**（G4-B，2026-11-19）
+
+要拿气隙/齿/轭的磁密，直觉做法是"建一条探针线 + 建 Fields 报告"。在 21.1 批处理下
+这条路**全灭**，且灭得很隐蔽：报告不抛异常，导出文件只有表头（`Distance=1, Mag_B` 空）。
+
+#### 为什么全灭
+
+1. **Fields 报告对 polyline 不绑定 Context**。试过 6 种 `CreateReport("Standard", ...)`
+   写法（`Context:=", "PROBE_GAP"`、`Polyline`、`SimValueContext` 第 12 位塞线名、
+   Domain 组合、Data Table、后补 `AddTraces`），**全部**导出 1 行空表。
+   `CreateReport` 的报错倒是暴露了真实参数名：`simValueCtxtArg` / `pointSetArg` /
+   `expressionsOfTrace` —— 但按它改名也还是空。
+2. **求解后新建任何几何都会作废解**。加一条 Non-Model 线（甚至是 Model 线）之后，
+   同一个报告的 `rows` 从 401 变 −1，`Solutions have been invalidated` 直接出现在日志里。
+   实测指纹（`g4b_test6.log`）：`TORQUE pre rows=401` → `MODEL_LINE_OK` → `TORQUE post rows=-1`。
+3. **`SaveFieldsType` 的键名是个坑**。生成器写 `"N:=", "2"`，21.1 静默忽略，落盘是
+   `'N Steps'='0'`，即**只存末时刻**。所以想采样 `0.0105s` 一定失败，只有 `0.02s` 有场。
+   正确键名没测出来：**已求解的工程上 `InsertSetup` 对所有数组都 raise**
+   （连历史上能用的旧数组也 raise），只能在重解前设置。见 `PROBLEM_LEDGER` P17。
+
+#### 能用的写法
+
+不建任何几何，直接用 `FieldsReporter` 按坐标逐点求值：
+
+```python
+oF = oDesign.GetModule("FieldsReporter")
+oF.EnterQty("B")
+oF.CalcOp("Mag")                      # 或 "ScalarX" / "ScalarY"
+oF.ExportToFile(out_csv, pts_txt,     # 5 个参数，不是 4 个
+                "Setup1 : Transient",
+                ["Time:=", "0.02s"],
+                1)                    # 1 = 用点文件的坐标
+```
+
+`pts_txt` 每行 `x y z`，**单位必须是米**：
+
+```
+0.0461625  0.0  0.0        ← r=46.1625 mm 的 0° 点
+```
+
+写成 `46.1625` 不会报错，会得到一列 `Nan`。这个坑在 `g4b_test10.log` 里第一次踩到
+（r=67 mm 全表 NaN），改成米后同一半径返回 0.08–0.30 T，物理合理。
+
+#### 只要末时刻够不够？
+
+G4-B 的结论是**够**，前提是把相位算清楚：`t = 0.02 s` 是两个电周期末，转子机械角 0°，
+8 极磁钢中心在 0°/45°/90°、12 槽中心在 0°/30°/60° ⇒ **15°/45° 的齿正对极轴**，
+正是齿磁密最大相位；同快照的 22.5°（极间）/31.5°（轭部）覆盖其余两个最大值。
+不够的是"全时程扫描"——那需要 `N Steps > 0` 的多快照存场，见 P17。
+
+#### 顺手记一个反例
+
+`g4b_solve2.py`（解前建 Model 线、`Flags=""`、vacuum、Line 分段）在 `SAVED_OK` 之后
+**静默崩溃**（RC=1，无 `ANALYZE_OK`，没有 Python 栈）。`g4b_solve3.py` 用文本改写
+`'N Steps'='0'→'5'` 重解（569.2 s 成功），但 `tq_g4b5.csv` 只剩 **1 行**，
+121/123 个时刻导出全失败 —— 存场设置改动与 Standard 报告退化的因果关系**没查清**。
+结论：涉及存场口径的改动一律视为未验证变更，必须重解并核对"报告仍 401 行"。
