@@ -1,0 +1,119 @@
+{
+  "expect": {
+    "stator_area": 9018.262,
+    "rotor_area": 4927.0683,
+    "coil_T": 13.884,
+    "coil_B": 13.881,
+    "magnet_total": 963.2
+  },
+  "measured": {
+    "sheets": 132,
+    "areas": {
+      "Region": 11307.6821,
+      "StatorOuter": 9017.8249,
+      "RotorOuter": 4927.0683,
+      "Band": 6694.6598
+    },
+    "coil": {
+      "min": 13.8811,
+      "max": 13.8836
+    },
+    "n_pm": 32,
+    "validate": "OK"
+  },
+  "checks": [
+    {
+      "name": "SHEETS = 4 + 32 + 96",
+      "value": 132,
+      "limit": 132,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Coil = 96",
+      "value": 96,
+      "limit": 96,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 PM = 32",
+      "value": 32,
+      "limit": 32,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Region = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 StatorOuter = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 RotorOuter = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Band = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "定子面积 = 环 − 48 槽（偏差 %）",
+      "value": 0.00485,
+      "limit": 0.05,
+      "status": "PASS"
+    },
+    {
+      "name": "转子面积 = 环 − Σ 磁钢（偏差 %）",
+      "value": 0.0,
+      "limit": 0.05,
+      "status": "PASS"
+    },
+    {
+      "name": "96 线圈面积（最大偏差 %）",
+      "value": 0.0029,
+      "limit": 1.0,
+      "status": "PASS"
+    },
+    {
+      "name": "32 块磁钢面积 = L×t（最大偏差 %）",
+      "value": 0.0,
+      "limit": 0.1,
+      "status": "PASS"
+    },
+    {
+      "name": "磁钢中心镜像对称（最大不对称 mm）",
+      "value": 0.0,
+      "limit": 0.02,
+      "status": "PASS"
+    },
+    {
+      "name": "AEDT 设计校验",
+      "value": "OK",
+      "limit": "OK",
+      "status": "PASS"
+    },
+    {
+      "name": "工程存盘",
+      "value": true,
+      "limit": true,
+      "status": "PASS"
+    },
+    {
+      "name": ".aedt 文件存在",
+      "value": true,
+      "limit": true,
+      "status": "PASS"
+    }
+  ],
+  "status": "PASS",
+  "log": "D:/ANSYS_Run/ipm_m1.log",
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M1.aedt"
+}

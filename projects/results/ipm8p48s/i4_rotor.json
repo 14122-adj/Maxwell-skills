@@ -1,0 +1,376 @@
+{
+  "rotor_od": 91.65,
+  "rotor_id": 30.0,
+  "poles": 8,
+  "pm_thickness": 2.8,
+  "magnets": 32,
+  "layout": {
+    "v_outer": [
+      33.0,
+      40.0,
+      11.5,
+      3.0
+    ],
+    "v_inner": [
+      21.0,
+      36.0,
+      10.0,
+      3.0
+    ]
+  },
+  "radial": [
+    {
+      "layer": "outer",
+      "pole": 1,
+      "side": "+",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "outer",
+      "pole": 1,
+      "side": "-",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "inner",
+      "pole": 1,
+      "side": "+",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "inner",
+      "pole": 1,
+      "side": "-",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "outer",
+      "pole": 2,
+      "side": "+",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "outer",
+      "pole": 2,
+      "side": "-",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "inner",
+      "pole": 2,
+      "side": "+",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "inner",
+      "pole": 2,
+      "side": "-",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "outer",
+      "pole": 3,
+      "side": "+",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "outer",
+      "pole": 3,
+      "side": "-",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "inner",
+      "pole": 3,
+      "side": "+",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "inner",
+      "pole": 3,
+      "side": "-",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "outer",
+      "pole": 4,
+      "side": "+",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "outer",
+      "pole": 4,
+      "side": "-",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "inner",
+      "pole": 4,
+      "side": "+",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "inner",
+      "pole": 4,
+      "side": "-",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "outer",
+      "pole": 5,
+      "side": "+",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "outer",
+      "pole": 5,
+      "side": "-",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "inner",
+      "pole": 5,
+      "side": "+",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "inner",
+      "pole": 5,
+      "side": "-",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "outer",
+      "pole": 6,
+      "side": "+",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "outer",
+      "pole": 6,
+      "side": "-",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "inner",
+      "pole": 6,
+      "side": "+",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "inner",
+      "pole": 6,
+      "side": "-",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "outer",
+      "pole": 7,
+      "side": "+",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "outer",
+      "pole": 7,
+      "side": "-",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "inner",
+      "pole": 7,
+      "side": "+",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "inner",
+      "pole": 7,
+      "side": "-",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "outer",
+      "pole": 8,
+      "side": "+",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "outer",
+      "pole": 8,
+      "side": "-",
+      "r_max": 42.745,
+      "r_min": 31.412,
+      "bridge_od": 3.08,
+      "gap_shaft": 16.412
+    },
+    {
+      "layer": "inner",
+      "pole": 8,
+      "side": "+",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    },
+    {
+      "layer": "inner",
+      "pole": 8,
+      "side": "-",
+      "r_max": 30.011,
+      "r_min": 19.717,
+      "bridge_od": 15.814,
+      "gap_shaft": 4.717
+    }
+  ],
+  "pair_min": {
+    "inter_layer": 4.216,
+    "intra_v": 3.0,
+    "inter_pole": 3.187
+  },
+  "checks": [
+    {
+      "name": "磁钢外角到转子 OD 桥厚 ≥ 1.5",
+      "value": 3.08,
+      "limit": 1.5,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "单块面积 = L×t（防自交）",
+      "value": 0.0,
+      "limit": 0.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "磁钢到轴孔 ≥ 3.0",
+      "value": 4.717,
+      "limit": 3.0,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "同组两腿间距 ≥ 1.0",
+      "value": 3.0,
+      "limit": 1.0,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "层间铁桥 ≥ 1.2",
+      "value": 4.216,
+      "limit": 1.2,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "极间铁桥 ≥ 1.2",
+      "value": 3.187,
+      "limit": 1.2,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "磁钢块数 = 8×2×2",
+      "value": 32,
+      "limit": 32,
+      "op": "==",
+      "status": "PASS"
+    }
+  ],
+  "magnet_area_total": 963.2,
+  "rotor_area": 5890.268,
+  "flux_note": {
+    "tau_pole": 35.991,
+    "magnet_width_per_pole": 21.5,
+    "concentration": 1.1947,
+    "Bg_est_leak07": 0.978
+  },
+  "status": "PASS"
+}

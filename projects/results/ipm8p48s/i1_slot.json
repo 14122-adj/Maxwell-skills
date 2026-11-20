@@ -1,0 +1,166 @@
+{
+  "config": {
+    "stator_od": 150.0,
+    "stator_id": 93.0,
+    "slots": 48,
+    "stack": 160.0,
+    "tau_bore": 6.0868
+  },
+  "chain": [
+    {
+      "step": "① 齿宽下限",
+      "formula": "b_t = Bg·τ/(B_t·k_fe)",
+      "expr": "0.8500·6.0868/(1.65·0.95)",
+      "value_mm": 3.3007,
+      "note": "齿部最窄截面（槽身起点）按 1.65 T 上限反算"
+    },
+    {
+      "step": "② 槽口宽 Bs0",
+      "formula": "min(τ−b_t, max(0.36τ, d_wire+0.4))",
+      "expr": "min(2.7862, max(2.20, 1.90))",
+      "value_mm": 2.2,
+      "note": "半闭口槽开口 0.30–0.40τ；同时保证 Ø1.5 线可下"
+    },
+    {
+      "step": "③ 颈高 Hs0",
+      "formula": "ceil(max(3·t_lam, 1.0)+0.1, 0.1)",
+      "expr": "ceil(max(1.05, 1.0)+0.1, 0.1)",
+      "value_mm": 1.2,
+      "note": "槽楔 + 槽绝缘的机械高度"
+    },
+    {
+      "step": "④ 肩宽 Bs1",
+      "formula": "Bs0+0.5",
+      "expr": "2.20+0.5",
+      "value_mm": 2.7,
+      "note": "x1 处齿宽 3.544 mm ⇒ B_t=1.537 T"
+    },
+    {
+      "step": "⑤ 槽身宽 Bs2",
+      "formula": "ceil(2·d_wire+0.5, 0.1)",
+      "expr": "ceil(2·1.50+0.5, 0.1)",
+      "value_mm": 3.5,
+      "note": "双层各 2 根并排 + 单边 0.25 绝缘；圆线满率可达 0.55–0.62"
+    },
+    {
+      "step": "⑥ 斜肩高 Hs1",
+      "formula": "ceil((Bs2+1.04·b_t)·N/(2π) − (R_bore+Hs0), 0.1)",
+      "expr": "ceil((3.50+1.04·3.3007)·48/(2π) − (46.50+1.20), 0.1)",
+      "value_mm": 5.3,
+      "note": "保证槽身起点处齿宽 ≥ 3.301 mm（含 4% 冲剪余量）"
+    },
+    {
+      "step": "⑦ 槽底半径 Rs",
+      "formula": "Bs2/2（相切恒等式）",
+      "expr": "3.50/2",
+      "value_mm": 1.75,
+      "note": "半圆两端点与直身边重合，切向连续；见 check_tangency"
+    },
+    {
+      "step": "⑧ 槽深 Hs2",
+      "formula": "(R_out−h_yoke) − R_bore",
+      "expr": "(75.00−16.00) − 46.50",
+      "value_mm": 12.5,
+      "note": "口径 = 内径 → 槽底最底端（与表 2 一致）"
+    }
+  ],
+  "dims": {
+    "Bs0": 2.2,
+    "Hs0": 1.2,
+    "Bs1": 2.7,
+    "Hs1": 5.3,
+    "Bs2": 3.5,
+    "Rs": 1.75,
+    "Hs2": 12.5
+  },
+  "radii": {
+    "x0": 46.3,
+    "x1": 47.7,
+    "x2": 53.0,
+    "x3": 57.25,
+    "x4": 59.0,
+    "h_yoke": 16.0
+  },
+  "areas": {
+    "slot_analytic": 39.196,
+    "slot_effective": 38.756,
+    "coil_shrink_086": 28.966,
+    "coil_to_slot": 0.739
+  },
+  "flux": {
+    "tau_pole": 36.521,
+    "phi_pole_uWb": 4966.858,
+    "B_tooth_min_at": 52.962,
+    "B_tooth_min": 1.5865,
+    "B_yoke": 1.0211
+  },
+  "thermal": {
+    "l_end_mm": 30.22,
+    "l_turn_m": 0.3804,
+    "a_cu_req_mm2": 20.777,
+    "a_slot_req_mm2": 37.776,
+    "a_cu_avail_mm2": 21.558,
+    "J": 6.0,
+    "fill": 0.55,
+    "P_cu_at_J": 145.2602328767635
+  },
+  "checks": [
+    {
+      "name": "槽口齿宽 ≥ b_t_min",
+      "value": 3.8868,
+      "limit": 3.3007,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "x1 齿宽 ≥ b_t_min",
+      "value": 3.5439,
+      "limit": 3.3007,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "齿宽最小处 B_t ≤ 上限",
+      "value": 1.5865,
+      "limit": 1.65,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "轭厚 ≥ baseline",
+      "value": 16.0,
+      "limit": 16.0,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "轭部 B_yoke ≤ 上限",
+      "value": 1.0211,
+      "limit": 1.45,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "槽面积 ≥ 铜耗所需",
+      "value": 39.196,
+      "limit": 37.776,
+      "op": ">=",
+      "status": "PASS"
+    },
+    {
+      "name": "Rs = Bs2/2 相切",
+      "value": 1.75,
+      "limit": 1.75,
+      "op": "==",
+      "status": "PASS"
+    },
+    {
+      "name": "相邻槽底净距 ≥ 1.0 mm",
+      "value": 3.994,
+      "limit": 1.0,
+      "op": ">=",
+      "status": "PASS"
+    }
+  ],
+  "status": "PASS"
+}
