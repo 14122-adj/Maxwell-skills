@@ -11,12 +11,12 @@
 
 判据（M1'，`PROJECT_SPEC.md` §4）
 --------------------------------
-1. `SHEETS = 132`（Region/StatorOuter/RotorOuter/Band 各 1 + PM 32 + Coil 96）；
-2. 前缀计数 `PM=32`、`Coil=96`；
+1. `SHEETS = 116`（Region/StatorOuter/RotorOuter/Band 各 1 + PM 16 + Coil 96）；
+2. 前缀计数 `PM=16`、`Coil=96`；
 3. 定子面积 = 环面积 − 48×槽实切面积（±0.05%）；
 4. 转子面积 = 环面积 − Σ磁钢面积（±0.05%）；
 5. 96 个线圈面积全部落在 13.88 ±1%（两层各半槽）；
-6. 32 块磁钢面积 = L×t（±0.1%），且中心关于极轴镜像；
+6. 16 块磁钢面积 = L×t（±0.1%），且中心关于极轴镜像；
 7. `VALIDATE_OK`（AEDT 设计校验通过）+ `SAVED_OK`。
 
 用法
@@ -91,7 +91,7 @@ def check(cfg, log: dict) -> dict:
         return abs(a - b) / b * 100.0 if b else 1e9
 
     checks = []
-    checks.append(dict(name="SHEETS = 4 + 32 + 96", value=log["sheets"], limit=4 + n_pm + cfg.slots * 2,
+    checks.append(dict(name="SHEETS = 4 + 16 + 96", value=log["sheets"], limit=4 + n_pm + cfg.slots * 2,
                        status="PASS" if log["sheets"] == 4 + n_pm + cfg.slots * 2 else "FAIL"))
     for k, want in (("Coil", cfg.slots * 2), ("PM", n_pm), ("Region", 1), ("StatorOuter", 1),
                     ("RotorOuter", 1), ("Band", 1)):
@@ -109,27 +109,24 @@ def check(cfg, log: dict) -> dict:
     checks.append(dict(name="96 线圈面积（最大偏差 %）", value=round(d_cu, 4), limit=1.0,
                        status="PASS" if d_cu <= 1.0 else "FAIL"))
 
-    # 每块面积 = L×t
-    lens = {"outer": cfg.v_outer[2], "inner": cfg.v_inner[2]}
+    # 每块面积 = L×t（单层 V：全部 16 块同一长度，无 outer/inner 之分）
+    lens = {"single": cfg.v_single[2]}
     worst = 0.0
     for lab, m in log["pm"].items():
-        idx = int(lab.split("_")[1]) - 1
-        layer = "outer" if (idx % 4) in (0, 1) else "inner"
-        worst = max(worst, rel(m["area"], lens[layer] * cfg.pm_thickness))
-    checks.append(dict(name="32 块磁钢面积 = L×t（最大偏差 %）", value=round(worst, 4), limit=0.1,
+        worst = max(worst, rel(m["area"], lens["single"] * cfg.pm_thickness))
+    checks.append(dict(name="16 块磁钢面积 = L×t（最大偏差 %）", value=round(worst, 4), limit=0.1,
                        status="PASS" if worst <= 0.1 else "FAIL"))
 
     # 镜像对称：同极内 ± 两条腿的 center y 应互为相反数（极轴局部坐标）
+    # 单层 V：每极 2 块（原双层是 4 块两对），只有 (0,1) 一对。
     asym = 0.0
     for pole in range(cfg.poles):
-        base = pole * 4
-        for j, k in ((0, 1), (2, 3)):
+        base = pole * 2
+        for j, k in ((0, 1),):
             a = log["pm"].get("PM_%02d" % (base + j + 1))
             b = log["pm"].get("PM_%02d" % (base + k + 1))
             if a and b:
                 ang = math.radians(pole * 360.0 / cfg.poles)
-                for p in (a, b):
-                    pass
                 # 旋转到该极的局部坐标，比较 |y| 与 x
                 def loc(p):
                     x = p["cx"] * math.cos(-ang) - p["cy"] * math.sin(-ang)

@@ -6,9 +6,9 @@
 --------------------------------------------
 `scripts/main.py::MotorModelBuilder` 的几何段是 SPM 专用（单槽单线圈、表贴磁钢、
 `PM_1..PM_8` 命名），且被 `gen_maxwell_model.py --check` 逐字门禁。往里面加
-「双层线圈 + 32 块 V 型磁钢」必然改动那段 f-string 的空白与顺序，一旦生成物与
+「双层线圈 + 16 块单层 V 型磁钢」必然改动那段 f-string 的空白与顺序，一旦生成物与
 `maxwell_model/*.py` 不再逐字相同，SPM 基线的可复现性就断了。新项目要的是
-**96 个可数线圈边对象 + 32 块独立磁钢多边形**，与 SPM 不共享结构，因此独立生成，
+**96 个可数线圈边对象 + 16 块独立磁钢多边形**，与 SPM 不共享结构，因此独立生成，
 SPM 模板一行不动。
 
 生成物（`D:/ANSYS_Run/ipm_m1_build.py`）内容
@@ -17,10 +17,10 @@ setup → materials → geometry → winding → boundary → mesh → solver �
 
 * 几何全部在 CPython 侧算好（`ipm_geom`），IronPython 里只做 CreatePolyline；
   几何数字只有一个来源。
-* 磁化方向**逐块**写进材料：32 块方向各不相同，用「一块一个材料」换取
+* 磁化方向**逐块**写进材料：16 块方向各不相同，用「一块一个材料」换取
   「显式、无隐式坐标系 API」。`SetMaterialOrientation` 的键名在 2021.1 上未验证，
   写错是静默无效键（`MAXWELL_INTERNALS.md` P17 的教训），不用。
-* 不求解：M1' 的验收是「48 槽 / 32 磁钢 / 96 线圈边数得出来，且无 intersect」。
+* 不求解：M1' 的验收是「48 槽 / 16 磁钢 / 96 线圈边数得出来，且无 intersect」。
 
 用法
 ----
@@ -54,6 +54,24 @@ C_COIL = "(255 128 0)"
 C_N = "(255 0 0)"
 C_S = "(0 0 255)"
 
+# ── M270-35A 直流磁化曲线（2026-11-22，M2' 暴露 I13 后补）──────────────────
+# 为什么必须是非线性：SPM 是表贴结构、没有隔磁桥，线性 μr=1000 只是轻微偏乐观；
+# 这台 IPM 有 3.08–4.72 mm 的铁桥，桥的磁阻只有气隙的 1/58（3.19 mm 桥 / μr 1000
+# vs 0.675 mm 气隙 / μr 1），线性模型下 98% 的磁钢磁通走桥短路 —— M2' 实测气隙
+# 0.0296 T 而磁钢内部 0.925 T，就是这个机理。真实铁在 ~2 T 饱和，桥的磁阻随磁通
+# 剧增，磁通才被迫改走气隙。所以 BH 不是"精度选项"，是**能不能算**的前提。
+#
+# 来源类型：公开 datasheet 量级 + 单调解析（M270-35A 级高磁导冷轧无取向硅钢，
+# 0.35 mm）。锚点：1.5 T @ ≈400 A/m、膝点 1.85–1.95 T、50 kA/m @ 2.05 T。
+# `assumption=待验证`（见账本 I13）：缺厂商原始曲线，膝点 ±5% 的影响待 M4' 敏感性复算。
+BH_M270_35A = [
+    (0, 0.00), (30, 0.30), (50, 0.52), (80, 0.80), (100, 0.95),
+    (130, 1.10), (160, 1.22), (200, 1.33), (250, 1.41), (300, 1.47),
+    (400, 1.54), (500, 1.59), (700, 1.65), (1000, 1.70), (1500, 1.75),
+    (2000, 1.79), (3000, 1.84), (5000, 1.89), (8000, 1.93), (12000, 1.96),
+    (20000, 2.00), (30000, 2.03), (50000, 2.06), (100000, 2.10),
+]
+
 
 def _fmt(v: float) -> str:
     return ("%.6f" % v).rstrip("0").rstrip(".")
@@ -64,30 +82,30 @@ def _pts_literal(pts) -> str:
 
 
 def magnet_directions(cfg) -> list:
-    """32 块磁钢的**外法线**单位向量（已旋转到全局）。
+    """16 块磁钢（单层 V）的**外法线**单位向量（已旋转到全局）。
 
     厚度沿 +n 偏置（n 指向极轴内侧），故「外侧那条面」是 p1p2 所在面，
     外法线 = (sinβ, −s·cosβ)，s = ±1。偶数极取外法线（N 朝气隙），奇数极反向（S）。
     返回顺序与 `derive_rotor()["polygons"]` 完全一致：
-    pole → layer(outer/inner) → side(+/-)。
+    pole → side(+/-)（单层，无 outer/inner 之分）。
     """
     out = []
     pole_pitch = 360.0 / cfg.poles
+    _ra, tilt, _len, _gap = cfg.v_single
+    t = math.radians(tilt)
     for pole in range(cfg.poles):
         a = math.radians(pole * pole_pitch)
-        for _lname, (_ra, tilt, _len, _gap) in (("outer", cfg.v_outer), ("inner", cfg.v_inner)):
-            t = math.radians(tilt)
-            for _side, s in (("+", 1.0), ("-", -1.0)):
-                ux, uy = math.sin(t), -s * math.cos(t)
-                gx = ux * math.cos(a) - uy * math.sin(a)
-                gy = ux * math.sin(a) + uy * math.cos(a)
-                if pole % 2 == 1:
-                    gx, gy = -gx, -gy
-                out.append((pole, gx, gy))
+        for _side, s in (("+", 1.0), ("-", -1.0)):
+            ux, uy = math.sin(t), -s * math.cos(t)
+            gx = ux * math.cos(a) - uy * math.sin(a)
+            gy = ux * math.sin(a) + uy * math.cos(a)
+            if pole % 2 == 1:
+                gx, gy = -gx, -gy
+            out.append((pole, gx, gy))
     return out
 
 
-def build_script(cfg) -> str:
+def build_script(cfg, aedt_out: str = AEDT_OUT) -> str:
     i1 = ipm_geom.derive_slot(cfg)
     layers = ipm_geom.coil_layers(cfg)
     rotor = ipm_geom.derive_rotor(cfg)
@@ -120,7 +138,7 @@ def build_script(cfg) -> str:
     A = L.append
     A("# -*- coding: utf-8 -*-")
     A("# IPM 8p48s M1' — 由 projects/IPM_8p48s/ipm_build.py 生成，勿手改。")
-    A("# 48 槽梨形槽 + 32 块双层 V 磁钢 + 96 个线圈边；不求解。")
+    A("# 48 槽梨形槽 + 16 块单层 V 磁钢 + 96 个线圈边；不求解。")
     A("import time")
     A("import traceback")
     A("")
@@ -180,12 +198,22 @@ def build_script(cfg) -> str:
     # ------------------------------------------------------------ materials
     A("")
     A("oDefinitionManager = oProject.GetDefinitionManager()")
+    A("# 非线性 BH：`Coordinates:=` 只接受**纯数值平铺数组** [H1,B1,H2,B2,...]。")
+    A("# 嵌套 [[h,b],...] 或 keyed block 会被 EditMaterial 直接拒（\"A block func can")
+    A("# only have primitives...\"），2026-11-22 三种容器实测过。permeability 仍写 1000：")
+    A("# 若 BH 块被静默忽略，模型退化回线性对照（Bg=0.0296 T），可一眼分辨。")
+    _bh = ", ".join("%g, %g" % (h, b) for (h, b) in BH_M270_35A)
     A('oDefinitionManager.EditMaterial("M270_35A",')
     A('    ["NAME:M270_35A", "CoordinateSystemType:=", "Cartesian", "BulkOrSurfaceType:=", 1,')
     A('     ["NAME:PhysicsTypes", "set:=", ["Electromagnetic", "Thermal", "Structural"]],')
     A('     "permittivity:=", "1", "permeability:=", "1000", "conductivity:=", "2000000",')
     A('     "dielectric_loss_tangent:=", "0", "magnetic_loss_tangent:=", "0",')
+    A('     ["NAME:BHCoordinates", "property_type:=", "nonlinear", "BType:=", "BValue",')
+    A('      "HUnit:=", "A_per_meter", "BUnit:=", "tesla",')
+    A('      "Coordinates:=", [' + _bh + ']],')
     A('     "mass_density:=", "7650", "youngs_modulus:=", "200000000000"])')
+    A('log("material M270_35A: BH ' + str(len(BH_M270_35A)) + ' pts, '
+      'Hmax=' + str(BH_M270_35A[-1][0]) + ' Bmax=' + str(BH_M270_35A[-1][1]) + '")')
     A("")
     for _n, _pts, mat, gx, gy, _c in pm_entries:
         A('oDefinitionManager.EditMaterial("' + mat + '",')
@@ -404,8 +432,8 @@ def build_script(cfg) -> str:
     A('    log("VALIDATE_NA: " + repr(traceback.format_exc().splitlines()[-1]))')
     A("")
     A("try:")
-    A('    oProject.SaveAs(r"' + AEDT_OUT + '", True)')
-    A('    log("SAVED_OK ' + AEDT_OUT + '")')
+    A('    oProject.SaveAs(r"' + aedt_out + '", True)')
+    A('    log("SAVED_OK ' + aedt_out + '")')
     A("except Exception:")
     A('    log("SAVE_FAIL: " + repr(traceback.format_exc().splitlines()[-1]))')
     A("")
@@ -418,14 +446,17 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="IPM 8p48s M1' 建模脚本生成")
     ap.add_argument("--run", action="store_true", help="生成后直接调用 ansysedt 真机建模")
     ap.add_argument("--out", default=SCRIPT)
+    ap.add_argument("--aedt", default=AEDT_OUT,
+                    help="工程落盘路径（换版本时用新名，保留上一版可比对）")
     args = ap.parse_args(argv)
 
     cfg = ipm_geom.IPMConfig()
-    text = build_script(cfg)
+    text = build_script(cfg, args.aedt)
     os.makedirs(RUN_DIR, exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as fh:
         fh.write(text)
     print("生成：%s（%.1f KB，%d 行）" % (args.out, len(text) / 1024.0, text.count("\n")))
+    print("BH 曲线：%d 点（M270_35A），工程 -> %s" % (len(BH_M270_35A), args.aedt))
     compile(text, args.out, "exec")
     print("语法自检：CPython compile OK")
 

@@ -1,9 +1,9 @@
-"""IPM 8p48s（2026-11-20）：48 槽梨形槽 / q=2 双层绕组 / 双层 V 磁钢 的几何护栏。
+"""IPM 8p48s（2026-11-22 改单层 V + 槽内对称绕组）：48 槽梨形槽 / q=2 双层绕组 / 单层 V 磁钢 的几何护栏。
 
 为什么需要这一组
 ----------------
 新项目的第一天最容易「拍脑袋填数」：把表 2 的 12 槽梨形槽缩小 1/4 当 48 槽用、
-把集中绕组的 12 槽相属表加个循环当分布绕组、把 8 块表贴磁钢复制 4 份当双层 V。
+把集中绕组的 12 槽相属表加个循环当分布绕组、把 8 块表贴磁钢复制 2 份当单层 V。
 这三件事都能建出「看起来像电机」的模型，但 FEA 出来全是废数。本文件把
 `projects/IPM_8p48s/ipm_geom.py` 与 `ipm_winding.py` 的定源结论钉死：
 
@@ -11,7 +11,8 @@
    齿部最窄 3.44 mm、轭厚 16.0 mm、`Rs = Bs2/2` 是相切恒等式；
 2. **I2**：q=2、y=5 的双层 60° 相带 ⇒ 96 边、每相 16 线圈、k_w1=0.9330、
    k_w5=k_w7=0.0670（短距 1 槽的直接效果）；
-3. **I4**：每极 2 组 V × 2 块 × 8 极 = 32 块，块块在转子内且桥厚达标。
+3. **I4**：每极 1 组 V × 2 块 × 8 极 = 16 块（单层 V），块块在转子内且桥厚达标。
+4. **I2 槽内排布**：两条边按切向 y=0 对称并排（非径向一远一近），距气隙等距。
 """
 from __future__ import annotations
 
@@ -94,7 +95,7 @@ def test_i1_slot_not_through_stator(cfg):
 
 
 def test_i1_coil_inside_slot(cfg):
-    """两层线圈都必须在槽内且互不相交（0.4 mm 层间绝缘）。"""
+    """两条边必须都在槽内、关于切向中心线对称、互不相交（0.4 mm 绝缘）。"""
     layers = ipm_geom.coil_layers(cfg)
     sc = ipm_geom.slot_only(cfg)
     outline = ipm_geom.slot_profile.pear_outline(sc)
@@ -102,6 +103,12 @@ def test_i1_coil_inside_slot(cfg):
     assert ipm_geom.poly_dist(layers["lower"], outline) > 0.1
     assert ipm_geom.poly_dist(layers["upper"], layers["lower"]) == pytest.approx(0.4, abs=0.02)
     assert layers["area_upper"] == pytest.approx(layers["area_lower"], rel=0.01)
+    assert layers["split_axis"] == "tangential_y"
+    # 两条边在径向 x 上覆盖同一范围 ⇒ 到气隙等距，不是一远一近
+    ux = [p[0] for p in layers["upper"]]
+    lx = [p[0] for p in layers["lower"]]
+    assert min(ux) == pytest.approx(min(lx), abs=1e-6)
+    assert max(ux) == pytest.approx(max(lx), abs=1e-6)
 
 
 # ------------------------------------------------------------------ I2 绕组
@@ -152,17 +159,16 @@ def test_i4_all_checks_pass(i4):
 
 
 def test_i4_magnet_count(i4):
-    assert i4["magnets"] == 32
-    assert len(i4["polygons"]) == 32
-    assert len(i4["labels"]) == 32
+    assert i4["magnets"] == 16
+    assert len(i4["polygons"]) == 16
+    assert len(i4["labels"]) == 16
 
 
 def test_i4_each_magnet_area(i4, cfg):
     """每块面积必须等于 L×t；自交或镜像写错会立刻偏离。"""
-    lens = {"outer": cfg.v_outer[2], "inner": cfg.v_inner[2]}
     for lab, pts in zip(i4["labels"], i4["polygons"]):
-        layer = lab.split("_")[0]
-        assert ipm_geom.polygon_area(pts) == pytest.approx(lens[layer] * cfg.pm_thickness, abs=1e-6)
+        assert lab.startswith("single_")
+        assert ipm_geom.polygon_area(pts) == pytest.approx(cfg.v_single[2] * cfg.pm_thickness, abs=1e-6)
 
 
 def test_i4_inside_rotor(i4, cfg):
@@ -185,7 +191,7 @@ def test_build_script_compiles(cfg):
     sides = src.split("SIDES = [")[1].split("\n]")[0]
     assert sides.count('"Coil_T') == cfg.slots
     assert sides.count('"Coil_B') == cfg.slots
-    assert src.count('("PM_') == 32
+    assert src.count('("PM_') == 16
     assert "AssignCoil" in src
     assert "ModelDepth" in src
     assert "ValidateDesign" in src
@@ -194,6 +200,6 @@ def test_build_script_compiles(cfg):
 def test_magnet_directions_unit(cfg):
     import ipm_build
     dirs = ipm_build.magnet_directions(cfg)
-    assert len(dirs) == 32
+    assert len(dirs) == 16
     for _pole, gx, gy in dirs:
         assert math.hypot(gx, gy) == pytest.approx(1.0, abs=1e-9)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""IPM 8p48s 几何定源 —— I1（48 槽梨形槽 7 尺寸）+ I4 初设（双层 V 型磁钢）
+"""IPM 8p48s 几何定源 —— I1（48 槽梨形槽 7 尺寸）+ I4（单层 V 型磁钢）
 
 为什么单独一个模块
 ------------------
@@ -13,9 +13,13 @@
   圆线排布（2 根 Ø1.5 并排 + 绝缘）取整；④ 轭厚取 baseline 的 16 mm；最后
   用铜耗预算反算所需槽面积并对照。`Rs = Bs2/2` 是梨形槽「半圆底与直身相切」
   的几何恒等式，本模块显式验证它在新尺寸下仍然成立（端点重合）。
-* **I4**：每极两组 V、每组 2 块 ⇒ 8 极 32 块。每块用「内端起点 + 方向 + 长度
-  + 厚度」参数化，逐块校验：在转子内（OD 桥厚 ≥ 1.5 mm）、离轴孔 ≥ 3 mm、
-  同组两腿间距、层间/极间间距 ≥ 1.2 mm，并给出最近距离的数值证据。
+* **I4**：每极**一组** V、每组 2 块 ⇒ 8 极 **16 块（单层 V）**。用户 2026-11-22
+  明确要求磁钢单层，不用双层 V。每块用「内端起点 + 方向 + 长度 + 厚度」参数化，
+  逐块校验：在转子内（OD 桥厚 ≥ 1.5 mm）、离轴孔 ≥ 3 mm、同组两腿间距、
+  极间间距 ≥ 1.2 mm，并给出最近距离的数值证据。
+* **I2 线圈排布**：用户 2026-11-22 明确要求绕组在**同一槽内关于切向中心线对称
+  并排**，不是径向「一远一近」。梨形槽轮廓本身关于 y=0 对称，故按 y=0 把
+  内缩线圈切成左右两半、中间留 0.4 mm 绝缘带；两条边距气隙**等距**。
 
 本模块只做几何与解析，**不产生 FEA 结论**；所有 FEA 数字必须由真机求解给出
 （见 `docs/ENGINEERING_ACCEPTANCE.md` §4）。
@@ -80,13 +84,14 @@ class IPMConfig:
     conductors_per_slot: int = 5
     wire_diameter_mm: float = 1.50
 
-    # D4（I4 初设）
+    # D4（I4：单层 V，用户 2026-11-22 定）
     rotor_id: float = 30.0
     pm_thickness: float = 2.8
     pm_bridge_od: float = 1.5     # 磁钢外角到转子 OD 的最小铁桥
-    pm_bridge_gap: float = 1.2    # 层间/极间最小铁桥
-    v_outer: tuple = (33.0, 40.0, 11.5, 3.0)   # (apex 半径, 与径向夹角°, 长度, 内端间距)
-    v_inner: tuple = (21.0, 36.0, 10.0, 3.0)
+    pm_bridge_gap: float = 1.2    # 组内两腿/极间最小铁桥
+    # 单层 V：(apex 半径, 与径向夹角°, 长度, 内端间距)。参数由 TEMP 扫描定源，
+    # 块数 = 8 极 × 2 块 = 16，不再是双层的 32。
+    v_single: tuple = (26.0, 38.0, 13.0, 3.0)
 
     # 材料/工况（§1）
     Bg_assumed: float = 0.85     # 假设：V 型聚磁后气隙工作磁密（M2' FEA 验证）
@@ -322,19 +327,52 @@ def solve_split_radius(pts, frac_above: float = 0.5) -> float:
     return 0.5 * (lo + hi)
 
 
-def coil_layers(cfg: IPMConfig, shrink: float = 0.86, gap: float = 0.4) -> dict:
-    """双层绕组的两层线圈截面（槽内局部坐标：x=径向，y=切向，mm）。
+def clip_y(pts, yc: float, keep_less: bool):
+    """Sutherland–Hodgman：按 y = yc 半平面裁剪（保留 y≤yc 或 y≥yc）。
 
-    上层（靠气隙）与下层面积相等（各自 50%），中间留 `gap` mm 层间绝缘。
-    先按 0.86 向顶点形心收缩（对小槽 ≈ 0.24 mm 单边槽绝缘），再按半径切开。
+    与 `clip_x` 同构，只是切向中心线。梨形槽关于 y=0 对称，故按 y=0 切出的
+    两半天然等面积、且到气隙（x 方向）等距 —— 满足用户「同槽内对称排布」。
+    """
+    def inside(p):
+        return (p[1] <= yc) if keep_less else (p[1] >= yc)
+
+    out = []
+    n = len(pts)
+    for i in range(n):
+        cur, nxt = pts[i], pts[(i + 1) % n]
+        ci, ni = inside(cur), inside(nxt)
+        if ci:
+            out.append(cur)
+        if ci != ni:
+            dy = nxt[1] - cur[1]
+            t = 0.0 if abs(dy) < 1e-12 else (yc - cur[1]) / dy
+            out.append((cur[0] + t * (nxt[0] - cur[0]), yc))
+    clean = []
+    for p in out:
+        if not clean or abs(p[0] - clean[-1][0]) > 1e-9 or abs(p[1] - clean[-1][1]) > 1e-9:
+            clean.append(p)
+    if len(clean) > 1 and abs(clean[0][0] - clean[-1][0]) < 1e-9 and abs(clean[0][1] - clean[-1][1]) < 1e-9:
+        clean.pop()
+    return clean
+
+
+def coil_layers(cfg: IPMConfig, shrink: float = 0.86, gap: float = 0.4) -> dict:
+    """双层绕组的两条边截面（槽内局部坐标：x=径向，y=切向，mm）。
+
+    用户 2026-11-22：绕组「不是一远一近，是在同一定子槽内对称排布」。
+    因此按**切向中心线 y=0** 把内缩线圈切成左右两半（各 50%），中间留 `gap`
+    mm 绝缘带；两条边在 x（径向）上覆盖同样的范围 ⇒ 到气隙等距。
+    先按 0.86 向顶点形心收缩（对小槽 ≈ 0.24 mm 单边槽绝缘），再按 y=0 切开。
+    保留 `upper`/`lower` 键名只为兼容既有调用方（电气上仍是双层 U/L 边），
+    几何上二者是「切向左/右」，不再有径向远近之分。
     """
     sc = slot_only(cfg)
     outline = slot_profile.pear_outline(sc)
     coil = slot_profile.shrink_toward_centroid(outline, shrink)
-    r_split = solve_split_radius(coil, 0.5)
-    upper = clip_x(coil, r_split - gap / 2.0, keep_less=True)
-    lower = clip_x(coil, r_split + gap / 2.0, keep_less=False)
-    return dict(r_split=round(r_split, 4), upper=upper, lower=lower,
+    # 轮廓关于 y=0 对称 ⇒ 直接按 y=0 切，两半天然等面积
+    upper = clip_y(coil, -gap / 2.0, keep_less=True)   # 切向负侧（原 upper 键名）
+    lower = clip_y(coil, +gap / 2.0, keep_less=False)  # 切向正侧（原 lower 键名）
+    return dict(r_split=0.0, split_axis="tangential_y", upper=upper, lower=lower,
                 area_upper=round(polygon_area(upper), 3),
                 area_lower=round(polygon_area(lower), 3),
                 area_total=round(polygon_area(coil), 3))
@@ -400,19 +438,21 @@ def _v_legs(apex_r: float, tilt_deg: float, length: float, gap_in: float, thick:
 
 
 def derive_rotor(cfg: IPMConfig) -> dict:
-    """I4 初设：每极两组 V、共 32 块；逐块几何自检并返回全局多边形。"""
+    """I4：每极**一组** V、共 16 块（单层 V）；逐块自检并返回全局多边形。
+
+    用户 2026-11-22 要求永磁体单层，取消原双层 V 的 outer/inner 两层。
+    """
     r_rot = cfg.rotor_od / 2.0
     r_shaft = cfg.rotor_id / 2.0
     pole_pitch = 360.0 / cfg.poles
     t = cfg.pm_thickness
+    ra, tilt, length, gap_in = cfg.v_single
 
-    layers = [("outer", cfg.v_outer), ("inner", cfg.v_inner)]
-    local = []   # (layer, side, pole, pts_local)
+    local = []   # (layer, side, pole, pts_local) —— 单层，layer 恒为 "single"
     for pole in range(cfg.poles):
         ang = pole * pole_pitch
-        for lname, (ra, tilt, length, gap_in) in layers:
-            for side, pts in _v_legs(ra, tilt, length, gap_in, t):
-                local.append((lname, side, pole, rotate(pts, ang)))
+        for side, pts in _v_legs(ra, tilt, length, gap_in, t):
+            local.append(("single", side, pole, rotate(pts, ang)))
 
     # 校验 1：在转子内 / 离轴孔
     rad_check = []
@@ -426,26 +466,17 @@ def derive_rotor(cfg: IPMConfig) -> dict:
     min_bridge_od = min(x["bridge_od"] for x in rad_check)
     min_gap_shaft = min(x["gap_shaft"] for x in rad_check)
 
-    # 校验 2：两两最近距离（同极两层之间、同层两腿、相邻极之间）
-    pair_min = dict(inter_layer=1e9, intra_v=1e9, inter_pole=1e9)
+    # 校验 2：两两最近距离（单层只有同组两腿、相邻极两种）
+    pair_min = dict(intra_v=1e9, inter_pole=1e9)
     for i in range(len(local)):
         for j in range(i + 1, len(local)):
-            l1, s1, p1, a = local[i]
-            l2, s2, p2, b = local[j]
-            if p1 == p2:
-                if l1 != l2:
-                    k = "inter_layer"
-                elif s1 != s2:
-                    k = "intra_v"
-                else:
-                    continue
-            else:
-                k = "inter_pole"
-            d = poly_dist(a, b)
-            pair_min[k] = min(pair_min[k], d)
+            s1, p1, a = local[i][1], local[i][2], local[i][3]
+            s2, p2, b = local[j][1], local[j][2], local[j][3]
+            k = "intra_v" if p1 == p2 else "inter_pole"
+            pair_min[k] = min(pair_min[k], poly_dist(a, b))
 
-    _exp = {nm: lay[2] * t for nm, lay in (("outer", cfg.v_outer), ("inner", cfg.v_inner))}
-    _area_dev = max(abs(polygon_area(p) - _exp[lay]) for (lay, _s, _p, p) in local)
+    _exp = length * t
+    _area_dev = max(abs(polygon_area(p) - _exp) for (_l, _s, _p, p) in local)
     checks = [
         dict(name="磁钢外角到转子 OD 桥厚 ≥ %.1f" % cfg.pm_bridge_od,
              value=round(min_bridge_od, 3), limit=cfg.pm_bridge_od, op=">=",
@@ -456,24 +487,21 @@ def derive_rotor(cfg: IPMConfig) -> dict:
              status="PASS" if min_gap_shaft >= 3.0 else "FAIL"),
         dict(name="同组两腿间距 ≥ 1.0", value=round(pair_min["intra_v"], 3), limit=1.0, op=">=",
              status="PASS" if pair_min["intra_v"] >= 1.0 else "FAIL"),
-        dict(name="层间铁桥 ≥ %.1f" % cfg.pm_bridge_gap,
-             value=round(pair_min["inter_layer"], 3), limit=cfg.pm_bridge_gap, op=">=",
-             status="PASS" if pair_min["inter_layer"] >= cfg.pm_bridge_gap else "FAIL"),
         dict(name="极间铁桥 ≥ %.1f" % cfg.pm_bridge_gap,
              value=round(pair_min["inter_pole"], 3), limit=cfg.pm_bridge_gap, op=">=",
              status="PASS" if pair_min["inter_pole"] >= cfg.pm_bridge_gap else "FAIL"),
-        dict(name="磁钢块数 = 8×2×2", value=len(local), limit=cfg.poles * 4, op="==",
-             status="PASS" if len(local) == cfg.poles * 4 else "FAIL"),
+        dict(name="磁钢块数 = 8×1×2 = 16（单层 V）", value=len(local), limit=cfg.poles * 2, op="==",
+             status="PASS" if len(local) == cfg.poles * 2 else "FAIL"),
     ]
 
     # 磁通能力估算（解析，仅作交叉校验，不作 FEA 结论）
     tau_pole = math.pi * cfg.rotor_od / cfg.poles
-    w_sum = cfg.poles * (cfg.v_outer[2] + cfg.v_inner[2])
-    conc = (cfg.v_outer[2] + cfg.v_inner[2]) / (tau_pole / 2.0)
+    w_sum = cfg.poles * 2 * length
+    conc = (2 * length) / (tau_pole / 2.0)
     return dict(
         rotor_od=cfg.rotor_od, rotor_id=cfg.rotor_id, poles=cfg.poles,
-        pm_thickness=t, magnets=len(local),
-        layout=dict(v_outer=cfg.v_outer, v_inner=cfg.v_inner),
+        pm_thickness=t, magnets=len(local), v_type="single",
+        layout=dict(v_single=cfg.v_single),
         radial=rad_check, pair_min={k: round(v, 3) for k, v in pair_min.items()},
         checks=checks,
         magnet_area_total=round(sum(polygon_area(p) for (_l, _sl, _po, p) in local), 3),
@@ -530,10 +558,9 @@ def main(argv=None) -> int:
           % (i2["area_upper"], i2["area_lower"], i2["r_split"]))
 
     print("=" * 72)
-    print("I4 双层 V 磁钢  status=%s  块数=%d" % (i4["status"], i4["magnets"]))
-    print("  最近距离: 层间 %.2f / 同组两腿 %.2f / 极间 %.2f mm"
-          % (i4["pair_min"]["inter_layer"], i4["pair_min"]["intra_v"],
-             i4["pair_min"]["inter_pole"]))
+    print("I4 单层 V 磁钢  status=%s  块数=%d" % (i4["status"], i4["magnets"]))
+    print("  最近距离: 同组两腿 %.2f / 极间 %.2f mm（单层 V，无层间）"
+          % (i4["pair_min"]["intra_v"], i4["pair_min"]["inter_pole"]))
     print("  OD 桥厚 %.2f / 轴孔间隙 %.2f mm；聚磁比 %.3f，Bg 估算 %.3f T（漏磁 0.7）"
           % (min(x["bridge_od"] for x in i4["radial"]),
              min(x["gap_shaft"] for x in i4["radial"]),
