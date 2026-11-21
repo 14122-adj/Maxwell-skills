@@ -356,23 +356,79 @@ def clip_y(pts, yc: float, keep_less: bool):
     return clean
 
 
-def coil_layers(cfg: IPMConfig, shrink: float = 0.86, gap: float = 0.4) -> dict:
-    """双层绕组的两条边截面（槽内局部坐标：x=径向，y=切向，mm）。
+def coil_layers(cfg: IPMConfig, shrink: float = 0.86, gap: float = 0.4,
+                x_pad: float = 0.23, y_pad: float = 0.14) -> dict:
+    """双层绕组的两条边截面 —— **矩形**，关于切向 y=0 对称并排。
 
-    用户 2026-11-22：绕组「不是一远一近，是在同一定子槽内对称排布」。
-    因此按**切向中心线 y=0** 把内缩线圈切成左右两半（各 50%），中间留 `gap`
-    mm 绝缘带；两条边在 x（径向）上覆盖同样的范围 ⇒ 到气隙等距。
-    先按 0.86 向顶点形心收缩（对小槽 ≈ 0.24 mm 单边槽绝缘），再按 y=0 切开。
-    保留 `upper`/`lower` 键名只为兼容既有调用方（电气上仍是双层 U/L 边），
-    几何上二者是「切向左/右」，不再有径向远近之分。
+    用户 2026-11-22 两次修订：①「不是一远一近，是同槽内对称排布」；
+    ②「绕组截面应该是矩形，不要异形」。因此不再把内缩梨形切成两半，
+    而是直接在槽内放两个矩形（各 4 个 `CreatePolyline` 点）：
+      * x（径向）：从 `内缩线圈 x_min + x_pad` 到 `内缩线圈 x_max - x_pad`；
+      * y（切向）：从 `gap/2` 到 `槽直身半宽 - y_pad`，负侧镜像；
+      * 顶面在槽内（用 `in_poly` 逐角点验证），不越界、左右镜像、距气隙等距。
+
+    `x_pad/y_pad` 是绝缘留量：直身段槽半宽 1.75，留 0.14 后矩形外沿 1.358，
+    与中间 gap=0.4 的半带 0.2 之间净宽 1.158 mm；x 两端各留 0.23。
+    矩形面积 ≈11.8 mm²/条（旧异形 12.301，−4%），这是「矩形必须内接于
+    半圆底槽」的几何代价，不靠伸出槽外来保面积。
+    保留 `upper`/`lower` 键名只兼容既有调用方（电气 U/L 边），几何上是左/右。
     """
     sc = slot_only(cfg)
     outline = slot_profile.pear_outline(sc)
     coil = slot_profile.shrink_toward_centroid(outline, shrink)
-    # 轮廓关于 y=0 对称 ⇒ 直接按 y=0 切，两半天然等面积
-    upper = clip_y(coil, -gap / 2.0, keep_less=True)   # 切向负侧（原 upper 键名）
-    lower = clip_y(coil, +gap / 2.0, keep_less=False)  # 切向正侧（原 lower 键名）
-    return dict(r_split=0.0, split_axis="tangential_y", upper=upper, lower=lower,
+
+    def in_poly(x: float, y: float, poly) -> bool:
+        inside = False
+        n = len(poly)
+        for i in range(n):
+            x1, y1 = poly[i]
+            x2, y2 = poly[(i + 1) % n]
+            if ((y1 > y) != (y2 > y)) and (x < (x2 - x1) * (y - y1) / (y2 - y1) + x1):
+                inside = not inside
+        return inside
+
+    # 离槽壁 >= min_wall（真实槽绝缘 0.20~0.30 mm，取 0.20）。
+    # 关键：单一大矩形不能从槽口 x=47.55 起（那里是斜肩，槽壁收窄，边距会掉到
+    # 0.006 mm）。须把矩形起点放到直身段 x>=48.4，终点 x<=58.2（半圆底内）。
+    # 全局扫描（x_lo∈[48.4,51.5], x_hi∈[55,58.2], y_outer∈[1.0,1.55]）的最优：
+    #   x[48.40,58.20] y_outer=1.20 → 面积 9.800 mm²、边距 0.202 mm。
+    min_wall = 0.20
+    x_lo = min(p[0] for p in coil) + x_pad
+    x_hi = max(p[0] for p in coil) - x_pad
+    y_outer = cfg.slot_Bs2 / 2.0 - y_pad
+    best = None
+    # 以 0.05 mm 步长扫描，取满足边距的最大面积（确定性、可复现）
+    x_lo_i = int(math.ceil(x_lo / 0.05) * 0.05 / 0.05)
+    while x_lo_i * 0.05 <= min(x_lo + 3.0, 51.5):
+        xl = x_lo_i * 0.05
+        xh = min(x_hi, 58.2)
+        while xh >= max(xl + 2.0, 55.0):
+            yo = 1.55
+            while yo >= gap / 2.0 + 0.5:
+                rect = [(xl, gap / 2.0), (xh, gap / 2.0), (xh, yo), (xl, yo)]
+                if all(in_poly(x, y, outline) for x, y in rect):
+                    wall = poly_dist(rect, outline)
+                    if wall >= min_wall:
+                        area = (xh - xl) * (yo - gap / 2.0)
+                        if best is None or area > best[0] + 1e-9:
+                            best = (area, xl, xh, yo, wall)
+                        break   # 同一 (xl,xh) 下 y 越大面积越大，找到即停
+                yo -= 0.05
+            xh -= 0.05
+        x_lo_i += 1
+    if best is None:
+        raise RuntimeError("槽内放不下满足 %.2f mm 边距的矩形绕组" % min_wall)
+    _, x_lo, x_hi, y_outer, wall_final = best
+
+    # 右上角 (x_hi, y_outer) 在正 y 侧；负 y 侧镜像 => upper 键名保留
+    lower = [(x_lo, gap / 2.0), (x_hi, gap / 2.0),
+             (x_hi, y_outer), (x_lo, y_outer)]
+    upper = [(x, -y) for (x, y) in lower][::-1]  # 保持与 lower 同样的逆时针方向
+
+    return dict(r_split=0.0, split_axis="tangential_y", shape="rectangle",
+                x_range=(round(x_lo, 4), round(x_hi, 4)),
+                y_outer=round(y_outer, 4), gap=gap, wall_mm=round(wall_final, 4),
+                upper=upper, lower=lower,
                 area_upper=round(polygon_area(upper), 3),
                 area_lower=round(polygon_area(lower), 3),
                 area_total=round(polygon_area(coil), 3))

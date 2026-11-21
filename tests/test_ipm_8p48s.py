@@ -104,11 +104,20 @@ def test_i1_coil_inside_slot(cfg):
     assert ipm_geom.poly_dist(layers["upper"], layers["lower"]) == pytest.approx(0.4, abs=0.02)
     assert layers["area_upper"] == pytest.approx(layers["area_lower"], rel=0.01)
     assert layers["split_axis"] == "tangential_y"
+    # 用户 11-22 二次修订：截面必须是矩形（4 点，非异形切分）
+    assert layers["shape"] == "rectangle"
+    assert len(layers["upper"]) == 4 and len(layers["lower"]) == 4
+    for poly in (layers["upper"], layers["lower"]):
+        xs = {p[0] for p in poly}
+        ys = {p[1] for p in poly}
+        assert len(xs) == 2 and len(ys) == 2   # 轴对齐矩形 ⇒ 只有 2 个 x、2 个 y
     # 两条边在径向 x 上覆盖同一范围 ⇒ 到气隙等距，不是一远一近
     ux = [p[0] for p in layers["upper"]]
     lx = [p[0] for p in layers["lower"]]
     assert min(ux) == pytest.approx(min(lx), abs=1e-6)
     assert max(ux) == pytest.approx(max(lx), abs=1e-6)
+    # 关于 y=0 镜像
+    assert min(p[1] for p in layers["upper"]) == pytest.approx(-max(p[1] for p in layers["lower"]), abs=1e-6)
 
 
 # ------------------------------------------------------------------ I2 绕组
