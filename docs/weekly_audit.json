@@ -1,201 +1,168 @@
 {
   "audit": {
-    "date": "2026-11-14",
-    "kind": "weekly_core_capability_acceptance",
+    "date": "2026-11-23",
+    "kind": "weekly_skill_acceptance_and_process_supervision",
     "trigger": "manual",
-    "scope": "M1-M4 + M6 + template path + M8 pear slot",
+    "stage": "IPM 8p48s 单层V+矩形绕组+气隙环+负载电流+I21 BEMF+每次剖分网格；SPM 8p12s 冻结；探索 LOCKED",
+    "baseline_head": "ae93bde52359dab751d4dbd5dd02975f91e262b5",
+    "baseline_head_eq_origin_main": true,
+    "worktree": "1 modified (m2_noload_rect.json float-tail 3e-6V, uncommitted) + .workbuddy/ untracked",
+    "overview": {
+      "line1_m1_m4": "M1' PASS | M2' PASS | M3' PASS | M4' FAIL (无 mesh_<case>.json)",
+      "line2_g9_g10": "G9 基本合规(2项部分) | G10 不合规(⑤网格严重违规、③字段不全、②部分完成)",
+      "exploration_gate": "LOCKED"
+    },
     "verdict_skill_usable": true,
     "verdict_skill_usable_cn": "技能可用",
     "verdict_design_qualified": false,
-    "verdict_design_qualified_cn": "设计不合格（齿槽 27.37% vs 判据 5%）",
-    "note": "两条口径分开判定，禁止把「技能可用」当「设计合格」",
+    "verdict_design_qualified_cn": "设计不合格(Bg 0.662<0.70 / BEMF 63.87<118 / 齿槽13.89%>5% / T_avg 1.56<22.5 / 网格判据全缺 / E8 E6 FEA仍缺)",
+    "verdict_process_compliant": false,
+    "verdict_process_compliant_cn": "流程不合规(G10⑤网格剖分全缺 / G10③excitation字段不全 / I21 bemf_load未入KEEP JSON)",
+    "note": "三条口径分开判定，禁止互相替代",
     "previous": {
-      "date": "2026-11-07",
-      "file": "docs/WEEKLY_AUDIT_2026-11-07.md",
-      "verdict": "部分失败 / 条件可用"
-    }
-  },
-  "baseline": {
-    "repo": "git@github.com:14122-adj/Maxwell-skills.git",
-    "branch": "main",
-    "head_commit": "1af9ddd1cdd50d6bbd5900e67ed8949f384fd2c5",
-    "head_date": "2026-11-14T13:47:23+08:00",
-    "head_subject": "docs(motor): M8 pear-slot spec (Table 2) + task/board switch to cogging optimization",
-    "dirty_worktree": true,
-    "dirty_count": 11,
-    "dirty_files": [
-      "SKILL.md",
-      "mcp-maxwell/server.py",
-      "output_scripts/36slot_industrial/winding.py",
-      "output_scripts/36slot_v2/coils.py",
-      "output_scripts/36slot_v2/winding.py",
-      "references/motor_design_guide.md",
-      "scripts/maxwell_bridge.py",
-      "scripts/motor_param_calc.py",
-      "scripts/winding_layout.py",
-      "output_scripts/36slot_industrial/coils.py (untracked)",
-      ".workbuddy/ (untracked)"
-    ],
-    "reference_values": {
-      "bemf_rms_phase_v": 118.8832,
-      "cogging_pp_nm": 6.84307,
-      "cogging_pct_rated": 27.372,
-      "load_T_avg_nm": 22.3344,
-      "load_vs_rated_pct": -10.663,
-      "report_bytes": 491996,
-      "report_tables": 13,
-      "report_embedded_png": 7,
-      "figure_files": 9
+      "date": "2026-11-14",
+      "file": "docs/WEEKLY_AUDIT_2026-11-14.md",
+      "verdict": "技能可用 / 设计不合格"
     }
   },
   "environment": {
     "os": "win32",
+    "workspace": "D:\\桌面\\ANSYS MaxWell_skill",
+    "repo": "git@github.com:14122-adj/Maxwell-skills.git",
     "aedt_path": "D:/Program Files/AnsysEM/AnsysEM21.1/Win64/ansysedt.exe",
     "aedt_version": "2021.1.0",
-    "aedt_launch_ok": true,
-    "aedt_launch_cmd": "ansysedt.exe -RunScriptAndExit \"脚本\"  （不带 -ng）",
-    "project_directory_live": "D:\\ANSYS_Run\\projects",
-    "project_directory_ok": true,
-    "audit_dir": "D:/ANSYS_Run/audit_20261114",
-    "python_requested": "C:/Users/ASUS/.workbuddy/binaries/python/versions/3.13.12/python.exe",
-    "python_actual": "3.13.14 (D:/ANSYS_Run/audit_20261107/venv)",
-    "ruff_version": "0.17.5"
+    "aedt_process_running": false,
+    "python_tests": "D:/ANSYS_Run/ci_venv/Scripts/python.exe",
+    "pytest_result": "468 passed in 11.93s",
+    "pytest_note": "首轮默认 basetemp 触发沙箱批量删除拦截(SAFE_DELETE_BULK_CONFIRM_REQUIRED)产生 unraisable warning；改用独立 --basetemp 后 EXIT=0 / 468 passed，测试本身全绿"
   },
-  "gates": [
+  "m_gates": [
     {
-      "id": "gate_core",
-      "name": "M1-M4 + M8（核心能力）",
-      "row": 1,
+      "id": "M1'",
+      "name": "IPM 建模 117 sheet + BH nonlinear",
+      "result": "pass",
+      "evidence": "m1_build_check.json 17/17 PASS: 117 sheet(5主体+16磁钢+96线圈), AirgapRing=1, v_single=[33,38,13,3], validate OK, 无 intersect; m2_noload_bhfix.json::solve.sheets=117; .aedt grep nonlinear=2 (旧0), 66点 BH 落盘",
+      "bh_fix": "CloneMaterial(JFE_Steel_35JN270, M270_35A) 替代静默丢弃的 EditMaterial BHCoordinates",
+      "assumption": "JFE 牌号=待验证(厂商曲线偏软约9%), Bg 由 FEA 判定"
+    },
+    {
+      "id": "M2'",
+      "name": "空载 401 点 (winding 0A)",
+      "result": "pass_chain_fail_design",
+      "evidence": "m2_noload_bhfix.json: Bg 0.6621T(旧0.1823,+264%), B_tooth 0.922T PASS, B_yoke 0.812T PASS, 401点 ANALYZE_OK 694.6s, 探针181/46/91, 空载无25N·m",
+      "fail_items": ["BEMF 63.87V (判据118-145, cps=5不足)", "齿槽 3.4729N·m (13.89%, 判据<=1.25, I22)", "Bg 0.662 (G4 0.70-0.90 边缘 FAIL; I16 0.45 PASS)"]
+    },
+    {
+      "id": "M3'",
+      "name": "负载 401 点 (三相正弦)",
+      "result": "pass_chain_fail_design",
+      "evidence": "m3_load_check.json + m3_load_phi90.json: 401行, T_avg 1.5635N·m(理论1.5632,误差0.017%), excitation.current_A=15.688>0真施加",
+      "torque_flatness": "峰峰2.7468%(<=10) / 主谐波h6 1.3297%(<=5) / 单点跳变0.3452%(<=15) 全PASS",
+      "fail_items": ["T_avg 1.56 < 22.5-27.5 (磁路/匝数,非管线)"]
+    },
+    {
+      "id": "M4'",
+      "name": "每次剖分网格 + 质量报告 (契约§8)",
       "result": "fail",
-      "detail": "M1-M4 全项通过；M8 not started → 5 项中 4 项过"
-    },
-    {
-      "id": "M1",
-      "name": "Maxwell 启动",
-      "result": "pass",
-      "evidence": "rc=0，31 s，AEDT 2021.1.0，探针写出 m1_probe.txt"
-    },
-    {
-      "id": "M2",
-      "name": "整机几何 24 图元",
-      "result": "pass",
-      "evidence": "N_SHEETS=24 / N_SOLIDS=0；Region/Stator/Rotor/PM×8/Band/Coil×12；尺寸 75.0/46.5/45.825/46.1625 存在",
-      "areas_mm2": {
-        "Region": 11053.3503,
-        "StatorOuter": 9645.3819,
-        "RotorOuter_manual": 6047.9819,
-        "RotorOuter_template": 5341.1213,
-        "Coil_1": 79.9568,
-        "PM_1": 59.7507,
-        "Band": 6694.6598
-      }
-    },
-    {
-      "id": "M3",
-      "name": "材料/绕组/边界/Setup",
-      "result": "pass",
-      "evidence": "ModelDepth='160mm'×1；M270_35A×2；NdFe35_N/S×8；copper×12；BoundType='Coil'×12；'Winding Group'×3；VectorPotential1+Edges(7)；Setup1 0.02s/5e-05s；MotionSetup1×1"
-    },
-    {
-      "id": "M4",
-      "name": "空载 401 点",
-      "result": "pass",
-      "evidence": "401 点×4 CSV（两条路径）；BEMF 118.8594 V（−0.02%）；齿槽 6.84307 N·m（0.000%）；负载 22.3435 N·m（+0.04%）",
-      "samples": 401,
-      "recomputed_independently": true
-    },
-    {
-      "id": "M8",
-      "name": "梨形槽（2026-11-14 新增）",
-      "result": "not_started",
-      "evidence": [
-        "1af9ddd 仅改 3 个 md，零代码",
-        "main.py:261-300 pear 分支仍为旧 7 点浅梨形（x1=x0+Hs0，Arc StartIndex:=3，无 x4 / 无肩部台阶）",
-        "gen_maxwell_model.build_config 仍为 SlotType.RECTANGULAR（Bs0=2.5 / Hs2=18.0）",
-        "全盘无 T4_pear*.aedt",
-        "gen_maxwell_model --check 无漂移仅证明模板=生成物"
-      ],
-      "spec_check": {
-        "slot_area_mm2": 93.02,
-        "coil_area_mm2": 72.03,
-        "yoke_mm": 16.0,
-        "caliber": "Hs2 = 内径→槽底最底端（x3=54.25, x4=59.0）",
-        "spec_self_consistent": true
-      },
-      "risk_if_implemented_literally": {
-        "polygon_area_no_arc_sampling_mm2": 80.15,
-        "coil_area_no_arc_sampling_mm2": 62.07,
-        "deviation_vs_72_pct": -13.8,
-        "conclusion": "弧段必须 ≥8 采样点，否则撞穿 72±5%"
-      },
-      "blocker": true,
-      "desktop_command": "ansysedt.exe -RunScriptAndExit \"D:\\ANSYS_Run\\tpl_solve_noload.py\""
-    },
-    {
-      "id": "M5",
-      "name": "负载瞬态",
-      "result": "pass",
-      "evidence": "T_avg 22.3435 N·m = −10.63%（±20%）；脉动 32.376%"
-    },
-    {
-      "id": "M6",
-      "name": "报告回填",
-      "result": "pass",
-      "evidence": "491,996 B / 13 表 / 7 内嵌 PNG / figures 9 张；含 6.84 与 22.33 与 §11 对照"
-    },
-    {
-      "id": "TPL",
-      "name": "模板路径等价",
-      "result": "pass",
-      "evidence": "BEMF 118.8840 V（+0.0007% 对基线）；齿槽 6.81809 N·m（−0.365%）；401 行×4"
+      "severity": "blocker",
+      "evidence": "find -name mesh_*.json = 0; D:/ANSYS_Run/probe_mesh_api.log 不存在; MAXWELL_INTERNALS 无网格API结论; ipm_m1.log 无 mesh 行",
+      "violation": "建模→直接401点求解，跳过剖分+统计；无单元/节点数、min/max、质量指标、耗时、4组MaxLength证据"
     }
   ],
-  "deviations_pct": {
-    "manual_vs_baseline_bemf": -0.02,
-    "manual_vs_baseline_cogging": 0.0,
-    "manual_vs_baseline_load": 0.04,
-    "template_vs_baseline_bemf": 0.0007,
-    "template_vs_baseline_cogging": -0.365,
-    "tolerance": 10.0,
-    "pass": true
+  "g10_supervision": [
+    {
+      "id": "G10-1",
+      "name": "磁路根因翻转",
+      "result": "compliant",
+      "detail": "BH没进材料是Bg塌陷真因(EditMaterial 4种写法静默丢弃, μr=1); CloneMaterial修复后Bg 0.182→0.662T. FAIL后未继续改BH写法, 残余BEMF判为匝数不足. JFE牌号assumption已标注, Bg由FEA判定. I16 0.45 PASS / G4 0.70-0.90 边缘FAIL 分开记"
+    },
+    {
+      "id": "G10-2",
+      "name": "I21 BEMF幅值",
+      "result": "partial",
+      "detail": "+21%(φ0电枢反应增磁)与φ90相位偏11.96°未当bug改Imax/φ/参考系(合规). 顺序①磁路green②BEMF未回窗③bemf_load已实现④φ扫描未做. 缺口: bemf_load只在D:/ANSYS_Run/m3_load_phi90_check_i21.json(TEMP), KEEP的m3_load_*.json无此字段; 幅值比<=15%未复核"
+    },
+    {
+      "id": "G10-3",
+      "name": "两工况 excitation",
+      "result": "partial_noncompliant",
+      "detail": "空载5份JSON完全无excitation字段(契约§7.3要求空载记0A); 负载3份有current_A/phase_deg/frequency_hz/source但缺phase_abs_deg/bemf_offset_deg(账本I20声称已增,实测未落盘). 正项: 空载无25N·m(未自演), 负载current_A=15.688真施加, --phi相对反相点语义正确"
+    },
+    {
+      "id": "G10-4",
+      "name": "几何",
+      "result": "pass",
+      "detail": "AirgapRing R46.5/46.1625/厚0.3375 vacuum独立, 面积98.2489mm²(偏差1e-5%); Band共面贴边零重叠, VALIDATE_OK无intersect; M1' 117 sheet; apex33 OD桥1.549<=2.0. Band拓扑偏离§7.1字面(R<=45.80)的assumption已标注"
+    },
+    {
+      "id": "G10-5",
+      "name": "每次剖分网格",
+      "result": "fail",
+      "severity": "blocker",
+      "detail": "全库无mesh_<case>.json; probe_mesh_api.py已备但未跑(log不存在); 流程跳过剖分直接求解; 质量指标连unavailable都无. 未误做三档E1全扫描(合规). API未验证前未写死(合规), 但探测动作缺失"
+    },
+    {
+      "id": "G10-6",
+      "name": "转矩平直401点",
+      "result": "pass",
+      "detail": "m3_load_check.json独立重算(401行+FFT+逐点差分): 峰峰2.7468%<=10, 主谐波h6 1.3297%<=5, 单点跳变0.3452%<=15, 三项全PASS. T_avg幅值FAIL属磁路/匝数"
+    }
+  ],
+  "g9_supervision": [
+    {"id": 1, "name": "每日一个I号最高优先级", "result": "compliant", "evidence": "I13→BH闭环, I22齿槽新暴露, 每日单一焦点"},
+    {"id": 2, "name": "定源前填数进配置/跑FEA", "result": "compliant", "evidence": "cps=5保持TEMP值, Bg修复后才反推cps≈10, 解析只交叉校验"},
+    {"id": 3, "name": "401点/先green后优化", "result": "partial", "evidence": "401点合规; 网格未green就求解(G10⑤); 负载case在磁路未回窗时跑属管线验证, 留档FAIL"},
+    {"id": 4, "name": "解析填FEA/试算当性能/改判据/删失败", "result": "compliant", "evidence": "无, 所有FAIL留账本"},
+    {"id": 5, "name": "账本fail不删/连续2天标blocked", "result": "partial", "evidence": "fail不删合规; I16/I22 open多日未标blocked"},
+    {"id": 6, "name": "commit/push/HEAD/未add -A/时间未改", "result": "compliant", "evidence": "11-22共11次commit/push; HEAD==origin/main==ae93bde; 无add -A; 时间未改; 工作树1个3e-6V差异未提交"},
+    {"id": 7, "name": "探索闸门", "result": "compliant", "evidence": "LOCKED, 未运行探索案例"},
+    {"id": 8, "name": "项目切换闸门", "result": "compliant", "evidence": "SPM冻结, 未切36槽"},
+    {"id": 9, "name": "文件分类KEEP/TEMP/ARCHIVE", "result": "compliant", "evidence": "清理66个TEMP入_trash, 见CLEANUP_REPORT_2026-11-23.md"},
+    {"id": 10, "name": "修订一致性", "result": "partial", "evidence": "无旧版回潮(双层V/32块/一远一近/异形/三工况/额定励磁空载)合规; I21未当bug乱改; 网格统计缺JSON违规"},
+    {"id": 11, "name": "提问闸门", "result": "compliant", "evidence": "全程自主, 无提问工具"}
+  ],
+  "hard_gates": {
+    "m1_117_sheet_no_intersect": "PASS",
+    "noload_load_401pts_each": "PASS",
+    "noload_load_mesh_json_each": "FAIL (全缺)",
+    "g4_all_green_incl_e8_e6_fea": "FAIL (磁密三行IPM有实测0.662/0.922/0.812T; E8效率FEA/E6退磁FEA仍缺)",
+    "spm_g4b_closed": "PASS (Bg 0.8626/B_tooth 0.9896/B_yoke 1.1843T, 冻结不动)"
   },
-  "secondary_checks": [
-    {"name": "repo_integrity", "result": "pass", "evidence": "git fsck rc=0；main 与 origin 同步"},
-    {"name": "worktree", "result": "warn", "evidence": "9 改 + 2 未跟踪"},
-    {"name": "deps_install", "result": "pass", "evidence": "editable 安装可用；补装 ruff 0.17.5"},
-    {"name": "pytest", "result": "pass", "evidence": "289 passed / 2.67 s"},
-    {"name": "ruff", "result": "pass", "evidence": "All checks passed"},
-    {"name": "artifact_drift", "result": "pass", "evidence": "8 个生成物逐字一致"},
-    {"name": "report_chain", "result": "pass", "evidence": "491,996 B / 13 表 / 7 图"},
-    {"name": "project_directory", "result": "pass", "evidence": "真机 API 读出 D:\\ANSYS_Run\\projects"},
-    {"name": "doc_consistency", "result": "warn", "evidence": "4 处数值/口径漂移（P6/P7）"}
+  "i16_ruling": {
+    "decision": "修订判据: OD桥<=2.0mm 且 桥内磁密B>=1.8T(FEA实测饱和); 极间桥厚度不再作独立硬阈值",
+    "rationale": [
+      "极间桥10.141mm是8极V张角+3mm内端间距几何硬下限, 与极间<=2.0不可兼得, 原判据定错非设计失败",
+      "I16物理意图是桥薄到能被2T饱和; BH已生效(Bg 0.662T), 应回归物理意图用桥内FEA实测B>=1.8T判定",
+      "新增桥内B>=1.8T比原几何阈值更贴近物理且更严格, 非放宽判据掩盖FAIL"
+    ],
+    "constraint": "桥内B FEA实测未完成(I22诊断候选), 该子项记 unverified 不得标PASS; 下轮单一变量补测后闭环I16"
+  },
+  "file_cleanup": {
+    "report": "docs/CLEANUP_REPORT_2026-11-23.md",
+    "moved_count": 66,
+    "batches": [14, 20, 19, 13],
+    "trash_dir": "D:/ANSYS_Run/_trash_2026-11-23/",
+    "trash_bytes": 636432,
+    "retain_until": "2026-11-30",
+    "kept_review": ["projects/IPM_8p48s/TEMP/probe_mesh_api.py (网格探测前提,未跑)", "before_*.py (文档引用)", "m1_probe.py/.log (MAXWELL_INTERNALS引用)"],
+    "results_files_unchanged": 103,
+    "git_tracked_moved": false,
+    "ansysedt_process": false
+  },
+  "top3": [
+    {"priority": "P0", "id": "M4'网格剖分", "action": "真机跑probe_mesh_api.py→API结论写MAXWELL_INTERNALS→每case出mesh_<case>.json(单元/节点数分组/min-max/质量指标或unavailable/耗时/4组MaxLength)→校验Band<=0.25+4组Enabled; 未green前禁止新401点求解"},
+    {"priority": "P1", "id": "I3匝数+I22齿槽", "action": "按反推表cps=5→cps=10(160匝,预测127.74V)定源, 复核槽满率; 重算Imax+φ相对反相点扫描, T_avg 1.56→22.5-27.5; 同步处理齿槽3.4729N·m"},
+    {"priority": "P2", "id": "I21/excitation字段合规", "action": "bemf_load写回KEEP的m3_load_*.json; 空载JSON补excitation.current_A=0; 负载补phase_abs_deg/bemf_offset_deg; BEMF回窗后做幅值比<=15%复核"}
   ],
-  "issues": [
-    {"id": "P1", "severity": "blocker", "title": "M8 梨形槽未实现，齿槽 27.37% 未动"},
-    {"id": "P2", "severity": "major", "title": "11 控制点直接内缩 → 线圈 62.07 mm²（−13.8%），弧段须 ≥8 采样点"},
-    {"id": "P3", "severity": "major", "title": "齿槽 27.37% vs 5% 判据，差 5.47 倍"},
-    {"id": "P4", "severity": "minor", "title": "两路径转子内径不同源（13.24 vs 20.01 mm，面积差 706.86 = π·15²）"},
-    {"id": "P5", "severity": "minor", "title": "fea_results 三相不平衡 0.008% 不可独立复现（独立 0.220%）"},
-    {"id": "P6", "severity": "minor", "title": "文档数值漂移：767,290 vs 958,509 B；线圈 75.24 vs 79.96；9 图 vs 内嵌 7"},
-    {"id": "P7", "severity": "minor", "title": "SKILL.md:211 示例仍为旧梨形尺寸"},
-    {"id": "P8", "severity": "minor", "title": "工作树 11 项未提交"},
-    {"id": "P9", "severity": "info", "title": "阶段看板缺 M7/M8 行（本次已补）"}
-  ],
-  "refuted_claims": [
-    "Band 必须薄环 — 不成立（6fca72c）",
-    "EditSetup 丢运动 — 不成立（MotionSetup1 在）",
-    "齿槽 1.6% — 不成立（真值 6.84307 N·m / 27.37%）",
-    "沙箱无法启动 Maxwell = 环境限制 — 不成立（本次 rc=0，31 s）"
-  ],
-  "next_actions": [
-    "G6：按表 2 实现 11 点梨形槽 + 弧采样 → 重生成 → 真机 401 点",
-    "G7：若梨形单独不足 5%，做斜槽 / 极弧 / 槽口 FEA 扫描",
-    "G8：清工作树 + 对齐文档数值（767,290→958,509、9 图/7 图、线圈 75.24→79.96）"
-  ],
-  "artifacts": {
-    "report": "docs/WEEKLY_AUDIT_2026-11-14.md",
-    "weekly_goals": "projects/25Nm_PMSM/WEEKLY_GOALS.md",
-    "design_progress": "projects/25Nm_PMSM/DESIGN_PROGRESS.md",
-    "audit_scaffold": "D:/ANSYS_Run/audit_20261114/（m1_probe.py, m1_probe.txt, verify_fea.py, aedt_scan.py；不入库）"
+  "gates": {
+    "exploration": "LOCKED — G0-G4未全绿(E8/E6 FEA缺+多判据FAIL+M4'网格全缺)+流程不合规+无书面批准, 不批准",
+    "project_switch_36slot": "不写自动切36槽工业机 — IPM未收口(设计不合格+流程不合规), 待收口+周检确认后另行执行"
+  },
+  "commit": {
+    "add_whitelist": ["docs/WEEKLY_AUDIT_2026-11-23.md", "docs/CLEANUP_REPORT_2026-11-23.md", "docs/weekly_audit.json", "projects/IPM_8p48s/PROBLEM_LEDGER.md", "projects/25Nm_PMSM/DESIGN_PROGRESS.md"],
+    "no_add_A": true,
+    "excluded": ["m2_noload_rect.json (浮点尾数差异)", ".workbuddy/", "*.aedt", "__pycache__"],
+    "verify": "HEAD == origin/main after push",
+    "force_push": false
   }
 }

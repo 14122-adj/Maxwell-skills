@@ -1,0 +1,114 @@
+# 每周验收报告 2026-11-23（IPM 8p48s 单层V+矩形绕组+气隙环+负载+I21+每次剖分网格）
+
+> 触发：每周验收自动化（手动）。基线 HEAD `ae93bde`（= origin/main），工作树 1 改（`m2_noload_rect.json` 浮点尾数差异，未提交）+ `.workbuddy/` 未跟踪。
+> 判定口径三条**分开**，禁止互相替代：技能可用 ≠ 设计合格 ≠ 流程合规。
+
+## 0. 总览（第一行 M1'–M4'，第二行 G9+G10）
+
+**M1'–M4'：`M1' PASS | M2' PASS | M3' PASS | M4' FAIL`。** 真机链路 117 sheet / 401 点空载 / 401 点负载全绿；**M4'（每次剖分网格）全库无 `mesh_<case>.json`，probe 未跑，契约 §8 未执行**。
+
+**G9+G10：`G9 基本合规（2 项部分） | G10 不合规（⑤网格严重违规、③字段不全、②部分完成）`。** 探索闸门 **LOCKED**（G0–G4 未全绿 + 流程不合规，不批准）。
+
+| 判定口径 | 结论 | 关键依据 |
+|---|---|---|
+| **技能可用** | ✅ **可用** | M1' 真机 117 sheet / BH `nonlinear`=2 / apex33；M2' 401 点、M3' 401 点独立重算；468 tests passed；报告链完整 |
+| **设计合格** | ❌ **不合格** | G4 未全绿：Bg 0.662<0.70 下限、BEMF 63.87<118、齿槽 13.89%>5%、T_avg 1.56<22.5；网格判据全缺；E8 效率 FEA / E6 退磁 FEA 仍缺 |
+| **流程合规** | ❌ **不合规** | G10⑤ 网格剖分全缺（契约 §8 硬要求）；G10③ excitation 字段不全；I21 `bemf_load` 未写入 KEEP JSON |
+
+## 1. M1'–M4' 真机验收
+
+| 阶段 | 判定 | 硬数据 / 证据 |
+|---|---|---|
+| **M1' 建模** | ✅ PASS | `m1_build_check.json` 17/17 PASS：117 sheet（5 主体 + 16 磁钢 + 96 线圈）、`AirgapRing`=1、v_single=[33,38,13,3]、validate=OK、无 intersect；`m2_noload_bhfix.json::solve.sheets`=117；真机 `.aedt` grep `nonlinear`=2（旧 0），66 点厂商 BH 落盘 |
+| **M2' 空载 401 点** | ✅ 链路 PASS / 设计 FAIL | `m2_noload_bhfix.json`：Bg **0.6621 T**（旧 0.1823，+264%）、齿身 0.922 / 轭 0.812 T（PASS）、401 点 `ANALYZE_OK 694.6 s`、探针 181/46/91；**空载无 25 N·m**（符合 15:04 口径）。BEMF 63.87 V（判据 118–145 FAIL，匝数 cps=5 不足） |
+| **M3' 负载 401 点** | ✅ 链路 PASS / 设计 FAIL | `m3_load_check.json` + `m3_load_phi90.json`：401 行、`T_avg` **1.5635 N·m**（理论 1.5632，误差 0.017%）、`excitation.current_A`=15.688（真施加电流）、平直三项 PASS |
+| **M4' 每次剖分网格** | ❌ **FAIL（严重）** | 全库 `find -name "mesh_*.json"` = **0**；`D:/ANSYS_Run/probe_mesh_api.log` **不存在**；`docs/MAXWELL_INTERNALS.md` 无网格统计 API 结论；`ipm_m1.log` 无 mesh 行。契约 §8「建模→剖分+统计→401点求解」流程未执行 |
+
+## 2. G10 监督（本周重点）
+
+### ① 磁路根因翻转（22:35 已证）— ✅ 合规闭环
+- BH 真因坐实：`EditMaterial` 塞 BHCoordinates 的 4 种写法在 2021.1 全静默丢弃，铁芯按 μr=1；改 `CloneMaterial("JFE_Steel_35JN270","M270_35A")` 后真机 `.aedt` grep `nonlinear`=2，Bg 0.182→**0.662 T**（+264%，越过 I16 的 0.45 判据）。
+- Bg 由 FEA 判定（401 点），JFE 牌号 assumption 已在账本 I13/I14/I15 标注待验证 ✅。
+- **FAIL 后是否正确回几何而非继续改 BH 写法**：Bg 已过 0.45，无需回几何；残余 BEMF 63.87 V 判定为**匝数不足**（cps=5→cps≈10 反推），未继续改 BH 写法 ✅。
+- 遗留：G4 磁密判据 0.70–0.90 T，实测 0.662 边缘 FAIL（I16 0.45 PASS / G4 FAIL，两条判据分开记）。
+
+### ② I21 BEMF 幅值 — ⚠️ 部分完成，未违规
+- 实测：空载 10.3798 V@90°、负载 φ0 12.5572 V（+21%，电枢反应增磁）、φ90 10.6103 V@101.96°（相位偏 11.96°）。
+- **顺序核查**：①磁路 green（Bg 0.662≥0.45）✅ →②BEMF 仍未回 118–145 V（匝数）→③负载 BEMF 计算已实现（`ipm_m3_check.py::bemf_load_block()`，φ90 复现 A 相 10.6889 V@102.68°，与账本 10.6103 V@101.96° 逐位接近）→④φ 扫描复核幅值比≤15% 未做（依赖 BEMF 回窗）。
+- **是否把 +21% 当 bug 改 Imax/φ/参考系**：未改，账本与 prompt 明确禁止，判为真实电枢反应 ✅。
+- **缺口**：`bemf_load` 字段只写在 `D:/ANSYS_Run/m3_load_phi90_check_i21.json`（TEMP），**KEEP 的 `projects/results/ipm8p48s/m3_load_*.json` 无此字段**；幅值比≤15% 复核未执行。
+
+### ③ 两工况 excitation — ⚠️ 部分不合规
+| 工况 | JSON | excitation 字段 | 判定 |
+|---|---|---|---|
+| 空载 0A | `m2_noload_bhfix.json` 等 5 份 | **完全无 `excitation` 字段** | ❌ 契约 §7.3 要求每份 JSON 写 excitation、空载记 0A，未落实 |
+| 负载 φ90 / φ0 | `m3_load_phi90.json` / `m3_load_floor_e118.json` / `m3_load_check.json` | 有 `current_A`/`phase_deg`/`frequency_hz`/`source`，**缺 `phase_abs_deg`/`bemf_offset_deg`** | ⚠️ 账本 I20 声称已增这两字段，实测 JSON 未落盘 |
+- 正项：空载无 25 N·m（未自演）✅；负载 `current_A`=15.688>0 真施加 ✅；`--phi` 相对反相点语义正确（φ90→T_avg 转正，误差 0.017%）✅。
+
+### ④ 几何 — ✅ PASS，I16 判据见 §5 裁定
+`AirgapRing` 外 R46.5 / 内 R46.1625 / 厚 0.3375 vacuum 独立，面积 98.2489 mm²（解析偏差 1e-5%）；Band 与环共面贴边零重叠、真机 `VALIDATE_OK` 无 intersect；M1' 117 sheet；磁钢 apex33，OD 桥 1.549 mm（≤2.0）。Band 拓扑偏离 §7.1 字面（R≤45.80）的 assumption 已在账本标注，真机证明无 intersect。
+
+### ⑤ 每次剖分网格 — ❌ 严重违规（本周第一优先）
+- **每个 case 必须有 `projects/results/ipm8p48s/mesh_<case>.json`**：实测 **0 个** → 违规。
+- 流程是否"建模→剖分统计→401点求解"：实际是建模→直接 401 点求解，**跳过剖分** → 违规。
+- 统计内容（单元/节点数、min/max、质量指标、耗时、4 组 MaxLength）：无任何 JSON 证据；质量指标连 `unavailable` 说明都没有。
+- API 真机探测：`TEMP/probe_mesh_api.py` 已备但**未跑**（log 不存在）→ 未验证前不得写死 API 名 ✅（这点未违规），但探测动作本身缺失。
+- 是否误做三档 E1 全扫描：**否** ✅（D7/M4' 做一次即可，正确）。
+
+### ⑥ 转矩平直 — ✅ PASS（幅值另计）
+`m3_load_check.json` 独立重算（401 行 + FFT + 逐点差分）：峰峰值 2.7468%（≤10%）、主谐波 h=6 幅值 1.3297%（≤5%）、单点跳变 0.3452%（≤15%），三项全 PASS。`T_avg` 幅值 FAIL 属磁路/匝数问题，非平直度问题。
+
+## 3. G9 流程监督（11 项）
+
+| # | 项 | 结论 | 依据 |
+|---|---|---|---|
+| 1 | 每日一个 I 号最高优先级 | ✅ | I13→BH 闭环、I22 齿槽新暴露，每日单一焦点 |
+| 2 | 定源前填数进配置/跑 FEA | ✅ | cps=5 保持 TEMP 值，Bg 修复后才反推 cps≈10；解析只交叉校验 |
+| 3 | 401 点、先 green 后优化 | ⚠️ | 401 点✅；但网格未 green 就求解（见 G10⑤）；负载 case 在磁路未回窗时跑，属管线验证非优化，留档 FAIL |
+| 4 | 解析填 FEA/试算当性能/改判据/删失败 | ✅ | 无；所有 FAIL 留账本，解析标交叉校验 |
+| 5 | 账本 fail 不删、连续 2 天标 blocked | ⚠️ | fail 不删✅；I16/I22 等 open 多日未标 `blocked`（违反"连续 2 天标 blocked"规则） |
+| 6 | 每天 commit/push、HEAD==origin/main、未 add -A、时间未改 | ✅ | 11-22 共 11 次 commit/push；HEAD==origin/main==`ae93bde`；无 `add -A`；时间未改；工作树 1 个未提交浮点尾数差异（3e-6 V，轻微） |
+| 7 | 探索闸门 | ✅ | LOCKED，未运行探索案例 |
+| 8 | 项目切换闸门 | ✅ | SPM 冻结，未切 36 槽 |
+| 9 | 文件分类 KEEP/TEMP/ARCHIVE | ✅ | 本周清理 66 个 TEMP 入 `_trash`，见清理报告 |
+| 10 | 修订一致性 | ⚠️ | 无旧版回潮（双层V/32块/一远一近/异形/三工况/额定励磁空载均未回潮）✅；I21 未当 bug 乱改✅；**网格统计缺 JSON → 违规** |
+| 11 | 提问闸门 | ✅ | 全程自主、无提问工具 |
+
+## 4. 硬门槛核对
+
+| 门槛 | 结论 |
+|---|---|
+| M1' 117 sheet + 无 intersect | ✅ PASS |
+| 空载/负载各 401 点 | ✅ PASS |
+| 空载/负载各自 mesh JSON | ❌ **全缺** |
+| G4 全绿含磁密三行 + E8 效率 FEA + E6 退磁 FEA | ❌ 磁密三行 IPM 侧有实测（0.662/0.922/0.812 T）；E8/E6 FEA 仍缺 |
+| SPM G4b（Bg 0.8626 / B_tooth 0.9896 / B_yoke 1.1843 T） | ✅ closed，冻结不动 |
+
+## 5. I16「极间≤2.0」判据 — 周检书面裁定
+
+**裁定：修订该条判据为「OD 桥 ≤2.0 mm 且桥内磁密 B≥1.8 T（FEA 实测饱和）」，极间桥厚度不再作为独立硬阈值。** 依据：
+
+1. 极间桥恒 10.141 mm 是 8 极 V 张角 + 3 mm 内端间距的**几何硬下限**，与「极间≤2.0」不可兼得（账本 I16 定源预研已证）；该条判据定错，非设计失败。
+2. I16 的原始物理意图是「桥薄到能被 2 T 饱和，使磁通不短路」。现 BH 已生效（Bg 0.662 T），判据应回归物理意图——用**桥内 FEA 实测 B≥1.8 T** 判定饱和，而非已证不可达的几何厚度。
+3. 这是**修正定错的判据**，不是放宽判据掩盖 FAIL：新增的桥内 B≥1.8 T 比原几何阈值更贴近物理且更严格。
+
+**执行约束**：桥内 B 的 FEA 实测尚未完成（I22 诊断候选），该子项目前记 **`unverified`，不得标 PASS**；下轮按单一变量补测后再闭环 I16。此裁定同步写入 IPM 账本 I16。
+
+## 6. 每周文件清理摘要
+
+移出 66 个 TEMP 至 `D:/ANSYS_Run/_trash_2026-11-23/`（636 KB，保留至 2026-11-30）。`probe_mesh_api.py`（网格探测前提，未跑）、`before_*`/`m1_probe*`（文档引用）标 REVIEW 保留。`projects/results/**` 103 文件不变，无 git 跟踪文件被移动。详见 `docs/CLEANUP_REPORT_2026-11-23.md`。
+
+## 7. top3（本周重点，写入 IPM 账本 + SPM 看板）
+
+1. **P0 — M4' 网格剖分链路补齐**：真机跑 `probe_mesh_api.py`→把 2021.1 网格 API 结论写进 `docs/MAXWELL_INTERNALS.md`→按契约 §8 每个 case 出 `mesh_<case>.json`（单元/节点数分组、min/max、质量指标或 unavailable、耗时、4 组 MaxLength）→校验 Band≤0.25 + 4 组 Enabled。**未 green 前禁止新 401 点求解**。
+2. **P1 — I3 匝数定源 + T_avg 回窗**：Bg 已可信（0.662 T），按反推表 cps=5→**cps=10（160 匝，预测 127.74 V）**定源，复核槽满率；重算 Imax、φ 相对反相点扫描，把 `T_avg` 从 1.56 拉回 22.5–27.5 N·m；同步处理 I22 齿槽 3.4729 N·m。
+3. **P2 — I21/excitation 字段合规**：`bemf_load` 写回 KEEP 的 `m3_load_*.json`；空载 JSON 补 `excitation.current_A=0`；负载补 `phase_abs_deg`/`bemf_offset_deg`；BEMF 回窗后做幅值比≤15% 复核。
+
+## 8. 探索与项目切换闸门
+
+- **探索：LOCKED，不批准。** G0–G4 未全绿（E8/E6 FEA 缺 + 多个判据 FAIL + M4' 网格全缺）+ 流程不合规 + 无书面批准，三个条件均不满足。
+- **项目切换：不写「自动切 36 槽工业机」。** IPM 8p48s 未收口（设计不合格 + 流程不合规），Q4 预设的下一项目待本项目收口 + 周检确认后另行执行。
+
+## 9. 提交
+
+本轮只 add：本报告、`docs/CLEANUP_REPORT_2026-11-23.md`、`docs/weekly_audit.json`、IPM `PROBLEM_LEDGER.md`（top3+I16 裁定）、SPM `DESIGN_PROGRESS.md`（top3 记录）。不 add -A、不 add `m2_noload_rect.json` 浮点尾数差异、不 add `.workbuddy/`。push 后核验 `HEAD == origin/main`。

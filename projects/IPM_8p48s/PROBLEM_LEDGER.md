@@ -378,3 +378,26 @@ B/C 相同量级（空载 10.4635 V）。CSV：`csv_ipm_m2_apex33/`、`csv_ipm_m
   下限。按优化顺序，下一步先 I22（齿槽）与匝数 cps=10 定源，再跑负载 T_avg 与 φ 扫描。
 - 新增：`projects/results/ipm8p48s/m2_noload_bhfix.json` [KEEP] BH 修复 401 点独立重算证据。
   临时探针 `D:/ANSYS_Run/bh_probe{,2,3,4,5,6,7}.py` / `bh_probe*.aedt` [TEMP] 不入库。
+
+## 2026-11-23 周检书面裁定（docs/WEEKLY_AUDIT_2026-11-23.md）
+
+> 基线 HEAD `ae93bde` == origin/main；技能可用 ✅ / 设计不合格 ❌ / 流程不合规 ❌。
+> M1' PASS / M2' PASS / M3' PASS / **M4' FAIL（网格全缺）**。本节只裁定与记账，不删任何 fail 行、不改判据数值（I16 例外见下，为书面裁定明示修订）。
+
+### I16 判据书面裁定（周检授权）
+**裁定：修订为「OD 桥 ≤2.0 mm 且桥内磁密 B≥1.8 T（FEA 实测饱和）」；极间桥厚度不再作独立硬阈值。**
+- 依据①：极间桥恒 10.141 mm 是 8 极 V 张角 + 3 mm 内端间距的几何硬下限，与「极间≤2.0」不可兼得——原判据定错，非设计失败（I16 定源预研已证）。
+- 依据②：I16 原始意图是「桥薄到能被 2 T 饱和，磁通不短路」；BH 已生效（Bg 0.662 T），应回归物理意图，用桥内 FEA 实测 B≥1.8 T 判饱和。此前「桥饱和前提不成立」的旧说法一并更正为「BH 未进材料导致 μr=1，非桥几何问题」。
+- 依据③：新增桥内 B≥1.8 T 比原几何阈值更严格、更贴物理，**不是放宽判据掩盖 FAIL**。
+- 执行约束：桥内 B FEA 实测未完成（I22 诊断候选），该子项记 **`unverified`，不得标 PASS**；下轮单一变量补测后再闭环 I16。
+
+### 本周 top3（P0/P1/P2）
+1. **P0 — M4' 网格剖分链路（G10⑤ blocker）**：全库无 `mesh_<case>.json`、`probe_mesh_api.log` 不存在、流程跳过剖分直接求解。先真机跑 `TEMP/probe_mesh_api.py`→把 2021.1 网格 API 结论写进 `docs/MAXWELL_INTERNALS.md`→每 case 出 `mesh_<case>.json`（单元/节点数按对象、min/max、质量指标或 unavailable、耗时、4 组 MaxLength）→校验 Band≤0.25 + 4 组 Enabled。**未 green 前禁止新 401 点求解**。
+2. **P1 — I3 匝数定源 + I22 齿槽**：Bg 0.662 T 已可信，按反推表 cps=5→**cps=10（160 匝，预测 127.74 V）**定源并复核槽满率；重算 Imax、φ 相对反相点扫描，T_avg 1.56→22.5–27.5 N·m；同步处理齿槽 3.4729 N·m（13.89%）。
+3. **P2 — I21/excitation 字段合规**：`bemf_load` 从 `D:/ANSYS_Run/m3_load_phi90_check_i21.json`（TEMP）写回 KEEP 的 `m3_load_*.json`；空载 5 份 JSON 补 `excitation.current_A=0`；负载补 `phase_abs_deg`/`bemf_offset_deg`；BEMF 回窗后做幅值比≤15% 复核。
+
+### 新暴露 minor（周检记账，不改判据）
+| ID | 严重度 | 领域 | 问题 | 验收 | 状态 |
+|---|---|---|---|---|---|
+| **I23** | minor | 流程/证据 | G10③：空载 5 份 JSON 完全无 `excitation` 字段（契约 §7.3 要求记 0A）；负载 3 份缺 `phase_abs_deg`/`bemf_offset_deg`（账本 I20 声称已增，实测未落盘） | 每份 JSON excitation 字段齐全，空载 current_A=0，负载含相位字段 | open（P2 一并处理） |
+| **I24** | major | 流程/证据 | G10⑤：每次建模后剖分+统计未执行，全库无 `mesh_<case>.json`；网格 API 未真机探测 | 契约 §8 流程与 mesh JSON 判据全过 | open（P0，blocker 级） |
