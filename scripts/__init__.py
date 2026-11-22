@@ -23,6 +23,6 @@ Entry points (after `pip install -e .`):
     maxwell-test        → scripts.test_winding_layouts:main
 """
 
-__version__ = "4.4.0"
+__version__ = "4.5.0"
 __author__ = "Maxwell Skill Maintainers"
 __license__ = "Unlicense (public domain)"

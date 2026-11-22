@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ansys-maxwell-motor"
-version = "4.4.0"
+version = "4.5.0"
 description = "ANSYS Maxwell motor modeling + multiphysics MDAO orchestration skill — 19 canonical pole-slot winding layouts, Maxwell COM API bridge, 10 simulation types, NSGA-II optimization, IGBT reliability workflow"
 readme = "README.md"
 license = "Unlicense"

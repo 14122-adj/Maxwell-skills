@@ -283,6 +283,70 @@ P11（THD 超下限）的单变量实验。结论先行：**斜槽 0.5 槽距把
 
 ---
 
+## [4.5.0] — 2026-11-23 — "IPM 8p48s + load cases + FEA provenance"
+
+本版把 skill 从「25 N·m 8p12s 表贴电机」扩展到「8p48s 内嵌 V 型永磁 + 负载仿真 +
+真机证据链」。不改变既有 API，但新增了 3 个建模/后处理脚本与 2 份验收规范。
+
+### Added — IPM 8p48s 项目（commits 4fc5c92 / 97da23f / d71f489 / a2f0ef4）
+
+- 新项目目录 `projects/IPM_8p48s/`：设计契约 `PROJECT_SPEC.md`、问题账本
+  `PROBLEM_LEDGER.md`（I1–I22）、绕组表 `WINDING_TABLE.md`。
+- 几何定源 `ipm_geom.py`：48 槽梨形槽 7 尺寸按槽距 6.0868 mm 约束推导
+  （`Rs=Bs2/2` 相切恒等式）、q=2 双层分布绕组（y=5 短距、`k_w1=0.9330`）、
+  单层 V 磁钢 16 块（`v_single=(33,38,13,3)`、OD 桥 1.549 mm）、
+  气隙独立环 `AirgapRing`（外 R46.5 / 内 R46.1625 / 厚 0.3375 mm vacuum）。
+- 绕组截面按用户要求改为**槽内切向 y=0 对称的矩形 4 点**
+  （x[48.4,58.2] / y[±0.2,±1.2]、9.800 mm²/条、槽壁边距 0.2023 mm），
+  不是径向「一远一近」、也不是异形内缩切分。
+- 脚本 `ipm_build.py`（真机建模）、`ipm_m1_check.py`（116→117 sheet 自检）、
+  `ipm_m2_check.py` / `ipm_m2_noload.py`（401 点空载）、
+  `ipm_m3_load.py` / `ipm_m3_check.py`（401 点负载 + 转矩平直 FFT/逐点差分）。
+- 负载电流按用户截图公式：`Ia=Imax·sin(2πf·t+φ)`、`f=p·n/60=100 Hz`、
+  `ω=628.3185 rad/s`；`--phi` 默认 0 = 相对 BEMF 反相点，`--phi-abs` 兼容历史。
+- 测试 `tests/test_ipm_8p48s.py` / `test_ipm_m2.py`（全量 468 passed）。
+
+### Fixed — 磁路与材料真因（commits e32ad2e / 128d45f / 25316ba / ae93bde）
+
+- **Bg 塌陷真因翻转**：不是磁钢埋深或隔磁桥不饱和，而是 AEDT 2021.1 的
+  `EditMaterial` 塞 `BHCoordinates` 4 种写法全被静默丢弃，铁芯按 μr=1 求解
+  （旧 `.aedt` grep `nonlinear`=0）。改用 `CloneMaterial("JFE_Steel_35JN270",
+  "M270_35A")`，66 点厂商 BH 真机落盘（`nonlinear`=2），Bg **0.182 → 0.662 T**。
+- 删除静默无效键 `"N:="`（`SaveFieldsType`）；存场口径与注释一致。
+- I20 电流相位参考系：`φ=0` 在本机与 BEMF 正交导致 `T_avg≈0`，改为相对
+  BEMF 反相点起算，`φ=90°` 真机 `T_avg` 转正且与理论差 0.017%。
+- 空载/负载口径按用户明确纠正：**空载 = winding 0A 无电流**，负载 = 三相正弦电流。
+  禁止在空载工况注入电流凑 25 N·m（判自演）。
+
+### Added — 验收与流程（commits 30c8d40 / da1fb68 / c33bdcc / f9ef41e / f9b0402 / 25316ba / a997bd7 / 5933160）
+
+- SPM 项目 G4-B 场探针收口：解后纯 `FieldsReporter` 后处理（不碰几何），
+  Bg 0.8626 / B_tooth 0.9896 / B_yoke 1.1843 T 三行 FEA PASS。
+- 契约 §7：气隙环几何、磁钢外移、两工况激励、转矩平直判据、I21 负载 BEMF
+  幅值优化顺序（禁止坏磁路上调参掩盖）。
+- 契约 §8：**每次建模后剖分网格 + 质量报告**（`mesh_<case>.json`：单元/节点数、
+  min/max 单元、质量指标或 `unavailable`、耗时、MaxLength），流程改为
+  「建模 → 剖分+统计 → 401 点求解」。
+- 周检 G10 监督几何位置/两工况/网格剖分；周检 2026-11-23 判定
+  「技能可用 / 设计不合格 / 流程不合规」，M4' 网格全缺为 P0。
+- 文件生命周期规范 `docs/FILE_LIFECYCLE.md`（KEEP / TEMP / ARCHIVE），
+  每日打标、周检清理 TEMP。
+- 中文主版 `SKILL_zh.md` 与英文/原版 `SKILL.md` 内容同步。
+
+### Changed — 工程卫生（commit 902f49f）
+
+- 清理 9 个历史未提交改动：MCP 幂等建项目、36 槽绕组 v4 修复
+  （`AssignCoilGroup` 调用形式 + 线圈居中）、公式溯源注释。
+- 全量测试 437 → 468 passed。
+
+### Known issues（本版未解决，非回归）
+
+- IPM 8p48s 设计仍未达标：BEMF 63.87 V < 118、齿槽 13.89% > 5%、
+  `T_avg` 1.56 N·m < 22.5、E8 效率 FEA 与 E6 退磁 FEA 仍缺。
+- M4' 网格剖分链路全缺（无 `mesh_<case>.json`、API 未真机探测），契约 §8 未执行。
+- I16「极间 ≤2.0」判据经解析扫描与单层 V 几何不可兼得，周检已裁定改为
+  「OD 桥 ≤2.0 且桥内 B≥1.8 T」，桥内 B 实测尚未完成。
+
 ## [4.4.0] — 2026-09-12 — "GitHub-ready release"
 
 ### Added
