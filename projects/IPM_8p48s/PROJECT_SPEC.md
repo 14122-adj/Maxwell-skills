@@ -262,5 +262,48 @@ f = p·n/60   （ω = 2πf = 2π·n·p/60）
   ⑤每步 401 点真机，FAIL 写账本不改判据。
 - **周检新增 G10 几何/工况监督**：查 `AirgapRing` 内外径是否为 92.325/93.000、
   Band 是否不占实体、apex 是否=33、两工况 JSON 的 `excitation` 字段是否齐全、
-  25 N·m 是否只在工况②③出现（工况①不得假造 25 N·m）。
+  25 N·m 是否只在负载工况出现（空载 0A 不得假造 25 N·m）。
 - 探索仍 LOCKED；项目切换（36 槽）仍须等 G0–G4 全绿 + 周检确认。
+
+---
+
+## 8. 2026-11-22 22:35 用户要求 —— 每次建模后剖分网格 + 质量报告
+
+用户原话："接下来我要每次做完后剖分网格，你提前学习一下，然后写进任务。"
+用户选择：**剖分统计 + 质量报告**（不是只确认网格存在，也不是每次做网格无关性全扫描）。
+
+### 8.1 已学习到的现状（一手证据，不是推测）
+
+| 项 | 事实 | 证据 |
+|---|---|---|
+| 网格操作 | IPM 已有 4 组 `AssignLengthOp`：Band 0.25 / Stator 0.9 / Rotor 1.2 / PM 0.5 mm | `ipm_build.py:425-433` |
+| 落盘结构 | `.aedt` 里 `$begin 'MeshSetup' → MeshOperations`，4 个 LengthBased 块，`MeshMethod='AnsoftTAU'` | `IPM_8p48s_M1_rect.aedt` 行 60861–60925 |
+| **缺口** | 从不主动生成网格、从不导出网格统计/质量；`ipm_m1.log` 无 mesh 行 | grep 全库无 `Mesh.*Elements`；真机日志无 mesh |
+| 2021.1 API 限制 | 无 `AssignSurfApproxOp`；气隙网格只能用 `AssignLengthOp` | `docs/MAXWELL_INTERNALS.md` §13.8 |
+| 网格收敛口径 | E1 三档（粗 1.5 / 中 1.0 / 细 0.6）只差 `MaxLength`，BEMF 三档极差 0.006%、齿槽 medium→fine −0.53%；粗档齿槽 +7.46% 不可用 | `results/fea/e1_mesh_summary.json` |
+| **待真机确认** | 2021.1 `oMesh` 是否有 `GenerateMesh` / `GetMeshInfo` 等统计 API | 已备 `TEMP/probe_mesh_api.py`，待 Maxwell 空闲时探测；**未验证前不得写死 API 名进任务** |
+
+### 8.2 新增流程动作（每次建模后必做，一天一小步内嵌）
+
+1. **生成网格**：建模完成、SaveAs 后，调真机支持的 API 主动剖分（API 名以 8.1 探测结果为准，
+   未确认前只写"调用真机网格生成"，不写具体函数名）。
+2. **导出统计**到 `projects/results/ipm8p48s/mesh_<case>.json`（KEEP），至少含：
+   - 网格单元数、节点数（总数 + 按对象分组：Band/Stator/Rotor/PM/AirgapRing/Coil）
+   - 最小/最大单元尺寸（mm）
+   - 质量指标（如歪斜度/skewness 或真机能导出的等价量；**导不出就写 `unavailable` + 原因，不许编数**）
+   - 生成耗时（秒）、工程名、4 组 MaxLength 口径、网格方法
+3. **质量判据**（失败写 FAIL，不改判据）：
+   - 4 组 `AssignLengthOp` 必须 Enabled、MaxLength 与本契约一致；
+   - Band（气隙）单元尺寸 ≤0.25 mm（48 槽槽距 6.087 mm ⇒ 每气隙至少多单元）；
+   - 若某对象单元数为 0 或统计缺失 → FAIL，先修剖分再求解；
+   - 网格统计与 `ANALYZE_OK` 秒数一并入账，供 E1/D7 复用。
+4. **与求解的顺序**：建模 → **剖分+统计** → 401 点求解 → 导出 → 独立重算。
+   **禁止跳过剖分直接求解**；周检查每个 case 是否都有 `mesh_<case>.json`。
+5. **不重复做 E1 全扫描**：本动作是"每次剖分 + 出统计"，不是每次跑三档网格；
+   D7/M4' 阶段仍做一次三档收敛（E1 口径）即可。
+
+### 8.3 写进每日/周检任务
+
+- **每日**：闭环 Standard 段插入"剖分+统计"步骤，Deliver 段增 `mesh_<case>.json`。
+- **周检 G10** 增第⑤项：每次建模是否都有网格统计 JSON、判据是否全过、
+  是否先剖分后求解、统计里 `unavailable` 项是否有说明。
