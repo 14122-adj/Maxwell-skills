@@ -38,7 +38,7 @@ BORE_OVERLAP_MM = 0.2
 COIL_SHRINK = 0.88
 
 
-def pear_radii(cfg) -> dict:
+def pear_radii(cfg) -> dict[str, float]:
     """梨形槽五条径向基准线（mm）。`Hs2` 口径 = 内径 → 槽底**最底端**。"""
     r_bore = cfg.stator_id / 2.0
     rs = cfg.slot_Rs
@@ -146,9 +146,9 @@ def shrink_toward_centroid(pts, s: float) -> list:
 def pear_area_analytic(cfg) -> float:
     """解析槽面积（mm²）—— 颈 + 斜肩梯形 + 直身 + 半圆底。"""
     r = pear_radii(cfg)
-    b0, b1, b2 = cfg.slot_Bs0, cfg.slot_Bs1, cfg.slot_Bs2
+    b0, b1, b2 = float(cfg.slot_Bs0), float(cfg.slot_Bs1), float(cfg.slot_Bs2)
     neck = b0 * (r["x1"] - r["x0"])
-    shoulder = (b1 + b2) / 2.0 * cfg.slot_Hs1
+    shoulder = (b1 + b2) / 2.0 * float(cfg.slot_Hs1)
     body = b2 * (r["x3"] - r["x2"])
     bottom = math.pi * r["rs"] ** 2 / 2.0
     return neck + shoulder + body + bottom
@@ -162,16 +162,16 @@ def slot_effective_area(cfg, area: float | None = None) -> float:
     """
     if area is None:
         area = pear_area_analytic(cfg)
-    return area - BORE_OVERLAP_MM * cfg.slot_Bs0
+    return area - BORE_OVERLAP_MM * float(cfg.slot_Bs0)
 
 
 def stator_ring_area(cfg) -> float:
     """整圈定子环（无槽）面积，mm²；用于从 GetFaceArea 反算槽面积。"""
-    r_out = cfg.stator_od / 2.0
-    r_in = cfg.stator_id / 2.0
+    r_out = float(cfg.stator_od) / 2.0
+    r_in = float(cfg.stator_id) / 2.0
     return math.pi * (r_out ** 2 - r_in ** 2)
 
 
 def slot_area_from_stator_face(cfg, face_area: float) -> float:
     """由 `GetFaceArea(StatorOuter)` 反算单槽面积（含内孔重叠段，可比解析值）。"""
-    return (stator_ring_area(cfg) - face_area) / float(cfg.slots) + BORE_OVERLAP_MM * cfg.slot_Bs0
+    return (stator_ring_area(cfg) - face_area) / float(cfg.slots) + BORE_OVERLAP_MM * float(cfg.slot_Bs0)

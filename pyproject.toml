@@ -79,12 +79,14 @@ all = [
     "pywin32>=306; sys_platform == 'win32'",
 ]
 # Dev tooling
+# Upper bounds keep CI reproducible: unpinned tooling pulled newer rule sets
+# that red-flagged unchanged code on every push (CI #38-#59).
 dev = [
-    "pytest>=7.4",
-    "pytest-cov>=4.1",
-    "ruff>=0.1.0",
-    "mypy>=1.7",
-    "types-PyYAML",
+    "pytest>=7.4,<9",
+    "pytest-cov>=4.1,<7",
+    "ruff>=0.1.0,<0.18",
+    "mypy>=1.7,<1.19",
+    "types-PyYAML<6",
 ]
 
 [project.urls]

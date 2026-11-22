@@ -48,8 +48,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_DEFAULT }}
 
+      # Pin upper bound: unpinned `pip install --upgrade ruff` pulls newer rule
+      # sets that flag pre-existing code (CI #38+ went red for 20+ runs while
+      # local ruff 0.17.3 stayed green). Bump deliberately, not on every push.
       - name: Install ruff
-        run: pip install --upgrade "ruff>=0.1.0"
+        run: pip install "ruff>=0.1.0,<0.18"
 
       # Advisory until the one-time `ruff format` pass lands. The repo predates
       # an enforced formatter, and a full reformat (24 files) should not be
@@ -77,8 +80,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_DEFAULT }}
 
+      # Pin upper bound: mypy 1.19+ adds checks that conflict with this repo's
+      # `warn_unused_ignores = true` baseline (see pyproject.toml [tool.mypy]).
       - name: Install mypy
-        run: pip install --upgrade "mypy>=1.7" "types-PyYAML"
+        run: pip install "mypy>=1.7,<1.19" "types-PyYAML<6"
 
       - name: Type-check scripts/
         run: mypy scripts/
