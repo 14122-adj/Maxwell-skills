@@ -1,0 +1,27 @@
+{
+  "case": "floor_e118",
+  "excitation": {
+    "current_A": 15.688,
+    "current_unit": "A_peak",
+    "phase_deg": 0.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "explicit",
+    "expressions": {
+      "A": "-15.688000*sin(628.318531*Time)",
+      "B": "-15.688000*sin(628.318531*Time-2.094395102)",
+      "C": "-15.688000*sin(628.318531*Time+2.094395102)"
+    },
+    "formula": "Imax*sin(2*pi*f*Time + phi), B=phi-120deg, C=phi+120deg"
+  },
+  "bemf_input": null,
+  "imax_source": "explicit",
+  "p_mech_w": 3926.9908169872415,
+  "build_script": "D:/ANSYS_Run/ipm_m3_build_floor_e118.py",
+  "solve_script": "D:/ANSYS_Run/ipm_m3_solve_floor_e118.py",
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M3_floor_e118.aedt",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m3_floor_e118",
+  "generated": true,
+  "solved": false
+}

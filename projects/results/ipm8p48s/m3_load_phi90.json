@@ -1,0 +1,27 @@
+{
+  "case": "phi90",
+  "excitation": {
+    "current_A": 15.688,
+    "current_unit": "A_peak",
+    "phase_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "explicit",
+    "expressions": {
+      "A": "-15.688000*sin(628.318531*Time+1.570796327)",
+      "B": "-15.688000*sin(628.318531*Time-0.523598776)",
+      "C": "-15.688000*sin(628.318531*Time+3.665191429)"
+    },
+    "formula": "Imax*sin(2*pi*f*Time + phi), B=phi-120deg, C=phi+120deg"
+  },
+  "bemf_input": null,
+  "imax_source": "explicit",
+  "p_mech_w": 3926.9908169872415,
+  "build_script": "D:/ANSYS_Run/ipm_m3_build_phi90.py",
+  "solve_script": "D:/ANSYS_Run/ipm_m3_solve_phi90.py",
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M3_phi90.aedt",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m3_phi90",
+  "generated": true,
+  "solved": false
+}

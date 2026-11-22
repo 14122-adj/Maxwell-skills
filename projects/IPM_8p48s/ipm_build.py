@@ -105,7 +105,13 @@ def magnet_directions(cfg) -> list:
     return out
 
 
-def build_script(cfg, aedt_out: str = AEDT_OUT) -> str:
+def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "M1") -> str:
+    """生成 M1' 建模 IronPython。
+
+    currents: None（默认，三相 "0A" 空载）或 {"A","B","C"} → Maxwell Current 字面量。
+              IronPython 2.7 只收字面量，表达式必须在 CPython 侧算好再传入。
+    case_tag: 日志标识，负载版用 "M3_load"。
+    """
     i1 = ipm_geom.derive_slot(cfg)
     layers = ipm_geom.coil_layers(cfg)
     rotor = ipm_geom.derive_rotor(cfg)
@@ -178,7 +184,7 @@ def build_script(cfg, aedt_out: str = AEDT_OUT) -> str:
     A("    return sum([float(oEditor.GetFaceArea(f)) for f in ids])")
     A("")
     A("")
-    A('log("=== IPM 8p48s M1 build start ===")')
+    A('log("=== IPM 8p48s ' + case_tag + ' build start ===")')
     A("t_all = time.time()")
 
     # ---------------------------------------------------------------- setup
@@ -332,6 +338,34 @@ def build_script(cfg, aedt_out: str = AEDT_OUT) -> str:
     A('     "Transparency:=", 0.75, "PartCoordinateSystem:=", "Global",')
     A("""     "MaterialValue:=", '"vacuum"', "SolveInside:=", True])""")
 
+    # ------------------------------------------------- airgap ring (I17)
+    # 独立 vacuum 环：外半径=定子内径 46.5，内半径=气隙中线 46.1625，厚 0.3375。
+    # 与 Band（整圆 R=46.1625，包住转子、绑定运动）共面于 R=46.1625 —— 是**面接触**
+    # 不是体积重叠，Maxwell 只报"边界穿越"型 intersect，共面贴边不报。
+    # 为什么不动 Band：MAXWELL_INTERNALS.md §9.2 实测——Band 做成气隙环/收进转子
+    # 会触发 `No objects within the band`（运动带失效）。保留整圆 Band + 外壁再贴
+    # 一个独立环，是同时满足"独立气隙环"与"运动带包住转子"的唯一拓扑。
+    # 假设=待验证：M1' 真机 Validate_OK + 无 intersect + 117 sheet 为准。
+    A("")
+    A("oEditor.CreateCircle(")
+    A('    ["NAME:CircleParameters", "XCenter:=", "0mm", "YCenter:=", "0mm",')
+    A('     "ZCenter:=", "0mm", "Radius:=", "%gmm", "WhichAxis:=", "Z"],' % (cfg.stator_id / 2))
+    A('    ["NAME:Attributes", "Name:=", "AirgapRing", "Flags:=", "", "Color:=", "(180 180 255)",')
+    A('     "Transparency:=", 0.75, "PartCoordinateSystem:=", "Global",')
+    A("""     "MaterialValue:=", '"vacuum"', "SolveInside:=", True])""")
+    A("oEditor.CreateCircle(")
+    A('    ["NAME:CircleParameters", "XCenter:=", "0mm", "YCenter:=", "0mm",')
+    A('     "ZCenter:=", "0mm", "Radius:=", "%gmm", "WhichAxis:=", "Z"],' % (cfg.rotor_od / 2 + cfg.airgap / 2))
+    A('    ["NAME:Attributes", "Name:=", "AirgapRingInner", "Flags:=", "", "Color:=", "(180 180 255)",')
+    A('     "Transparency:=", 1, "PartCoordinateSystem:=", "Global",')
+    A("""     "MaterialValue:=", '"vacuum"', "SolveInside:=", True])""")
+    A('oEditor.Subtract(["NAME:Selections", "Blank Parts:=", "AirgapRing",')
+    A('                   "Tool Parts:=", "AirgapRingInner"],')
+    A('                  ["NAME:SubtractParameters", "KeepOriginals:=", False])')
+    A('log("airgap ring -> AirgapRing " + str(round(area_of("AirgapRing"), 4)) + " mm2 (expect ' +
+      _fmt(math.pi * ((cfg.stator_id / 2) ** 2 -
+                     (cfg.rotor_od / 2 + cfg.airgap / 2) ** 2)) + ')")')
+
     # ---------------------------------------------------------------- coils
     A("")
     A("# 96 个线圈边：上层 = 线圈 s 的 go 边，下层 = 线圈 s−y 的回边")
@@ -346,7 +380,7 @@ def build_script(cfg, aedt_out: str = AEDT_OUT) -> str:
 
     # -------------------------------------------------------- region split
     A("")
-    A('_tools = ["StatorOuter", "RotorOuter", "Band"] + [p[0] for p in PM] + [c[0] for c in COILS]')
+    A('_tools = ["StatorOuter", "RotorOuter", "Band", "AirgapRing"] + [p[0] for p in PM] + [c[0] for c in COILS]')
     A('oEditor.Subtract(["NAME:Selections", "Blank Parts:=", "Region", "Tool Parts:=", ", ".join(_tools)],')
     A('                  ["NAME:SubtractParameters", "KeepOriginals:=", True])')
     A('log("region split -> region " + str(round(area_of("Region"), 4)) + " mm2")')
@@ -354,10 +388,16 @@ def build_script(cfg, aedt_out: str = AEDT_OUT) -> str:
     # -------------------------------------------------------------- winding
     A("")
     A('oModule = oDesign.GetModule("BoundarySetup")')
+    if currents is None:
+        # 空载（M1'/M2'）：三相 0A，零电流无额定转矩，只验 BEMF/THD/齿槽/Bg
+        A('CURRENTS = {"A": "0A", "B": "0A", "C": "0A"}')
+    else:
+        # 负载（M3）：三相正弦电流，表达式由 CPython 侧按实测 BEMF 算好（字面量）
+        A('CURRENTS = ' + repr(currents))
     A('for phase in ["A", "B", "C"]:')
     A("    oModule.AssignWindingGroup(")
     A('        ["NAME:Winding" + phase, "Type:=", "Current", "IsSolid:=", False,')
-    A('         "Current:=", "0A", "Resistance:=", "0.1ohm", "Inductance:=", "0.001H",')
+    A('         "Current:=", CURRENTS[phase], "Resistance:=", "0.1ohm", "Inductance:=", "0.001H",')
     A('         "Voltage:=", "0V", "ParallelBranchesNum:=", "1"])')
     A("CPS = " + str(cfg.conductors_per_slot) + "   # TEMP：I3 未定源，仅影响 Conductor number")
     A("SIDES = [")
@@ -409,7 +449,7 @@ def build_script(cfg, aedt_out: str = AEDT_OUT) -> str:
     A('        k = o.split("_")[0]')
     A("        _pref[k] = _pref.get(k, 0) + 1")
     A('    log("PREFIX " + " ".join([k + "=" + str(_pref[k]) for k in sorted(_pref)]))')
-    A('    for nm in ("Region", "StatorOuter", "RotorOuter", "Band"):')
+    A('    for nm in ("Region", "StatorOuter", "RotorOuter", "Band", "AirgapRing"):')
     A('        log("AREA " + nm + " " + str(round(area_of(nm), 4)))')
     A("    _amin, _amax = 1e9, -1e9")
     A("    for i in range(1, " + str(cfg.slots) + " + 1):")

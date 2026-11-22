@@ -11,8 +11,8 @@
 
 判据（M1'，`PROJECT_SPEC.md` §4）
 --------------------------------
-1. `SHEETS = 116`（Region/StatorOuter/RotorOuter/Band 各 1 + PM 16 + Coil 96）；
-2. 前缀计数 `PM=16`、`Coil=96`；
+1. `SHEETS = 117`（Region/StatorOuter/RotorOuter/Band/AirgapRing 各 1 + PM 16 + Coil 96）；
+2. 前缀计数 `PM=16`、`Coil=96`、`AirgapRing=1`；
 3. 定子面积 = 环面积 − 48×槽实切面积（±0.05%）；
 4. 转子面积 = 环面积 − Σ磁钢面积（±0.05%）；
 5. 96 个线圈面积全部落在 13.88 ±1%（两层各半槽）；
@@ -92,11 +92,12 @@ def check(cfg, log: dict, aedt_path: str = AEDT) -> dict:
     def rel(a, b):
         return abs(a - b) / b * 100.0 if b else 1e9
 
+    # 117 = 5 主体（Region/StatorOuter/RotorOuter/Band/AirgapRing）+ 16 PM + 96 Coil
     checks = []
-    checks.append(dict(name="SHEETS = 4 + 16 + 96", value=log["sheets"], limit=4 + n_pm + cfg.slots * 2,
-                       status="PASS" if log["sheets"] == 4 + n_pm + cfg.slots * 2 else "FAIL"))
+    checks.append(dict(name="SHEETS = 5 + 16 + 96", value=log["sheets"], limit=5 + n_pm + cfg.slots * 2,
+                       status="PASS" if log["sheets"] == 5 + n_pm + cfg.slots * 2 else "FAIL"))
     for k, want in (("Coil", cfg.slots * 2), ("PM", n_pm), ("Region", 1), ("StatorOuter", 1),
-                    ("RotorOuter", 1), ("Band", 1)):
+                    ("RotorOuter", 1), ("Band", 1), ("AirgapRing", 1)):
         checks.append(dict(name="前缀计数 %s = %d" % (k, want), value=log["prefix"].get(k),
                            limit=want, status="PASS" if log["prefix"].get(k) == want else "FAIL"))
 
@@ -106,6 +107,12 @@ def check(cfg, log: dict, aedt_path: str = AEDT) -> dict:
     d_rt = rel(log["areas"].get("RotorOuter", 0.0), exp_rotor)
     checks.append(dict(name="转子面积 = 环 − Σ 磁钢（偏差 %）", value=round(d_rt, 5), limit=0.05,
                        status="PASS" if d_rt <= 0.05 else "FAIL"))
+    # I17 独立气隙环：外 R=定子内径、内 R=气隙中线（= Band 半径），厚=½气隙
+    exp_ring = math.pi * ((cfg.stator_id / 2) ** 2 -
+                          (cfg.rotor_od / 2 + cfg.airgap / 2) ** 2)
+    d_ring = rel(log["areas"].get("AirgapRing", 0.0), exp_ring)
+    checks.append(dict(name="气隙环面积 = π(46.5²−46.1625²)（偏差 %）", value=round(d_ring, 5), limit=0.05,
+                       status="PASS" if d_ring <= 0.05 else "FAIL"))
     d_cu = max(rel(log["coil"].get("min", 0.0), layers["area_lower"]),
                rel(log["coil"].get("max", 0.0), layers["area_upper"]))
     checks.append(dict(name="96 线圈面积（最大偏差 %）", value=round(d_cu, 4), limit=1.0,
@@ -148,8 +155,10 @@ def check(cfg, log: dict, aedt_path: str = AEDT) -> dict:
                        status="PASS" if os.path.exists(aedt_path) else "FAIL"))
 
     return dict(expect=dict(stator_area=round(exp_stator, 4), rotor_area=round(exp_rotor, 4),
+                            airgap_ring_area=round(exp_ring, 4),
                             coil_T=layers["area_upper"], coil_B=layers["area_lower"],
-                            magnet_total=rotor["magnet_area_total"]),
+                            magnet_total=rotor["magnet_area_total"],
+                            v_single=list(cfg.v_single)),
                 measured=dict(sheets=log["sheets"], areas=log["areas"], coil=log["coil"],
                               n_pm=len(log["pm"]), validate=log["validate"]),
                 checks=checks,

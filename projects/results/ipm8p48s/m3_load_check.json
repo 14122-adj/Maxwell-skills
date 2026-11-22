@@ -1,0 +1,97 @@
+{
+  "stage": "M3' 401 点负载（I18 电流 + I19 平直）",
+  "torque": {
+    "t_avg_nm": 1.563486,
+    "pp_nm": 0.042946,
+    "pp_pct": 2.7468,
+    "main_harmonic_order": 6,
+    "main_harmonic_nm": 0.020789,
+    "main_harmonic_pct": 1.3297,
+    "jump_max_nm": 0.005397,
+    "jump_max_pct": 0.3452,
+    "window_samples": 200,
+    "total_rows": 401,
+    "torque_unit": "NewtonMeter",
+    "torque_scale": 1.0,
+    "spectrum_top5": [
+      [
+        6,
+        0.020789
+      ],
+      [
+        12,
+        0.002998
+      ],
+      [
+        30,
+        0.001099
+      ],
+      [
+        16,
+        5.2e-05
+      ],
+      [
+        10,
+        4.1e-05
+      ]
+    ]
+  },
+  "excitation": {
+    "current_A": 15.688,
+    "current_unit": "A_peak",
+    "phase_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "explicit",
+    "expressions": {
+      "A": "-15.688000*sin(628.318531*Time+1.570796327)",
+      "B": "-15.688000*sin(628.318531*Time-0.523598776)",
+      "C": "-15.688000*sin(628.318531*Time+3.665191429)"
+    },
+    "formula": "Imax*sin(2*pi*f*Time + phi), B=phi-120deg, C=phi+120deg"
+  },
+  "checks": [
+    {
+      "name": "T_avg ∈ 22.5–27.5 N·m",
+      "value": 1.5635,
+      "limit": [
+        22.5,
+        27.5
+      ],
+      "op": "in",
+      "status": "FAIL"
+    },
+    {
+      "name": "峰峰值 ≤ 10% T_avg",
+      "value": 2.7468,
+      "limit": 10.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "主谐波幅值 ≤ 5% T_avg",
+      "value": 1.3297,
+      "limit": 5.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "单点跳变 ≤ 15% T_avg",
+      "value": 0.3452,
+      "limit": 15.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "负载 excitation.current_A > 0（真施加电流）",
+      "value": 15.688,
+      "limit": 0,
+      "op": ">",
+      "status": "PASS"
+    }
+  ],
+  "status": "FAIL",
+  "source_json": "D:/桌面/ANSYS MaxWell_skill/projects/results/ipm8p48s/m3_load_phi90.json",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m3_phi90"
+}
