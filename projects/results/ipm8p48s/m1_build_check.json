@@ -1,31 +1,31 @@
 {
   "expect": {
     "stator_area": 9018.262,
-    "rotor_area": 4927.0683,
-    "coil_T": 13.884,
-    "coil_B": 13.881,
-    "magnet_total": 963.2
+    "rotor_area": 5307.8683,
+    "coil_T": 9.8,
+    "coil_B": 9.8,
+    "magnet_total": 582.4
   },
   "measured": {
-    "sheets": 132,
+    "sheets": 116,
     "areas": {
-      "Region": 11307.6821,
+      "Region": 11699.5892,
       "StatorOuter": 9017.8249,
-      "RotorOuter": 4927.0683,
+      "RotorOuter": 5307.8683,
       "Band": 6694.6598
     },
     "coil": {
-      "min": 13.8811,
-      "max": 13.8836
+      "min": 9.8,
+      "max": 9.8
     },
-    "n_pm": 32,
+    "n_pm": 16,
     "validate": "OK"
   },
   "checks": [
     {
-      "name": "SHEETS = 4 + 32 + 96",
-      "value": 132,
-      "limit": 132,
+      "name": "SHEETS = 4 + 16 + 96",
+      "value": 116,
+      "limit": 116,
       "status": "PASS"
     },
     {
@@ -35,9 +35,9 @@
       "status": "PASS"
     },
     {
-      "name": "前缀计数 PM = 32",
-      "value": 32,
-      "limit": 32,
+      "name": "前缀计数 PM = 16",
+      "value": 16,
+      "limit": 16,
       "status": "PASS"
     },
     {
@@ -78,12 +78,12 @@
     },
     {
       "name": "96 线圈面积（最大偏差 %）",
-      "value": 0.0029,
+      "value": 0.0,
       "limit": 1.0,
       "status": "PASS"
     },
     {
-      "name": "32 块磁钢面积 = L×t（最大偏差 %）",
+      "name": "16 块磁钢面积 = L×t（最大偏差 %）",
       "value": 0.0,
       "limit": 0.1,
       "status": "PASS"
@@ -115,5 +115,5 @@
   ],
   "status": "PASS",
   "log": "D:/ANSYS_Run/ipm_m1.log",
-  "aedt": "D:/ANSYS_Run/IPM_8p48s_M1.aedt"
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M1_rect.aedt"
 }

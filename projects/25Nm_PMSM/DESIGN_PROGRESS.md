@@ -36,6 +36,10 @@
 > 三行磁密 FEA 全 PASS（Bg 0.8626 T / B_tooth 0.9896 T / B_yoke 1.1843 T），
 > 账本 G4b → **closed**。这是 SPM 冻结前的在飞收尾项，**不构成重开优化**。
 > 下方 11-18 及更早记录是 SPM baseline 的历史存档，保留不删。
+> **IPM 进度同步（11-22，SPM 只读）**：IPM 完成 11-22 两次修订后的**矩形绕组 M1' 真机重跑**
+> —— 116 sheet / 96 线圈边（矩形 4 点，9.800 mm²）/ 16 块单层 V 磁钢 / `VALIDATE_OK` / 34.5 s，
+> `m1_build_check.json` 15/15 PASS；矩形版 M2' 401 点空载求解中。SPM 几何/绕组/判据
+> **一行未改**，探索仍 LOCKED。详细进展见 `projects/IPM_8p48s/PROBLEM_LEDGER.md`。
 
 ## 昨日 / 今日 / 明日（2026-11-20：IPM 8p48s 定源 + M1' 真机建模，SPM 只读不动）
 

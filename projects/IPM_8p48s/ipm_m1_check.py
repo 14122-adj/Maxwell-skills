@@ -41,7 +41,9 @@ if _HERE not in sys.path:
 import ipm_geom  # noqa: E402
 
 DEFAULT_LOG = r"D:/ANSYS_Run/ipm_m1.log"
-AEDT = r"D:/ANSYS_Run/IPM_8p48s_M1.aedt"
+# 当前契约版工程（11-22 两次修订：单层 V 16 块 + 矩形绕组 9.8 mm²）。
+# 旧双层/异形版工程另存为 *_M1.aedt / *_M1c.aedt，不参与本轮证据链。
+AEDT = r"D:/ANSYS_Run/IPM_8p48s_M1_rect.aedt"
 
 
 def parse_log(text: str) -> dict:
@@ -76,7 +78,7 @@ def parse_log(text: str) -> dict:
     return out
 
 
-def check(cfg, log: dict) -> dict:
+def check(cfg, log: dict, aedt_path: str = AEDT) -> dict:
     i1 = ipm_geom.derive_slot(cfg)
     rotor = ipm_geom.derive_rotor(cfg)
     layers = ipm_geom.coil_layers(cfg)
@@ -142,8 +144,8 @@ def check(cfg, log: dict) -> dict:
                        status="PASS" if log["validate"] == "OK" else "FAIL"))
     checks.append(dict(name="工程存盘", value=bool(log["saved"]), limit=True,
                        status="PASS" if log["saved"] else "FAIL"))
-    checks.append(dict(name=".aedt 文件存在", value=os.path.exists(AEDT), limit=True,
-                       status="PASS" if os.path.exists(AEDT) else "FAIL"))
+    checks.append(dict(name=".aedt 文件存在", value=os.path.exists(aedt_path), limit=True,
+                       status="PASS" if os.path.exists(aedt_path) else "FAIL"))
 
     return dict(expect=dict(stator_area=round(exp_stator, 4), rotor_area=round(exp_rotor, 4),
                             coil_T=layers["area_upper"], coil_B=layers["area_lower"],
@@ -157,6 +159,7 @@ def check(cfg, log: dict) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="IPM 8p48s M1' 独立复核")
     ap.add_argument("--log", default=DEFAULT_LOG)
+    ap.add_argument("--aedt", default=AEDT, help="待核验的矩形版工程路径")
     ap.add_argument("--out", default=os.path.join(_ROOT, "projects", "results", "ipm8p48s"))
     args = ap.parse_args(argv)
 
@@ -167,9 +170,9 @@ def main(argv=None) -> int:
         text = fh.read()
     log = parse_log(text)
     cfg = ipm_geom.IPMConfig()
-    res = check(cfg, log)
+    res = check(cfg, log, args.aedt)
     res["log"] = args.log
-    res["aedt"] = AEDT
+    res["aedt"] = args.aedt
 
     print("=" * 74)
     print("M1' 复核  status=%s" % res["status"])
