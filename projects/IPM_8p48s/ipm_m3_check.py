@@ -109,7 +109,76 @@ def dft_magnitudes(t, y):
     return out
 
 
-def check(csvdir: str, meta: dict) -> dict:
+def fundamental(t, y):
+    """单周期（第二电周期）基波幅值 + 相位，以 sin(ωt) 为参考。
+
+    与账本 I21 口径一致：跳过第一电周期，取随后 N=round(T/dt)-1 点（去重复端点），
+    去均值后单周期 DFT：e(t)=A·sin(ωt+φ)。返回 (amp, phase_deg, rms, n)。
+    """
+    if len(t) < 10:
+        return 0.0, 0.0, 0.0, 0
+    diffs = sorted(t[i + 1] - t[i] for i in range(min(len(t) - 1, 50)))
+    dt = diffs[len(diffs) // 2] if diffs else 0.0
+    n_per = int(round((1.0 / F_ELEC) / dt)) if dt > 0 else 0
+    n_skip = n_per
+    if n_per <= 0 or len(t) - n_skip < 10:
+        return 0.0, 0.0, 0.0, 0
+    ts, ys = t[n_skip:], y[n_skip:]
+    # 去重复端点：窗口 n_per+1 点时丢弃末点，得整周期 n_per 点
+    if len(ts) > n_per and abs(ts[-1] - ts[0] - n_per * dt) < dt * 0.5:
+        pass
+    if len(ts) > 1 and abs(ts[-1] - ts[-2] - dt) > dt * 0.5:
+        ts, ys = ts[:-1], ys[:-1]
+    n = len(ys)
+    if n < 4:
+        return 0.0, 0.0, 0.0, n
+    mean = sum(ys) / n
+    # e = a·sin(ωt) + b·cos(ωt)；amp=√(a²+b²)，φ=atan2(b,a)
+    sa = sum((ys[k] - mean) * math.sin(2.0 * math.pi * k / n) for k in range(n))
+    sb = sum((ys[k] - mean) * math.cos(2.0 * math.pi * k / n) for k in range(n))
+    a = 2.0 * sa / n
+    b = 2.0 * sb / n
+    amp = math.hypot(a, b)
+    phase = math.degrees(math.atan2(b, a))
+    rms = math.sqrt(sum(v * v for v in ys) / n)
+    return amp, phase, rms, n
+
+
+def bemf_load_block(csvdir: str, noload_rms: float | None = None) -> dict | None:
+    """I21：负载工况 BEMF 独立重算（与空载分列），写幅值/RMS/相位/相对空载%。
+
+    数据来自负载 flux_<ph>.csv 的 d(FluxLinkage)/dt；没有 flux CSV 时返回 None
+    （不阻塞 I19 转矩判据，避免破坏既有 M3 case 回归）。
+    """
+    phases = {}
+    src = {}
+    for ph in ("a", "b", "c"):
+        got = ing.load_phase_bemf(csvdir, ph)
+        if got is None:
+            return None
+        t, e, how = got
+        phases[ph.upper()] = (t, e)
+        src[ph.upper()] = how
+    out = {"sources": src, "phase": {}, "note": "I21: 负载 BEMF = d(FluxLinkage)/dt，第二电周期基波 DFT"}
+    amps = []
+    for ph, (t, e) in phases.items():
+        amp, phase, rms, n = fundamental(t, e)
+        amps.append(amp)
+        out["phase"][ph] = {
+            "fundamental_amp_v": round(amp, 4),
+            "rms_v": round(rms, 4),
+            "phase_deg": round(phase, 4),
+            "n_samples": n,
+        }
+    out["fundamental_amp_mean_v"] = round(sum(amps) / len(amps), 4) if amps else 0.0
+    if noload_rms and noload_rms > 1e-9:
+        load_rms = sum(v["rms_v"] for v in out["phase"].values()) / len(out["phase"])
+        out["rms_vs_noload_pct"] = round(100.0 * (load_rms - noload_rms) / noload_rms, 4)
+        out["noload_rms_reference_v"] = round(noload_rms, 4)
+    return out
+
+
+def check(csvdir: str, meta: dict, noload_rms: float | None = None) -> dict:
     t_all, tq_all, unit, scale, n_rows = load_torque(csvdir)
     t_win, tq_win = last_period(t_all, tq_all)
     n_win = len(tq_win)
@@ -165,6 +234,7 @@ def check(csvdir: str, meta: dict) -> dict:
             spectrum_top5=[(h, round(a, 6)) for h, a in sorted(harm, key=lambda x: -x[1])[:5]],
         ),
         excitation=exc,
+        bemf_load=bemf_load_block(csvdir, noload_rms),
         checks=checks,
         status="PASS" if all(c["status"] == "PASS" for c in checks) else "FAIL",
     )
@@ -175,11 +245,18 @@ def main(argv=None) -> int:
     ap.add_argument("--csvdir", default=RUN_DIR + "/csv_ipm_m3_load")
     ap.add_argument("--json", default=os.path.join(RESULTS, "m3_load_load.json"))
     ap.add_argument("--out", default=os.path.join(RESULTS, "m3_load_check.json"))
+    ap.add_argument("--noload-json", default=None,
+                    help="空载 M2' JSON，用于算负载/空载 BEMF 相对%（I21）；缺省则只读绝对量")
     args = ap.parse_args(argv)
 
     with open(args.json, encoding="utf-8") as fh:
         meta = json.load(fh)
-    res = check(args.csvdir, meta)
+    noload_rms = None
+    if args.noload_json and os.path.exists(args.noload_json):
+        with open(args.noload_json, encoding="utf-8") as fh:
+            nl = json.load(fh)
+        noload_rms = nl.get("bemf", {}).get("phase_rms_mean")
+    res = check(args.csvdir, meta, noload_rms)
     res["source_json"] = args.json
     res["csvdir"] = args.csvdir
 
@@ -193,6 +270,12 @@ def main(argv=None) -> int:
              tq["jump_max_nm"], tq["jump_max_pct"]))
     print("  单位=%s scale=%g 窗口=%d 点 全样本=%d" %
           (tq["torque_unit"], tq["torque_scale"], tq["window_samples"], tq["total_rows"]))
+    bl = res.get("bemf_load")
+    if bl:
+        a = bl["phase"]["A"]
+        print("  负载BEMF(I21): A相基波 %.4f V @ %.2f°  RMS %.4f V  相对空载 %s%%"
+              % (a["fundamental_amp_v"], a["phase_deg"], a["rms_v"],
+                 bl.get("rms_vs_noload_pct", "n/a")))
     for c in res["checks"]:
         print("    [%s] %-40s %12s / %s" % (c["status"], c["name"], c["value"], c["limit"]))
 
