@@ -953,3 +953,103 @@ IPM 有磁阻转矩，MTPA 的 φ 需扫描 φ=0/−15°/−30° 取 T_avg 最�
   主谐波 ≤5%、单点跳变 ≤15%。
 - **重建而不是改电流**：§11.1 已实测，对已求解工程 `EditWindingGroup` 改电流虽不报错，
   但报表退化成 1 行；负载必须从头建新设计（独立 `ipm_m3_load.py` + 独立 CSV/JSON）。
+
+---
+
+## 18. 网格生成与统计 API（AEDT 2021.1 真机探测，2026-11-23）
+
+> 一手证据：`D:/ANSYS_Run/probe_mesh_api.log`、`probe_mesh_api2.log`、`probe_mesh_api3.log`
+> 三轮 `-RunScriptAndExit` 真机日志 + 导出文件 `D:/ANSYS_Run/meshstats_nominal.txt`（19363 B）。
+> 探测对象 `IPM_8p48s_M1_rect.aedt` / `Motor_Design` / `Setup1`，未保存工程。
+> 本节结论**只来自实测**；未验证项显式标注，禁止写死未验证的 API 名。
+
+### 18.1 方法挂在哪个对象（最关键，先记坑）
+
+| 层级 | 方法 | 结论 |
+|---|---|---|
+| `oDesign.GetModule("MeshSetup")` | `AssignLengthOp` / `EditLengthOp` / `GetOperationNames` / `InitialMeshSettings` 等 32 个 | ✅ 存在，但**只有剖分设置操作**（`dir()` 列全，见 probe1 log） |
+| 同上 | `GenerateMesh` / `GetMeshInfo` / `GetMeshStats` / `GetStatistics` / `GetMeshData` | ❌ **全部不存在**（`ADispatchWrapper has no attribute`，probe1 实测） |
+| **`oDesign`（设计层）** | **`GenerateMesh` / `ExportMeshStats` / `ApplyMeshOps`** | ✅ **三个都在**（`DESIGN_MESH_METHODS`，probe1/2 实测） |
+
+**结论**：2021.1 的网格**生成统计在设计层**，不在 MeshSetup 模块层。旧记忆里
+"oMesh 是否有 GenerateMesh"问错了对象——问 oMesh 永远得到 AttributeError。
+
+### 18.2 三个方法的精确签名（probe2 从异常消息实读）
+
+```
+GenerateMesh(Structured Array simulationNames) -> long
+    # GenerateMesh() 0 参数 → Exception；GenerateMesh("Setup1") → 返回 0（成功）
+ExportMeshStats(string setup, string variationKeys, string filePath,
+                [long overwriteIfExists /*optional*/])
+    # 至少 3 参数；0/1/2 参数全部 Exception（签名逐字来自异常消息）
+ApplyMeshOps(Structured Array simulationNames) -> long
+    # 至少 1 参数；0 参数 Exception
+```
+
+`GenerateMesh("Setup1")` 必须在**同一个 oDesign 会话**里先执行，再 `ExportMeshStats`，
+否则导出的统计文件为空/旧网格（probe3 顺序：Open→GenerateMesh→ExportMeshStats→Close，全绿）。
+
+### 18.3 ExportMeshStats 实测可用调用与导出格式
+
+```python
+des.GenerateMesh("Setup1")                                  # r=0
+des.ExportMeshStats("Setup1", "Nominal", outpath, 1)         # r=None，落盘 19363 B
+```
+
+- `variationKeys` 实测 `"Nominal"` 与 `""` 导出**完全相同**（文件逐字节同长 19363 B）；
+  本仓库统一用 `"Nominal"` 以表意明确（assumption=待验证：多设计点多 variation 的语义未测）。
+- 第 4 参数 overwrite：0/1 均成功落盘；统一用 `1` 防残留。
+- 扩展名 `.txt`/`.csv` **导出内容相同**（都是同一份文本表，非真 CSV），仓库统一用 `.txt`
+  作中间物，再由宿主侧 CPython 解析成 KEEP 的 `mesh_<case>.json`。
+
+**导出文本结构**（表头逐字，8 列）：
+
+```
+Maxwell 2D Mesh Statistics
+  Project: ...
+  Design: ...
+  Solution setup: ...
+Total number of mesh elements: 42838
+            | Num Elements | Min edge length | Max edge length | RMS edge length |
+   Min elem area | Max elem area | Mean elem area | Std Devn (area) |
+     Region | 12341 | 0.000123019 | 0.00882865 | 0.00152195 | ...
+```
+
+- 每个对象一行：`Region` / `StatorOuter` / `RotorOuter` / `PM_01..16` / `Band` /
+  `Coil_T01..48` + `Coil_B01..48`（本 case 共 123 行对象，96 个 coil 边各自成行）。
+- **无节点数列、无 skewness/质量指标**：`ExportMeshStats` 的 8 列全为单元统计，
+  没有 node count、skewness、aspect ratio、orthogonal quality。
+  ⇒ `mesh_<case>.json` 的 `quality_metrics` 必须写 `unavailable` + 原因
+  （"2021.1 ExportMeshStats 不输出质量指标；dir(oDesign) 无质量 getter"），
+  禁止编数。节点数同理写 unavailable（除非另有实测 API，当前未发现）。
+
+### 18.4 长度/面积单位 —— 推断 + 交叉验证（assumption=待验证）
+
+`ExportMeshStats` 文本**不写单位**。工程 `Units='mm'`（`.aedt` 实测），但统计数值必须按 **SI（m）** 读：
+
+| 对象 | 统计值 | 按 m 读（×1000→mm） | 交叉校验 |
+|---|---:|---:|---|
+| Band RMS edge | 0.000656487 | **0.656 mm** | ≈ 气隙 0.675 mm（Band 径向恰跨一层气隙），吻合到 2.8% |
+| Band min edge | 0.000151049 | 0.151 mm | 气隙内多单元，合理 |
+| Band max edge | 0.00763688 | 7.637 mm | 沿圆周方向的长边，与气隙径向无关，合理 |
+| PM max edge | 0.00160478 | 1.605 mm | V 磁钢厚 2.8 mm / 腿长 13 mm，合理 |
+
+反证：若按 mm 读，Band min edge = 0.000151 mm = 0.15 µm，42838 单元覆盖 150 mm 电机
+不可能（气隙 0.675 mm 里塞 4500 层单元），**排除**。
+面积列同理按 m² 读（×1e6→mm²）：Region mean area 9.46917e-7 m² → 0.947 mm²，合理。
+**验证方法**：换一个已知几何长度（如 PM 厚 2.8 mm）比对其 max edge，若仍在 0.1–3 mm 量级即坐实。
+在坐实前，`mesh_<case>.json` 的 `units` 字段写 `"SI_m_inferred"` 并带 `assumption=待验证`。
+
+### 18.5 落盘流程（契约 §8 的标准动作）
+
+```
+oProject = oDesktop.OpenProject(aedt)
+oDesign  = oProject.GetDesign("Motor_Design")
+oDesign.GenerateMesh("Setup1")
+oDesign.ExportMeshStats("Setup1", "Nominal", out_txt, 1)
+oProject.Close()
+→ 宿主 CPython 解析 out_txt → projects/results/ipm8p48s/mesh_<case>.json（KEEP）
+```
+
+**禁止**：①跳过 GenerateMesh 直接 ExportMeshStats（统计可能来自旧网格/空）；
+②把 API 名写死进任何未验证脚本（先 probe）；③质量指标/节点数导不出时编数。

@@ -400,4 +400,32 @@ B/C 相同量级（空载 10.4635 V）。CSV：`csv_ipm_m2_apex33/`、`csv_ipm_m
 | ID | 严重度 | 领域 | 问题 | 验收 | 状态 |
 |---|---|---|---|---|---|
 | **I23** | minor | 流程/证据 | G10③：空载 5 份 JSON 完全无 `excitation` 字段（契约 §7.3 要求记 0A）；负载 3 份缺 `phase_abs_deg`/`bemf_offset_deg`（账本 I20 声称已增，实测未落盘） | 每份 JSON excitation 字段齐全，空载 current_A=0，负载含相位字段 | open（P2 一并处理） |
-| **I24** | major | 流程/证据 | G10⑤：每次建模后剖分+统计未执行，全库无 `mesh_<case>.json`；网格 API 未真机探测 | 契约 §8 流程与 mesh JSON 判据全过 | open（P0，blocker 级） |
+| **I24** | major | 流程/证据 | G10⑤：每次建模后剖分+统计未执行，全库无 `mesh_<case>.json`；网格 API 未真机探测 | 契约 §8 流程与 mesh JSON 判据全过 | **closed（2026-11-23 P0 闭环，4 case 全 PASS，见下）** |
+
+### I24 / M4' 闭环（2026-11-23，P0）
+
+- **API 探测（真机三轮）**：`probe_mesh_api{,2,3}.log` 实测 2021.1 的网格生成统计在 **`oDesign` 层**
+  （`GenerateMesh`/`ExportMeshStats`/`ApplyMeshOps`），`oMesh`（MeshSetup module）层**没有**这些方法。
+  `GenerateMesh("Setup1")->0`、`ExportMeshStats(setup,keys,path,[overwrite])` 导出 8 列单元统计。
+  结论写入 `docs/MAXWELL_INTERNALS.md §18`（含签名、单位推断、坑位）。
+- **落盘脚本（KEEP）**：`ipm_mesh_check.py`（`--gen` 生成 IronPython 剖分脚本 / `--parse` 解析统计+
+  独立判定）；每 case 的 `mesh_<case>.json`（KEEP）。宿主侧 CPython 解析，不碰 AEDT 求解。
+- **四 case 全 PASS**（`mesh_<case>.json::verdict.overall_pass=true`，真机 GenerateMesh r=0）：
+
+| case | 工程 | 总单元 | 剖分耗时 s | Band | Stator | Rotor | PM(16) | AirgapRing | Coil(96) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| m1_bhfix | IPM_8p48s_M1_bhfix | 42684 | 11.491 | 4170 | 9543 | 10150 | 4508 | 4466 | 1574 |
+| m2_bhfix | IPM_8p48s_M2_bhfix | 42748 | 6.219 | — | — | — | — | — | — |
+| m3_phi90 | IPM_8p48s_M3_phi90 | 42858 | 7.350 | — | — | — | — | — | — |
+| m3_floor_e118 | IPM_8p48s_M3_floor_e118 | 42840 | 7.186 | — | — | — | — | — | — |
+
+- **判据逐项**：4 组 LengthOp 全 Enabled 且 MaxLength 一致（0.25/0.9/1.2/0.5 mm）、Band≤0.25 ✓、
+  六类对象单元数全非 0 ✓。质量指标（skewness）/节点数 2021.1 ExportMeshStats 不导出 →
+  JSON 写 `unavailable`+原因（§18.3），**未编数**。
+- **单位**：统计长度按 SI(m) 推断 ×1000→mm（Band RMS 0.656 mm ≈ 气隙 0.675 mm 交叉验证），
+  JSON 标 `assumption=待验证`+验证方法，未当已证（§18.4）。
+- **踩坑（高价值）**：①API 挂在 oDesign 不在 oMesh，问错对象全 AttributeError；②`--aedt` 传带扩展名
+  会在 gen 里拼成 `.aedt.aedt`，已加去扩展名保护；③异常退出残留 `.aedt.lock`+`*.asol.semaphore`
+  会让下次 OpenProject 报"used by another application"且脚本主体不执行，确认无 ansysedt 进程后清 TEMP 锁可恢复。
+- **未做（禁越界）**：未启动新 401 点求解（P0 只补剖分链路）、未碰 P1 匝数/齿槽、未碰 P2 字段。
+  下一步按 top3 顺序转 P1。
