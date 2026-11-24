@@ -41,12 +41,12 @@ def test_criteria_match_acceptance_doc():
 
 
 def test_machine_constants_match_contract():
-    """8p48s / 160 mm / 每相 16 线圈 / cps=5（TEMP）与契约一致。"""
+    """8p48s / 160 mm / 每相 16 线圈 / cps=10（I3 定源 11-24）与契约一致。"""
     assert m2.POLES == 8 and m2.SLOTS == 48
     assert m2.STACK_MM == 160.0
     assert m2.COILS_PER_PHASE == 16
-    assert m2.CPS_MODEL == 5
-    assert m2.CPS_MODEL * m2.COILS_PER_PHASE == 80
+    assert m2.CPS_MODEL == 10
+    assert m2.CPS_MODEL * m2.COILS_PER_PHASE == 160
 
 
 # ──────────────────────────────────────────────────────────── 窗口口径
@@ -94,17 +94,18 @@ def test_turns_backcalc_is_linear_in_bemf():
 
 
 def test_turns_backcalc_reproduces_model_point():
-    """用模型自身 BEMF 反推，必须回到 cps=5 —— 恒等校验。"""
-    per_turn = 120.0 / 80.0
+    """用模型自身 BEMF 反推，必须回到当前 cps —— 恒等校验（I3 定源后 cps=10）。"""
+    cps = m2.CPS_MODEL
+    n_ph = cps * m2.COILS_PER_PHASE
     tb = m2.turns_backcalc(120.0)
-    assert tb["bemf_per_turn_v"] == pytest.approx(per_turn, rel=1e-12)
-    assert tb["targets"]["design_125V"]["cps_int"] == 5
+    assert tb["bemf_per_turn_v"] == pytest.approx(120.0 / n_ph, rel=1e-12)
+    assert tb["targets"]["design_125V"]["cps_int"] == cps
 
 
 def test_turns_backcalc_rounds_up_when_below_lower_bound():
     """BEMF 偏低时必须推出更大的 cps（方向不能反）。"""
     tb = m2.turns_backcalc(100.0)
-    assert tb["targets"]["lower_118V"]["cps_int"] > 5
+    assert tb["targets"]["lower_118V"]["cps_int"] > m2.CPS_MODEL
 
 
 # ──────────────────────────────────────────────────────────── 探针 CSV

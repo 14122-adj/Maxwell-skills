@@ -170,6 +170,7 @@ def main(argv=None) -> int:
     ap.add_argument("--log", default=DEFAULT_LOG)
     ap.add_argument("--aedt", default=AEDT, help="待核验的矩形版工程路径")
     ap.add_argument("--out", default=os.path.join(_ROOT, "projects", "results", "ipm8p48s"))
+    ap.add_argument("--json", default="", help="输出 JSON 全路径（默认 <out>/m1_build_check.json）")
     args = ap.parse_args(argv)
 
     if not os.path.exists(args.log):
@@ -197,7 +198,7 @@ def main(argv=None) -> int:
         print("    [%s] %-36s %12s / %s" % (c["status"], c["name"], c["value"], c["limit"]))
 
     os.makedirs(args.out, exist_ok=True)
-    path = os.path.join(args.out, "m1_build_check.json")
+    path = args.json or os.path.join(args.out, "m1_build_check.json")
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(res, fh, ensure_ascii=False, indent=2)
     print("  ✔ %s" % path)

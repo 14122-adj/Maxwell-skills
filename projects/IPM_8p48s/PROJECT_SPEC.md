@@ -97,12 +97,24 @@ q = 48/(8×3) = 2，槽距电角 30°，**节距 y=5 槽（150° 电角，短距
 相属表：`projects/IPM_8p48s/WINDING_TABLE.md`（48 行×上下层），机读版
 `projects/results/ipm8p48s/i2_winding_sides.csv`（96 行）。
 
-### D3 —— 匝数/线径（open，M1' 用 TEMP 值）
+### D3 —— 匝数/线径（closed，I3 定源 2026-11-24）
 
-M1' 只把 `cps = 5` 写进 `AssignCoil` 的 `Conductor number`（不影响几何）。
-`N_ph = 16·cps` ⇒ cps=5 即 80 匝。**这不是设计结论**：真正的匝数由 M2' 空载 BEMF
-落在 118–145 V 反推，线径由槽满率 ≤0.78 与铜耗 ≤140 W 反推。当前槽内铜
-（10×Ø1.5 = 17.7 mm²）在 39.2 mm² 槽里 fill 0.45，留有余量。
+`cps = 10`（160 匝/相）写进 `AssignCoil` 的 `Conductor number`（不改几何）。
+`N_ph = 16·cps`。定源依据：BH 修复后 cps=5 空载 401 点实测 BEMF **63.8721 V**
+（`m2_noload_bhfix.json`，Bg 0.6621 T 可信），按 0.7984 V/匝/相线性反推
+125 V → cps=10（预测 127.744 V）。**真机验证**：cps=10 401 点空载实测
+BEMF **127.7440 V**（`m2_noload_cps10.json`，与预测差 0.0002%）⇒ 首次落
+118–145 V 窗，PASS。
+
+绕线线径 `wind_wire_mm = 1.35`：cps=10 每槽 2 边×10 根=20 根，Ø1.5 时
+铜 35.34 mm²/槽实切 38.756 mm² ⇒ fill 0.9119 FAIL（>0.78）；Ø1.35 时
+铜 28.63 mm² ⇒ fill 0.7387 PASS。**几何定标线径 `wire_diameter_mm = 1.50`
+不动**（Bs0/Bs2 由它推，改它会破坏已 green 的 M1'/M2' 几何证据链）。
+独立复算函数 `ipm_geom.slot_fill_factor`（`tests/test_ipm_8p48s.py` 3 例护栏）。
+`wind_wire_mm=1.35` 标 `assumption=待验证`：需 BOM 给真实漆包线规格；FEA 不依赖此字段（Conductor number 才是匝数）。
+
+槽满率仍满足铜耗预算（20 根 Ø1.35 = 28.63 mm² < 槽 38.756×0.78=30.23）。
+齿槽 3.4729 N·m（I22）与 Bg 0.6621 T（G4）仍是 open 项，与匝数定源无关，另行处理。
 
 ### D4 —— 单层 V 磁钢（2026-11-22 用户修订，几何 closed，磁路 open=I8）
 

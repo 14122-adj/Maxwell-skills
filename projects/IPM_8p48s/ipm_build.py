@@ -395,7 +395,7 @@ def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "
     A('        ["NAME:Winding" + phase, "Type:=", "Current", "IsSolid:=", False,')
     A('         "Current:=", CURRENTS[phase], "Resistance:=", "0.1ohm", "Inductance:=", "0.001H",')
     A('         "Voltage:=", "0V", "ParallelBranchesNum:=", "1"])')
-    A("CPS = " + str(cfg.conductors_per_slot) + "   # TEMP：I3 未定源，仅影响 Conductor number")
+    A("CPS = " + str(cfg.conductors_per_slot) + "   # I3 定源（11-24）：cps=10=160 匝/相，仅影响 Conductor number")
     A("SIDES = [")
     for r in wind["rows"]:
         A('    ("' + r["obj"] + '", "' + r["phase"] + '", "' +

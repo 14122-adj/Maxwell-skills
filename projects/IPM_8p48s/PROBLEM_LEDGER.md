@@ -12,7 +12,7 @@
 |---|---|---|---|---|---|---|---|
 | **I1** | blocker | 几何 | 48 槽梨形槽 7 尺寸未定；表 2 的 Bs2=9.5 mm > 48 槽槽距 6.087 mm，照抄必 intersect | `projects/IPM_8p48s/ipm_geom.py::derive_slot`（①–⑧ 推导链）、`projects/results/ipm8p48s/i1_slot.json` | 写出定标推导链 + 齿宽/轭厚约束；`.aedt` 中 48 槽无 intersect | **closed**（2026-11-20） | — |
 | **I2** | blocker | 绕组 | 8p48s 双层分布绕组展开图未定（集中绕组 `WINDING_LAYOUT` 不适用） | `ipm_winding.py`、`WINDING_TABLE.md`、`projects/results/ipm8p48s/i2_winding_sides.csv`（96 行） | 48 槽×2 层的相属表齐全，96 个线圈边可逐边 `AssignCoil` | **closed**（2026-11-20） | — |
-| **I3** | blocker | 绕组 | 每槽导体数 / 每相匝数 / 线径未定；84 匝是 12 槽口径 | 依赖 I1 槽面积 + I2（16 线圈/相）；由 M2' 空载 BEMF 定匝数 | BEMF 落 118–145 V；槽满率 ≤0.78 | **open（阻塞已解除：Bg 0.662 T，11-22 夜首次可信反推）** | BH 修复后 cps=5→BEMF 63.87 V（0.7984 V/匝）；118 V→cps=9（144 匝）、125 V→cps=10（160 匝）、145 V→cps=11。cps=10 在 9.8 mm² 矩形 fill 0.45 可行，待实测验证 |
+| **I3** | blocker | 绕组 | 每槽导体数 / 每相匝数 / 线径未定；84 匝是 12 槽口径 | `m2_noload_cps10.json`（401 点 BEMF 127.7440 V）；`ipm_geom.slot_fill_factor`；`m1_build_check_cps10.json` | BEMF 落 118–145 V；槽满率 ≤0.78 | **closed（2026-11-24：cps=10=160 匝定源，真机 401 点 BEMF 127.7440 V 落窗，槽满率 0.7387 PASS；见当日记录）** | 已定源，无后续；残余 FAIL 转 I22 齿槽 / G4 Bg |
 | **I4** | blocker | 转子 | **单层 V 型**磁钢尺寸 / V 夹角 / 隔磁桥 / 每极块数（2026-11-22 用户由双层 32 块改为单层 16 块） | `ipm_geom.py::derive_rotor`（`v_single=(26,38,13,3)`） | 8 极×1 组×2 块 = **16 块**；每块留桥、无 intersect | **closed（几何部分）**（11-20 双层 / 11-22 改单层重定源：6/6 PASS，OD 桥 8.356 / 轴孔 9.557 / 同组 3.000 / 极间 4.783） | 磁路/漏磁验证转 I8；**M1' 必须重跑**验收 116 sheet |
 | **I5** | major | 电磁 | 斜槽是否保留未定（48 槽分布绕组齿槽本就低，0.5 槽距可能过冲） | 依赖 M2' 空载实测齿槽 | 齿槽 ≤5% 且 BEMF 不出窗 | open | M2' 先跑无斜槽基线 |
 | **I6** | major | 几何 | 转子内径 / 轴径未定；30 mm 对 16 块单层 V 磁钢 | 11-22 单层 V：到轴孔最小间隙 **9.557 mm** | 两路径 `rotor_id` 同源 | **closed**（11-20 / 11-22 重算） | 30 mm 保留，理由写入 §3.1 |
@@ -429,3 +429,61 @@ B/C 相同量级（空载 10.4635 V）。CSV：`csv_ipm_m2_apex33/`、`csv_ipm_m
   会让下次 OpenProject 报"used by another application"且脚本主体不执行，确认无 ansysedt 进程后清 TEMP 锁可恢复。
 - **未做（禁越界）**：未启动新 401 点求解（P0 只补剖分链路）、未碰 P1 匝数/齿槽、未碰 P2 字段。
   下一步按 top3 顺序转 P1。
+
+## 2026-11-24（P1 主项）— I3 匝数定源 cps=10：401 点 BEMF 首次回窗（127.7440 V）
+
+> 开工 HEAD==origin/main==`386a806`（P0 已闭环），工作树干净。按 top3 的 P1 单项推进；
+> 一次一个变量（只改 cps=10 + 配套制造绕线线径 Ø1.35，几何/材料/BH/边界一律不动）。
+> 全程自主未提问。
+
+### 定源决策（assumption=待验证部分已就地标注）
+- **匝数**：cps 5→**10**（`N_ph=16·cps=160`）。依据：BH 修复后 cps=5 实测 BEMF 63.8721 V
+  （Bg 0.6621 T 可信）⇒ 0.7984 V/匝/相 ⇒ 125 V 需 cps=10（预测 127.7442 V，落 118–145 窗）。
+  119 V 下限需 cps=9（114.97 V 出窗），145 V 上限需 cps=11（140.52 V 在窗但槽满率爆表，
+  见下）⇒ **cps=10 是唯一同时满足 BEMF 窗与槽满率的整数匝数**。
+- **绕线线径**：cps=10 每槽 2 边×10 根 = 20 根。Ø1.5 铜 35.34 mm²/槽实切 38.756 mm²
+  ⇒ fill **0.9119 FAIL**（>0.78）；Ø1.35 铜 28.63 mm² ⇒ fill **0.7387 PASS**。
+  故 `wind_wire_mm=1.35`（新字段，仅槽满率口径；**不进 FEA、不改几何**）。
+  几何定标 `wire_diameter_mm=1.50` 不动（Bs0/Bs2 由它推，改它要推翻已 green 的 M1'）。
+  `assumption=待验证`：Ø1.35 需物料 BOM/真实漆包线规格确认；铜耗预算 28.63 < 38.756×0.78=30.23 ✓。
+
+### 代码改动（KEEP）
+- `projects/IPM_8p48s/ipm_geom.py`：`IPMConfig.conductors_per_slot` 5→10（定源，非 TEMP）；
+  新增 `wind_wire_mm=1.35` + `slot_fill_factor()` 独立复算函数。
+- `projects/IPM_8p48s/ipm_build.py`：`CPS = ` 生成行注释更新（TEMP→I3 定源）。
+- `projects/IPM_8p48s/ipm_m2_check.py`：`CPS_MODEL` 5→10。
+- `projects/IPM_8p48s/ipm_m1_check.py`：新增 `--json` 全路径参数（支持多 case 不覆盖旧证据）。
+- `tests/test_ipm_8p48s.py`：+3 例（cps=10 定源 / 槽满率 Ø1.35 PASS+Ø1.5 FAIL / 生成物 CPS=10）；
+  `tests/test_ipm_m2.py`：CPS_MODEL 断言 5→10 + 反推恒等校验改活。
+- `projects/IPM_8p48s/PROJECT_SPEC.md` §3.1 D3：open→closed，写明定源依据与 assumption。
+
+### 真机链路（全部 rc=0，401 点 + 每次剖分，契约 §8）
+| 动作 | 工程/产物 | 关键数 |
+|---|---|---|
+| M1' 建模 | `IPM_8p48s_M1_cps10.aedt` + `m1_build_check_cps10.json` | 117 sheet、CPS=10、96 Conductor number、BH `nonlinear`=2、`VALIDATE_OK`、35.8 s、**17/17 PASS** |
+| M1' 剖分 | `mesh_m1_cps10.json` | 42872 单元、17.278 s、4 组 LengthOp 合规、Band≤0.25、六类对象非 0、**overall PASS** |
+| M2' 空载 401 点 | `IPM_8p48s_M2_cps10.aedt` + `csv_ipm_m2_cps10/` + `m2_noload_cps10.json` | `ANALYZE_OK 710.3 s`、flux/tq 各 402 行、探针 181/46/91、SHEETS=117 |
+| M2' 剖分 | `mesh_m2_cps10.json` | 42758 单元、5.728 s、**overall PASS** |
+
+### 独立重算结果（`m2_noload_cps10.json`）
+| 量 | cps=5（旧） | cps=10（本轮） | 判据 | 判定 |
+|---|---:|---:|---|---|
+| 相 BEMF RMS | 63.8721 V | **127.7440 V**（预测 127.7442，误差 0.0002%） | 118–145 V | **PASS（首次回窗）** |
+| 线 BEMF THD | 4.4988% | 4.4988% | ≤10% | PASS |
+| 气隙 \|B\|峰 Bg | 0.6621 T | 0.6621 T（逐位不变，磁路未动） | 0.70–0.90 | FAIL（I3 无关，G4 遗留） |
+| 齿槽峰峰 | 3.4729 N·m | 3.4729 N·m（逐位不变） | ≤1.25 N·m | FAIL（I22 遗留） |
+| 三相不平衡 | 0.0003% | 0.0003% | ≤2% | PASS |
+| 齿身/轭部 B | 0.922/0.812 T | 0.922/0.812 T | ≤1.65/≤1.50 | PASS |
+
+- **关键交叉校验**：只改 cps（Conductor number）⇒ BEMF 严格线性 ×2（63.8721→127.7440，
+  比 2.00000），Bg/齿槽/THD 逐位不变 ⇒ 证明匝数旋钮与磁路解耦，I13/I16 的 BH 修复未被回退。
+- **未做（禁越界）**：未碰 I22 齿槽、未碰 I21/P2 字段、未碰 φ 扫描/T_avg（那是 P1 后半，
+  需负载 401 点；本轮只做匝数定源单项，Imax 表 E=125→14.810 A 现成可用，明日转负载）。
+  探索仍 LOCKED；SPM baseline 只读。
+- **遗留风险**：①Ø1.35 线径需 BOM 验证（assumption=待验证，不影响 FEA）；②齿槽 3.4729
+  与 Bg 0.6621 仍 FAIL，是本设计最终能否工程可用的真正卡点（I22/G4），非匝数问题。
+- 新增文件：`m1_build_check_cps10.json` [KEEP]、`mesh_m1_cps10.json` [KEEP]、
+  `mesh_m2_cps10.json` [KEEP]、`m2_noload_cps10.json` [KEEP]（首次 BEMF 回窗证据）。
+  TEMP 脚本/CSV/日志全在 `D:/ANSYS_Run/`，不入库。
+- 明日单一焦点：负载 T_avg 回窗——按实测 E=127.744 V 取 Imax（表 E=125→14.810 / 132→14.024
+  插值 ≈14.52 A），φ=0 相对反相点跑 401 点负载，看 T_avg 是否回 22.5–27.5；FAIL 留档后转 I22 齿槽。

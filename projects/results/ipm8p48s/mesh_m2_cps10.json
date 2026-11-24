@@ -1,0 +1,1418 @@
+{
+  "case": "m2_cps10",
+  "project": "IPM_8p48s_M2_cps10",
+  "design": "Motor_Design",
+  "setup": "Setup1",
+  "mesh_method": "AnsoftTAU",
+  "units": "SI_m_inferred_x1000_to_mm",
+  "units_assumption": {
+    "value": "统计长度按 SI(m) 读，×1000 转 mm；面积 ×1e6 转 mm²",
+    "status": "assumption=待验证",
+    "cross_check": "Band RMS 0.000656487 m -> 0.656 mm ≈ 气隙 0.675 mm（2.8%）；若按 mm 读则 0.15 µm 单元不可能",
+    "verify_method": "换已知几何（PM 厚 2.8 mm）比对 max edge 是否落 0.1–3 mm 量级"
+  },
+  "total_elements": 42758,
+  "element_size_mm": {
+    "min_edge": 0.151049,
+    "max_edge": 8.82865,
+    "note": "min/max 取逐对象列极值；Band 的 max_edge 是周向长边，与气隙径向厚度无关"
+  },
+  "length_ops": {
+    "Mesh_Band": {
+      "enabled": true,
+      "max_length": "0.25mm",
+      "expected_max_length_mm": 0.25,
+      "objects": "Band"
+    },
+    "Mesh_Stator": {
+      "enabled": true,
+      "max_length": "0.9mm",
+      "expected_max_length_mm": 0.9,
+      "objects": "StatorOuter"
+    },
+    "Mesh_Rotor": {
+      "enabled": true,
+      "max_length": "1.2mm",
+      "expected_max_length_mm": 1.2,
+      "objects": "RotorOuter"
+    },
+    "Mesh_PM": {
+      "enabled": true,
+      "max_length": "0.5mm",
+      "expected_max_length_mm": 0.5,
+      "objects": "PM"
+    }
+  },
+  "per_object": [
+    {
+      "object": "Region",
+      "num_elements": 8273,
+      "min_edge_mm": 0.195776,
+      "max_edge_mm": 8.82865,
+      "rms_edge_mm": 1.85405,
+      "min_elem_area_mm2": 0.0268643,
+      "max_elem_area_mm2": 26.0276,
+      "mean_elem_area_mm2": 1.40047,
+      "stdev_area_mm2": 3.62451
+    },
+    {
+      "object": "StatorOuter",
+      "num_elements": 9543,
+      "min_edge_mm": 0.195589,
+      "max_edge_mm": 7.65345,
+      "rms_edge_mm": 1.52881,
+      "min_elem_area_mm2": 0.0213071,
+      "max_elem_area_mm2": 20.1294,
+      "mean_elem_area_mm2": 0.942952,
+      "stdev_area_mm2": 1.73668
+    },
+    {
+      "object": "RotorOuter",
+      "num_elements": 10194,
+      "min_edge_mm": 0.183677,
+      "max_edge_mm": 7.66205,
+      "rms_edge_mm": 1.11041,
+      "min_elem_area_mm2": 0.022057,
+      "max_elem_area_mm2": 21.7076,
+      "mean_elem_area_mm2": 0.521359,
+      "stdev_area_mm2": 1.44683
+    },
+    {
+      "object": "PM_01",
+      "num_elements": 304,
+      "min_edge_mm": 0.175,
+      "max_edge_mm": 1.4,
+      "rms_edge_mm": 0.527085,
+      "min_elem_area_mm2": 0.025081199999999998,
+      "max_elem_area_mm2": 0.8025990000000001,
+      "mean_elem_area_mm2": 0.11973700000000001,
+      "stdev_area_mm2": 0.113828
+    },
+    {
+      "object": "PM_02",
+      "num_elements": 280,
+      "min_edge_mm": 0.220549,
+      "max_edge_mm": 1.40334,
+      "rms_edge_mm": 0.54821,
+      "min_elem_area_mm2": 0.038596,
+      "max_elem_area_mm2": 0.799079,
+      "mean_elem_area_mm2": 0.13,
+      "stdev_area_mm2": 0.0994883
+    },
+    {
+      "object": "PM_03",
+      "num_elements": 232,
+      "min_edge_mm": 0.232853,
+      "max_edge_mm": 1.51017,
+      "rms_edge_mm": 0.60238,
+      "min_elem_area_mm2": 0.0407493,
+      "max_elem_area_mm2": 0.528558,
+      "mean_elem_area_mm2": 0.156897,
+      "stdev_area_mm2": 0.111026
+    },
+    {
+      "object": "PM_04",
+      "num_elements": 304,
+      "min_edge_mm": 0.238276,
+      "max_edge_mm": 1.43138,
+      "rms_edge_mm": 0.525947,
+      "min_elem_area_mm2": 0.039862499999999995,
+      "max_elem_area_mm2": 0.503697,
+      "mean_elem_area_mm2": 0.11973700000000001,
+      "stdev_area_mm2": 0.0918754
+    },
+    {
+      "object": "PM_05",
+      "num_elements": 270,
+      "min_edge_mm": 0.231928,
+      "max_edge_mm": 1.46583,
+      "rms_edge_mm": 0.556813,
+      "min_elem_area_mm2": 0.0405874,
+      "max_elem_area_mm2": 0.513042,
+      "mean_elem_area_mm2": 0.13481500000000002,
+      "stdev_area_mm2": 0.101575
+    },
+    {
+      "object": "PM_06",
+      "num_elements": 294,
+      "min_edge_mm": 0.239376,
+      "max_edge_mm": 1.46679,
+      "rms_edge_mm": 0.534616,
+      "min_elem_area_mm2": 0.0418908,
+      "max_elem_area_mm2": 0.5133770000000001,
+      "mean_elem_area_mm2": 0.12380999999999999,
+      "stdev_area_mm2": 0.0972049
+    },
+    {
+      "object": "PM_07",
+      "num_elements": 264,
+      "min_edge_mm": 0.221368,
+      "max_edge_mm": 1.27341,
+      "rms_edge_mm": 0.559089,
+      "min_elem_area_mm2": 0.039862499999999995,
+      "max_elem_area_mm2": 0.445693,
+      "mean_elem_area_mm2": 0.13787899999999997,
+      "stdev_area_mm2": 0.0962561
+    },
+    {
+      "object": "PM_08",
+      "num_elements": 266,
+      "min_edge_mm": 0.25554,
+      "max_edge_mm": 1.5722,
+      "rms_edge_mm": 0.566186,
+      "min_elem_area_mm2": 0.0365293,
+      "max_elem_area_mm2": 0.577573,
+      "mean_elem_area_mm2": 0.136842,
+      "stdev_area_mm2": 0.10366399999999999
+    },
+    {
+      "object": "PM_09",
+      "num_elements": 304,
+      "min_edge_mm": 0.175,
+      "max_edge_mm": 1.4,
+      "rms_edge_mm": 0.527085,
+      "min_elem_area_mm2": 0.0250813,
+      "max_elem_area_mm2": 0.802601,
+      "mean_elem_area_mm2": 0.11973700000000001,
+      "stdev_area_mm2": 0.113828
+    },
+    {
+      "object": "PM_10",
+      "num_elements": 292,
+      "min_edge_mm": 0.220548,
+      "max_edge_mm": 1.24362,
+      "rms_edge_mm": 0.535132,
+      "min_elem_area_mm2": 0.038596,
+      "max_elem_area_mm2": 0.43526699999999996,
+      "mean_elem_area_mm2": 0.124658,
+      "stdev_area_mm2": 0.092757
+    },
+    {
+      "object": "PM_11",
+      "num_elements": 296,
+      "min_edge_mm": 0.175,
+      "max_edge_mm": 1.4,
+      "rms_edge_mm": 0.540085,
+      "min_elem_area_mm2": 0.0228054,
+      "max_elem_area_mm2": 0.729773,
+      "mean_elem_area_mm2": 0.122973,
+      "stdev_area_mm2": 0.123463
+    },
+    {
+      "object": "PM_12",
+      "num_elements": 304,
+      "min_edge_mm": 0.239551,
+      "max_edge_mm": 1.45016,
+      "rms_edge_mm": 0.523603,
+      "min_elem_area_mm2": 0.0399984,
+      "max_elem_area_mm2": 0.5104150000000001,
+      "mean_elem_area_mm2": 0.11973700000000001,
+      "stdev_area_mm2": 0.0914365
+    },
+    {
+      "object": "PM_13",
+      "num_elements": 270,
+      "min_edge_mm": 0.231928,
+      "max_edge_mm": 1.46584,
+      "rms_edge_mm": 0.556814,
+      "min_elem_area_mm2": 0.0405874,
+      "max_elem_area_mm2": 0.513043,
+      "mean_elem_area_mm2": 0.13481500000000002,
+      "stdev_area_mm2": 0.101575
+    },
+    {
+      "object": "PM_14",
+      "num_elements": 294,
+      "min_edge_mm": 0.239374,
+      "max_edge_mm": 1.4668,
+      "rms_edge_mm": 0.534616,
+      "min_elem_area_mm2": 0.0418904,
+      "max_elem_area_mm2": 0.513379,
+      "mean_elem_area_mm2": 0.12380999999999999,
+      "stdev_area_mm2": 0.0972049
+    },
+    {
+      "object": "PM_15",
+      "num_elements": 304,
+      "min_edge_mm": 0.175,
+      "max_edge_mm": 1.4,
+      "rms_edge_mm": 0.526813,
+      "min_elem_area_mm2": 0.0259521,
+      "max_elem_area_mm2": 0.830467,
+      "mean_elem_area_mm2": 0.11973700000000001,
+      "stdev_area_mm2": 0.11293099999999999
+    },
+    {
+      "object": "PM_16",
+      "num_elements": 260,
+      "min_edge_mm": 0.250726,
+      "max_edge_mm": 1.47193,
+      "rms_edge_mm": 0.57147,
+      "min_elem_area_mm2": 0.0355548,
+      "max_elem_area_mm2": 0.5151760000000001,
+      "mean_elem_area_mm2": 0.14,
+      "stdev_area_mm2": 0.102312
+    },
+    {
+      "object": "Band",
+      "num_elements": 4170,
+      "min_edge_mm": 0.151049,
+      "max_edge_mm": 7.63688,
+      "rms_edge_mm": 0.663848,
+      "min_elem_area_mm2": 0.0121474,
+      "max_elem_area_mm2": 21.968400000000003,
+      "mean_elem_area_mm2": 0.190519,
+      "stdev_area_mm2": 1.1389
+    },
+    {
+      "object": "AirgapRing",
+      "num_elements": 4466,
+      "min_edge_mm": 0.151049,
+      "max_edge_mm": 0.431834,
+      "rms_edge_mm": 0.227967,
+      "min_elem_area_mm2": 0.012521000000000001,
+      "max_elem_area_mm2": 0.056271400000000006,
+      "mean_elem_area_mm2": 0.0223534,
+      "stdev_area_mm2": 0.00890426
+    },
+    {
+      "object": "Coil_T01",
+      "num_elements": 14,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 3.28441,
+      "rms_edge_mm": 1.33377,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 1.6421999999999999,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.343578
+    },
+    {
+      "object": "Coil_B01",
+      "num_elements": 16,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 3.28441,
+      "rms_edge_mm": 1.36542,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 1.6421999999999999,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.356203
+    },
+    {
+      "object": "Coil_T02",
+      "num_elements": 15,
+      "min_edge_mm": 0.761439,
+      "max_edge_mm": 2.26404,
+      "rms_edge_mm": 1.2809,
+      "min_elem_area_mm2": 0.38072,
+      "max_elem_area_mm2": 1.13202,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.233437
+    },
+    {
+      "object": "Coil_B02",
+      "num_elements": 14,
+      "min_edge_mm": 0.913384,
+      "max_edge_mm": 2.26404,
+      "rms_edge_mm": 1.38989,
+      "min_elem_area_mm2": 0.456692,
+      "max_elem_area_mm2": 1.13202,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.204214
+    },
+    {
+      "object": "Coil_T03",
+      "num_elements": 16,
+      "min_edge_mm": 0.5816,
+      "max_edge_mm": 2.84494,
+      "rms_edge_mm": 1.24356,
+      "min_elem_area_mm2": 0.2908,
+      "max_elem_area_mm2": 1.42247,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.328032
+    },
+    {
+      "object": "Coil_B03",
+      "num_elements": 16,
+      "min_edge_mm": 0.665594,
+      "max_edge_mm": 2.84494,
+      "rms_edge_mm": 1.37678,
+      "min_elem_area_mm2": 0.332797,
+      "max_elem_area_mm2": 1.42247,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.32635200000000003
+    },
+    {
+      "object": "Coil_T04",
+      "num_elements": 15,
+      "min_edge_mm": 0.781089,
+      "max_edge_mm": 2.15307,
+      "rms_edge_mm": 1.29679,
+      "min_elem_area_mm2": 0.390545,
+      "max_elem_area_mm2": 1.07653,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.220678
+    },
+    {
+      "object": "Coil_B04",
+      "num_elements": 19,
+      "min_edge_mm": 0.588496,
+      "max_edge_mm": 2.15307,
+      "rms_edge_mm": 1.16248,
+      "min_elem_area_mm2": 0.29424799999999995,
+      "max_elem_area_mm2": 1.07653,
+      "mean_elem_area_mm2": 0.515789,
+      "stdev_area_mm2": 0.260939
+    },
+    {
+      "object": "Coil_T05",
+      "num_elements": 14,
+      "min_edge_mm": 0.718118,
+      "max_edge_mm": 2.09587,
+      "rms_edge_mm": 1.42921,
+      "min_elem_area_mm2": 0.359059,
+      "max_elem_area_mm2": 1.04794,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.24011
+    },
+    {
+      "object": "Coil_B05",
+      "num_elements": 18,
+      "min_edge_mm": 0.695054,
+      "max_edge_mm": 2.09587,
+      "rms_edge_mm": 1.15921,
+      "min_elem_area_mm2": 0.34752700000000003,
+      "max_elem_area_mm2": 1.04794,
+      "mean_elem_area_mm2": 0.5444439999999999,
+      "stdev_area_mm2": 0.208618
+    },
+    {
+      "object": "Coil_T06",
+      "num_elements": 22,
+      "min_edge_mm": 0.46,
+      "max_edge_mm": 1.88318,
+      "rms_edge_mm": 1.04035,
+      "min_elem_area_mm2": 0.22999999999999998,
+      "max_elem_area_mm2": 0.853261,
+      "mean_elem_area_mm2": 0.445455,
+      "stdev_area_mm2": 0.198324
+    },
+    {
+      "object": "Coil_B06",
+      "num_elements": 16,
+      "min_edge_mm": 0.699081,
+      "max_edge_mm": 1.90863,
+      "rms_edge_mm": 1.26266,
+      "min_elem_area_mm2": 0.34954100000000005,
+      "max_elem_area_mm2": 0.847241,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.154632
+    },
+    {
+      "object": "Coil_T07",
+      "num_elements": 14,
+      "min_edge_mm": 0.647723,
+      "max_edge_mm": 3.26891,
+      "rms_edge_mm": 1.40112,
+      "min_elem_area_mm2": 0.323861,
+      "max_elem_area_mm2": 1.63446,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.34808300000000003
+    },
+    {
+      "object": "Coil_B07",
+      "num_elements": 20,
+      "min_edge_mm": 0.493173,
+      "max_edge_mm": 2.20032,
+      "rms_edge_mm": 1.16174,
+      "min_elem_area_mm2": 0.20430700000000002,
+      "max_elem_area_mm2": 1.10016,
+      "mean_elem_area_mm2": 0.49,
+      "stdev_area_mm2": 0.271488
+    },
+    {
+      "object": "Coil_T08",
+      "num_elements": 19,
+      "min_edge_mm": 0.648372,
+      "max_edge_mm": 1.89755,
+      "rms_edge_mm": 1.11925,
+      "min_elem_area_mm2": 0.324186,
+      "max_elem_area_mm2": 0.948777,
+      "mean_elem_area_mm2": 0.515789,
+      "stdev_area_mm2": 0.191739
+    },
+    {
+      "object": "Coil_B08",
+      "num_elements": 15,
+      "min_edge_mm": 0.753014,
+      "max_edge_mm": 2.70245,
+      "rms_edge_mm": 1.36561,
+      "min_elem_area_mm2": 0.376507,
+      "max_elem_area_mm2": 1.35122,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.258517
+    },
+    {
+      "object": "Coil_T09",
+      "num_elements": 18,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 4.82529,
+      "rms_edge_mm": 1.1914,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 2.4126399999999997,
+      "mean_elem_area_mm2": 0.5444439999999999,
+      "stdev_area_mm2": 0.480761
+    },
+    {
+      "object": "Coil_B09",
+      "num_elements": 15,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 4.82529,
+      "rms_edge_mm": 1.59528,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 2.4126399999999997,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.494689
+    },
+    {
+      "object": "Coil_T10",
+      "num_elements": 14,
+      "min_edge_mm": 0.783593,
+      "max_edge_mm": 2.67347,
+      "rms_edge_mm": 1.34413,
+      "min_elem_area_mm2": 0.391797,
+      "max_elem_area_mm2": 1.33673,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.293509
+    },
+    {
+      "object": "Coil_B10",
+      "num_elements": 14,
+      "min_edge_mm": 0.915926,
+      "max_edge_mm": 2.25308,
+      "rms_edge_mm": 1.38967,
+      "min_elem_area_mm2": 0.457963,
+      "max_elem_area_mm2": 1.1265399999999999,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.211429
+    },
+    {
+      "object": "Coil_T11",
+      "num_elements": 13,
+      "min_edge_mm": 0.783534,
+      "max_edge_mm": 3.06718,
+      "rms_edge_mm": 1.41896,
+      "min_elem_area_mm2": 0.391767,
+      "max_elem_area_mm2": 1.53359,
+      "mean_elem_area_mm2": 0.753846,
+      "stdev_area_mm2": 0.30279799999999996
+    },
+    {
+      "object": "Coil_B11",
+      "num_elements": 16,
+      "min_edge_mm": 0.700181,
+      "max_edge_mm": 3.06718,
+      "rms_edge_mm": 1.36968,
+      "min_elem_area_mm2": 0.350091,
+      "max_elem_area_mm2": 1.53359,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.329
+    },
+    {
+      "object": "Coil_T12",
+      "num_elements": 18,
+      "min_edge_mm": 0.658326,
+      "max_edge_mm": 1.93607,
+      "rms_edge_mm": 1.19964,
+      "min_elem_area_mm2": 0.329163,
+      "max_elem_area_mm2": 0.9680329999999999,
+      "mean_elem_area_mm2": 0.544445,
+      "stdev_area_mm2": 0.24003600000000003
+    },
+    {
+      "object": "Coil_B12",
+      "num_elements": 16,
+      "min_edge_mm": 0.631185,
+      "max_edge_mm": 3.33763,
+      "rms_edge_mm": 1.3652,
+      "min_elem_area_mm2": 0.315593,
+      "max_elem_area_mm2": 1.6688100000000001,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.350573
+    },
+    {
+      "object": "Coil_T13",
+      "num_elements": 17,
+      "min_edge_mm": 0.624665,
+      "max_edge_mm": 3.34853,
+      "rms_edge_mm": 1.24696,
+      "min_elem_area_mm2": 0.312332,
+      "max_elem_area_mm2": 1.67427,
+      "mean_elem_area_mm2": 0.576471,
+      "stdev_area_mm2": 0.36213599999999996
+    },
+    {
+      "object": "Coil_B13",
+      "num_elements": 25,
+      "min_edge_mm": 0.224853,
+      "max_edge_mm": 1.67427,
+      "rms_edge_mm": 0.993294,
+      "min_elem_area_mm2": 0.112426,
+      "max_elem_area_mm2": 0.8371329999999999,
+      "mean_elem_area_mm2": 0.392,
+      "stdev_area_mm2": 0.166575
+    },
+    {
+      "object": "Coil_T14",
+      "num_elements": 18,
+      "min_edge_mm": 0.629363,
+      "max_edge_mm": 2.08782,
+      "rms_edge_mm": 1.1436,
+      "min_elem_area_mm2": 0.314681,
+      "max_elem_area_mm2": 1.04391,
+      "mean_elem_area_mm2": 0.5444439999999999,
+      "stdev_area_mm2": 0.227101
+    },
+    {
+      "object": "Coil_B14",
+      "num_elements": 15,
+      "min_edge_mm": 0.689263,
+      "max_edge_mm": 2.08782,
+      "rms_edge_mm": 1.32264,
+      "min_elem_area_mm2": 0.344632,
+      "max_elem_area_mm2": 1.04391,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.218471
+    },
+    {
+      "object": "Coil_T15",
+      "num_elements": 16,
+      "min_edge_mm": 0.732502,
+      "max_edge_mm": 2.5617,
+      "rms_edge_mm": 1.26449,
+      "min_elem_area_mm2": 0.366251,
+      "max_elem_area_mm2": 1.28085,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.277042
+    },
+    {
+      "object": "Coil_B15",
+      "num_elements": 23,
+      "min_edge_mm": 0.566281,
+      "max_edge_mm": 1.69147,
+      "rms_edge_mm": 1.05148,
+      "min_elem_area_mm2": 0.14157,
+      "max_elem_area_mm2": 0.813968,
+      "mean_elem_area_mm2": 0.426087,
+      "stdev_area_mm2": 0.196732
+    },
+    {
+      "object": "Coil_T16",
+      "num_elements": 15,
+      "min_edge_mm": 0.618815,
+      "max_edge_mm": 2.746,
+      "rms_edge_mm": 1.28759,
+      "min_elem_area_mm2": 0.309407,
+      "max_elem_area_mm2": 1.373,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.335455
+    },
+    {
+      "object": "Coil_B16",
+      "num_elements": 15,
+      "min_edge_mm": 0.648389,
+      "max_edge_mm": 2.746,
+      "rms_edge_mm": 1.40665,
+      "min_elem_area_mm2": 0.324195,
+      "max_elem_area_mm2": 1.373,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.329911
+    },
+    {
+      "object": "Coil_T17",
+      "num_elements": 16,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 2.94703,
+      "rms_edge_mm": 1.33088,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 1.4735200000000002,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.284075
+    },
+    {
+      "object": "Coil_B17",
+      "num_elements": 20,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 2.94703,
+      "rms_edge_mm": 1.17276,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 1.4735200000000002,
+      "mean_elem_area_mm2": 0.49,
+      "stdev_area_mm2": 0.28644800000000004
+    },
+    {
+      "object": "Coil_T18",
+      "num_elements": 15,
+      "min_edge_mm": 0.754206,
+      "max_edge_mm": 2.25389,
+      "rms_edge_mm": 1.35178,
+      "min_elem_area_mm2": 0.37710299999999997,
+      "max_elem_area_mm2": 1.1269500000000001,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.234641
+    },
+    {
+      "object": "Coil_B18",
+      "num_elements": 14,
+      "min_edge_mm": 0.948673,
+      "max_edge_mm": 2.25389,
+      "rms_edge_mm": 1.38916,
+      "min_elem_area_mm2": 0.474336,
+      "max_elem_area_mm2": 1.1269500000000001,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.206071
+    },
+    {
+      "object": "Coil_T19",
+      "num_elements": 16,
+      "min_edge_mm": 0.546867,
+      "max_edge_mm": 3.26891,
+      "rms_edge_mm": 1.25014,
+      "min_elem_area_mm2": 0.273434,
+      "max_elem_area_mm2": 1.6344500000000002,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.359685
+    },
+    {
+      "object": "Coil_B19",
+      "num_elements": 17,
+      "min_edge_mm": 0.688382,
+      "max_edge_mm": 3.26891,
+      "rms_edge_mm": 1.32802,
+      "min_elem_area_mm2": 0.34419099999999997,
+      "max_elem_area_mm2": 1.6344500000000002,
+      "mean_elem_area_mm2": 0.57647,
+      "stdev_area_mm2": 0.345385
+    },
+    {
+      "object": "Coil_T20",
+      "num_elements": 18,
+      "min_edge_mm": 0.698967,
+      "max_edge_mm": 1.90828,
+      "rms_edge_mm": 1.17905,
+      "min_elem_area_mm2": 0.349483,
+      "max_elem_area_mm2": 0.8807440000000001,
+      "mean_elem_area_mm2": 0.5444439999999999,
+      "stdev_area_mm2": 0.1543
+    },
+    {
+      "object": "Coil_B20",
+      "num_elements": 14,
+      "min_edge_mm": 0.785557,
+      "max_edge_mm": 2.74794,
+      "rms_edge_mm": 1.55328,
+      "min_elem_area_mm2": 0.39277900000000004,
+      "max_elem_area_mm2": 1.37397,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.315247
+    },
+    {
+      "object": "Coil_T21",
+      "num_elements": 13,
+      "min_edge_mm": 0.629469,
+      "max_edge_mm": 3.35496,
+      "rms_edge_mm": 1.51457,
+      "min_elem_area_mm2": 0.314734,
+      "max_elem_area_mm2": 1.6774799999999999,
+      "mean_elem_area_mm2": 0.753846,
+      "stdev_area_mm2": 0.359841
+    },
+    {
+      "object": "Coil_B21",
+      "num_elements": 17,
+      "min_edge_mm": 0.479637,
+      "max_edge_mm": 3.35496,
+      "rms_edge_mm": 1.34171,
+      "min_elem_area_mm2": 0.23981799999999998,
+      "max_elem_area_mm2": 1.6774799999999999,
+      "mean_elem_area_mm2": 0.57647,
+      "stdev_area_mm2": 0.346437
+    },
+    {
+      "object": "Coil_T22",
+      "num_elements": 14,
+      "min_edge_mm": 0.789175,
+      "max_edge_mm": 2.28449,
+      "rms_edge_mm": 1.41345,
+      "min_elem_area_mm2": 0.394587,
+      "max_elem_area_mm2": 1.1422400000000001,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.228607
+    },
+    {
+      "object": "Coil_B22",
+      "num_elements": 14,
+      "min_edge_mm": 0.587702,
+      "max_edge_mm": 3.4246,
+      "rms_edge_mm": 1.33183,
+      "min_elem_area_mm2": 0.293851,
+      "max_elem_area_mm2": 1.7123,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.357678
+    },
+    {
+      "object": "Coil_T23",
+      "num_elements": 15,
+      "min_edge_mm": 0.67019,
+      "max_edge_mm": 2.44755,
+      "rms_edge_mm": 1.31669,
+      "min_elem_area_mm2": 0.335095,
+      "max_elem_area_mm2": 1.22377,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.307888
+    },
+    {
+      "object": "Coil_B23",
+      "num_elements": 17,
+      "min_edge_mm": 0.83084,
+      "max_edge_mm": 2.36731,
+      "rms_edge_mm": 1.26384,
+      "min_elem_area_mm2": 0.41542,
+      "max_elem_area_mm2": 1.18365,
+      "mean_elem_area_mm2": 0.576471,
+      "stdev_area_mm2": 0.191598
+    },
+    {
+      "object": "Coil_T24",
+      "num_elements": 22,
+      "min_edge_mm": 0.506823,
+      "max_edge_mm": 2.77606,
+      "rms_edge_mm": 1.09386,
+      "min_elem_area_mm2": 0.12459300000000001,
+      "max_elem_area_mm2": 0.911972,
+      "mean_elem_area_mm2": 0.445455,
+      "stdev_area_mm2": 0.202134
+    },
+    {
+      "object": "Coil_B24",
+      "num_elements": 17,
+      "min_edge_mm": 0.64699,
+      "max_edge_mm": 2.77606,
+      "rms_edge_mm": 1.26839,
+      "min_elem_area_mm2": 0.32349500000000003,
+      "max_elem_area_mm2": 1.38803,
+      "mean_elem_area_mm2": 0.57647,
+      "stdev_area_mm2": 0.283821
+    },
+    {
+      "object": "Coil_T25",
+      "num_elements": 14,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 3.28441,
+      "rms_edge_mm": 1.33377,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 1.6421999999999999,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.343578
+    },
+    {
+      "object": "Coil_B25",
+      "num_elements": 16,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 3.28441,
+      "rms_edge_mm": 1.36542,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 1.6421999999999999,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.356203
+    },
+    {
+      "object": "Coil_T26",
+      "num_elements": 16,
+      "min_edge_mm": 0.761439,
+      "max_edge_mm": 2.26404,
+      "rms_edge_mm": 1.28131,
+      "min_elem_area_mm2": 0.38072,
+      "max_elem_area_mm2": 1.13202,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.240008
+    },
+    {
+      "object": "Coil_B26",
+      "num_elements": 14,
+      "min_edge_mm": 0.913384,
+      "max_edge_mm": 2.26404,
+      "rms_edge_mm": 1.37149,
+      "min_elem_area_mm2": 0.456692,
+      "max_elem_area_mm2": 1.13202,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.204214
+    },
+    {
+      "object": "Coil_T27",
+      "num_elements": 14,
+      "min_edge_mm": 0.830846,
+      "max_edge_mm": 2.84494,
+      "rms_edge_mm": 1.3418,
+      "min_elem_area_mm2": 0.415423,
+      "max_elem_area_mm2": 1.42247,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.293518
+    },
+    {
+      "object": "Coil_B27",
+      "num_elements": 16,
+      "min_edge_mm": 0.665594,
+      "max_edge_mm": 2.84494,
+      "rms_edge_mm": 1.37678,
+      "min_elem_area_mm2": 0.332797,
+      "max_elem_area_mm2": 1.42247,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.32635200000000003
+    },
+    {
+      "object": "Coil_T28",
+      "num_elements": 15,
+      "min_edge_mm": 0.781089,
+      "max_edge_mm": 2.15307,
+      "rms_edge_mm": 1.29679,
+      "min_elem_area_mm2": 0.390545,
+      "max_elem_area_mm2": 1.07653,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.220678
+    },
+    {
+      "object": "Coil_B28",
+      "num_elements": 19,
+      "min_edge_mm": 0.588496,
+      "max_edge_mm": 2.15307,
+      "rms_edge_mm": 1.16248,
+      "min_elem_area_mm2": 0.29424799999999995,
+      "max_elem_area_mm2": 1.07653,
+      "mean_elem_area_mm2": 0.515789,
+      "stdev_area_mm2": 0.260939
+    },
+    {
+      "object": "Coil_T29",
+      "num_elements": 14,
+      "min_edge_mm": 0.718118,
+      "max_edge_mm": 2.09587,
+      "rms_edge_mm": 1.42921,
+      "min_elem_area_mm2": 0.359059,
+      "max_elem_area_mm2": 1.04794,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.24011
+    },
+    {
+      "object": "Coil_B29",
+      "num_elements": 18,
+      "min_edge_mm": 0.695054,
+      "max_edge_mm": 2.09587,
+      "rms_edge_mm": 1.15921,
+      "min_elem_area_mm2": 0.34752700000000003,
+      "max_elem_area_mm2": 1.04794,
+      "mean_elem_area_mm2": 0.5444439999999999,
+      "stdev_area_mm2": 0.208618
+    },
+    {
+      "object": "Coil_T30",
+      "num_elements": 22,
+      "min_edge_mm": 0.46,
+      "max_edge_mm": 1.88318,
+      "rms_edge_mm": 1.04035,
+      "min_elem_area_mm2": 0.22999999999999998,
+      "max_elem_area_mm2": 0.85326,
+      "mean_elem_area_mm2": 0.445455,
+      "stdev_area_mm2": 0.198324
+    },
+    {
+      "object": "Coil_B30",
+      "num_elements": 14,
+      "min_edge_mm": 0.699086,
+      "max_edge_mm": 2.7351,
+      "rms_edge_mm": 1.42842,
+      "min_elem_area_mm2": 0.34954300000000005,
+      "max_elem_area_mm2": 1.36755,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.23480499999999999
+    },
+    {
+      "object": "Coil_T31",
+      "num_elements": 15,
+      "min_edge_mm": 0.647723,
+      "max_edge_mm": 3.26891,
+      "rms_edge_mm": 1.35213,
+      "min_elem_area_mm2": 0.323861,
+      "max_elem_area_mm2": 1.63446,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.362583
+    },
+    {
+      "object": "Coil_B31",
+      "num_elements": 20,
+      "min_edge_mm": 0.493173,
+      "max_edge_mm": 2.20032,
+      "rms_edge_mm": 1.16174,
+      "min_elem_area_mm2": 0.20430700000000002,
+      "max_elem_area_mm2": 1.10016,
+      "mean_elem_area_mm2": 0.49,
+      "stdev_area_mm2": 0.271488
+    },
+    {
+      "object": "Coil_T32",
+      "num_elements": 19,
+      "min_edge_mm": 0.648372,
+      "max_edge_mm": 1.89755,
+      "rms_edge_mm": 1.13156,
+      "min_elem_area_mm2": 0.324186,
+      "max_elem_area_mm2": 0.948777,
+      "mean_elem_area_mm2": 0.515789,
+      "stdev_area_mm2": 0.191739
+    },
+    {
+      "object": "Coil_B32",
+      "num_elements": 14,
+      "min_edge_mm": 0.753014,
+      "max_edge_mm": 2.70245,
+      "rms_edge_mm": 1.46328,
+      "min_elem_area_mm2": 0.376507,
+      "max_elem_area_mm2": 1.35122,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.24557199999999998
+    },
+    {
+      "object": "Coil_T33",
+      "num_elements": 16,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 4.82532,
+      "rms_edge_mm": 1.26115,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 2.41266,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.495727
+    },
+    {
+      "object": "Coil_B33",
+      "num_elements": 14,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 4.82532,
+      "rms_edge_mm": 1.63474,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 2.41266,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.540525
+    },
+    {
+      "object": "Coil_T34",
+      "num_elements": 14,
+      "min_edge_mm": 0.864519,
+      "max_edge_mm": 3.36226,
+      "rms_edge_mm": 1.49894,
+      "min_elem_area_mm2": 0.43226,
+      "max_elem_area_mm2": 1.68113,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.339713
+    },
+    {
+      "object": "Coil_B34",
+      "num_elements": 14,
+      "min_edge_mm": 0.92,
+      "max_edge_mm": 3.36226,
+      "rms_edge_mm": 1.364,
+      "min_elem_area_mm2": 0.45999999999999996,
+      "max_elem_area_mm2": 1.68113,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.340777
+    },
+    {
+      "object": "Coil_T35",
+      "num_elements": 16,
+      "min_edge_mm": 0.467846,
+      "max_edge_mm": 3.06721,
+      "rms_edge_mm": 1.27811,
+      "min_elem_area_mm2": 0.233923,
+      "max_elem_area_mm2": 1.5336100000000001,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.367981
+    },
+    {
+      "object": "Coil_B35",
+      "num_elements": 16,
+      "min_edge_mm": 0.700121,
+      "max_edge_mm": 3.06721,
+      "rms_edge_mm": 1.27694,
+      "min_elem_area_mm2": 0.35006099999999996,
+      "max_elem_area_mm2": 1.5336100000000001,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.32896600000000004
+    },
+    {
+      "object": "Coil_T36",
+      "num_elements": 18,
+      "min_edge_mm": 0.658324,
+      "max_edge_mm": 1.93607,
+      "rms_edge_mm": 1.19963,
+      "min_elem_area_mm2": 0.329162,
+      "max_elem_area_mm2": 0.968034,
+      "mean_elem_area_mm2": 0.544445,
+      "stdev_area_mm2": 0.24003000000000002
+    },
+    {
+      "object": "Coil_B36",
+      "num_elements": 16,
+      "min_edge_mm": 0.631271,
+      "max_edge_mm": 3.33746,
+      "rms_edge_mm": 1.36519,
+      "min_elem_area_mm2": 0.315635,
+      "max_elem_area_mm2": 1.66873,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.350566
+    },
+    {
+      "object": "Coil_T37",
+      "num_elements": 15,
+      "min_edge_mm": 0.622975,
+      "max_edge_mm": 3.35405,
+      "rms_edge_mm": 1.32071,
+      "min_elem_area_mm2": 0.311487,
+      "max_elem_area_mm2": 1.67703,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.370816
+    },
+    {
+      "object": "Coil_B37",
+      "num_elements": 26,
+      "min_edge_mm": 0.613003,
+      "max_edge_mm": 1.67703,
+      "rms_edge_mm": 0.930871,
+      "min_elem_area_mm2": 0.306501,
+      "max_elem_area_mm2": 0.8385130000000001,
+      "mean_elem_area_mm2": 0.376923,
+      "stdev_area_mm2": 0.13912
+    },
+    {
+      "object": "Coil_T38",
+      "num_elements": 18,
+      "min_edge_mm": 0.62936,
+      "max_edge_mm": 2.08782,
+      "rms_edge_mm": 1.1436,
+      "min_elem_area_mm2": 0.31468,
+      "max_elem_area_mm2": 1.04391,
+      "mean_elem_area_mm2": 0.5444439999999999,
+      "stdev_area_mm2": 0.22709700000000002
+    },
+    {
+      "object": "Coil_B38",
+      "num_elements": 15,
+      "min_edge_mm": 0.689263,
+      "max_edge_mm": 2.08782,
+      "rms_edge_mm": 1.32264,
+      "min_elem_area_mm2": 0.344632,
+      "max_elem_area_mm2": 1.04391,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.218471
+    },
+    {
+      "object": "Coil_T39",
+      "num_elements": 16,
+      "min_edge_mm": 0.732502,
+      "max_edge_mm": 2.5617,
+      "rms_edge_mm": 1.26449,
+      "min_elem_area_mm2": 0.366251,
+      "max_elem_area_mm2": 1.28085,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.277042
+    },
+    {
+      "object": "Coil_B39",
+      "num_elements": 23,
+      "min_edge_mm": 0.566281,
+      "max_edge_mm": 1.69147,
+      "rms_edge_mm": 1.02914,
+      "min_elem_area_mm2": 0.14157,
+      "max_elem_area_mm2": 0.813968,
+      "mean_elem_area_mm2": 0.426087,
+      "stdev_area_mm2": 0.196732
+    },
+    {
+      "object": "Coil_T40",
+      "num_elements": 15,
+      "min_edge_mm": 0.618815,
+      "max_edge_mm": 2.746,
+      "rms_edge_mm": 1.28759,
+      "min_elem_area_mm2": 0.309407,
+      "max_elem_area_mm2": 1.373,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.335455
+    },
+    {
+      "object": "Coil_B40",
+      "num_elements": 15,
+      "min_edge_mm": 0.648389,
+      "max_edge_mm": 2.746,
+      "rms_edge_mm": 1.40665,
+      "min_elem_area_mm2": 0.324195,
+      "max_elem_area_mm2": 1.373,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.329911
+    },
+    {
+      "object": "Coil_T41",
+      "num_elements": 16,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 2.94703,
+      "rms_edge_mm": 1.33088,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 1.4735200000000002,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.284075
+    },
+    {
+      "object": "Coil_B41",
+      "num_elements": 20,
+      "min_edge_mm": 0.497067,
+      "max_edge_mm": 2.94703,
+      "rms_edge_mm": 1.17276,
+      "min_elem_area_mm2": 0.248533,
+      "max_elem_area_mm2": 1.4735200000000002,
+      "mean_elem_area_mm2": 0.49,
+      "stdev_area_mm2": 0.28644800000000004
+    },
+    {
+      "object": "Coil_T42",
+      "num_elements": 15,
+      "min_edge_mm": 0.754206,
+      "max_edge_mm": 2.25389,
+      "rms_edge_mm": 1.35178,
+      "min_elem_area_mm2": 0.37710299999999997,
+      "max_elem_area_mm2": 1.1269500000000001,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.234641
+    },
+    {
+      "object": "Coil_B42",
+      "num_elements": 14,
+      "min_edge_mm": 0.948673,
+      "max_edge_mm": 2.25389,
+      "rms_edge_mm": 1.38916,
+      "min_elem_area_mm2": 0.474336,
+      "max_elem_area_mm2": 1.1269500000000001,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.206071
+    },
+    {
+      "object": "Coil_T43",
+      "num_elements": 15,
+      "min_edge_mm": 0.546867,
+      "max_edge_mm": 3.26891,
+      "rms_edge_mm": 1.28854,
+      "min_elem_area_mm2": 0.273434,
+      "max_elem_area_mm2": 1.6344500000000002,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.36480199999999996
+    },
+    {
+      "object": "Coil_B43",
+      "num_elements": 16,
+      "min_edge_mm": 0.688382,
+      "max_edge_mm": 3.26891,
+      "rms_edge_mm": 1.40067,
+      "min_elem_area_mm2": 0.34419099999999997,
+      "max_elem_area_mm2": 1.6344500000000002,
+      "mean_elem_area_mm2": 0.6124999999999999,
+      "stdev_area_mm2": 0.340629
+    },
+    {
+      "object": "Coil_T44",
+      "num_elements": 18,
+      "min_edge_mm": 0.698972,
+      "max_edge_mm": 1.90828,
+      "rms_edge_mm": 1.19402,
+      "min_elem_area_mm2": 0.34948599999999996,
+      "max_elem_area_mm2": 0.8807440000000001,
+      "mean_elem_area_mm2": 0.5444439999999999,
+      "stdev_area_mm2": 0.154299
+    },
+    {
+      "object": "Coil_B44",
+      "num_elements": 14,
+      "min_edge_mm": 0.785557,
+      "max_edge_mm": 2.74794,
+      "rms_edge_mm": 1.55328,
+      "min_elem_area_mm2": 0.39277900000000004,
+      "max_elem_area_mm2": 1.37397,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.315247
+    },
+    {
+      "object": "Coil_T45",
+      "num_elements": 13,
+      "min_edge_mm": 0.629469,
+      "max_edge_mm": 3.35496,
+      "rms_edge_mm": 1.51457,
+      "min_elem_area_mm2": 0.314734,
+      "max_elem_area_mm2": 1.6774799999999999,
+      "mean_elem_area_mm2": 0.753846,
+      "stdev_area_mm2": 0.359841
+    },
+    {
+      "object": "Coil_B45",
+      "num_elements": 17,
+      "min_edge_mm": 0.479637,
+      "max_edge_mm": 3.35496,
+      "rms_edge_mm": 1.34171,
+      "min_elem_area_mm2": 0.23981799999999998,
+      "max_elem_area_mm2": 1.6774799999999999,
+      "mean_elem_area_mm2": 0.57647,
+      "stdev_area_mm2": 0.346437
+    },
+    {
+      "object": "Coil_T46",
+      "num_elements": 14,
+      "min_edge_mm": 0.789175,
+      "max_edge_mm": 2.28449,
+      "rms_edge_mm": 1.41345,
+      "min_elem_area_mm2": 0.394587,
+      "max_elem_area_mm2": 1.1422400000000001,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.228607
+    },
+    {
+      "object": "Coil_B46",
+      "num_elements": 14,
+      "min_edge_mm": 0.587702,
+      "max_edge_mm": 3.4246,
+      "rms_edge_mm": 1.33183,
+      "min_elem_area_mm2": 0.293851,
+      "max_elem_area_mm2": 1.7123,
+      "mean_elem_area_mm2": 0.7,
+      "stdev_area_mm2": 0.357678
+    },
+    {
+      "object": "Coil_T47",
+      "num_elements": 15,
+      "min_edge_mm": 0.67019,
+      "max_edge_mm": 2.44755,
+      "rms_edge_mm": 1.31669,
+      "min_elem_area_mm2": 0.335095,
+      "max_elem_area_mm2": 1.22377,
+      "mean_elem_area_mm2": 0.653333,
+      "stdev_area_mm2": 0.307888
+    },
+    {
+      "object": "Coil_B47",
+      "num_elements": 17,
+      "min_edge_mm": 0.83084,
+      "max_edge_mm": 2.36731,
+      "rms_edge_mm": 1.22289,
+      "min_elem_area_mm2": 0.41542,
+      "max_elem_area_mm2": 1.18365,
+      "mean_elem_area_mm2": 0.576471,
+      "stdev_area_mm2": 0.191598
+    },
+    {
+      "object": "Coil_T48",
+      "num_elements": 22,
+      "min_edge_mm": 0.506823,
+      "max_edge_mm": 2.77606,
+      "rms_edge_mm": 1.10476,
+      "min_elem_area_mm2": 0.12459300000000001,
+      "max_elem_area_mm2": 0.911972,
+      "mean_elem_area_mm2": 0.445455,
+      "stdev_area_mm2": 0.202134
+    },
+    {
+      "object": "Coil_B48",
+      "num_elements": 17,
+      "min_edge_mm": 0.64699,
+      "max_edge_mm": 2.77606,
+      "rms_edge_mm": 1.26839,
+      "min_elem_area_mm2": 0.32349500000000003,
+      "max_elem_area_mm2": 1.38803,
+      "mean_elem_area_mm2": 0.57647,
+      "stdev_area_mm2": 0.283821
+    }
+  ],
+  "mesh_generation_time_s": 5.728,
+  "verdict": {
+    "checks": {
+      "length_ops_enabled_and_match": {
+        "pass": true,
+        "detail": {
+          "Mesh_Band": {
+            "enabled": true,
+            "max_length_mm": 0.25,
+            "pass": true
+          },
+          "Mesh_Stator": {
+            "enabled": true,
+            "max_length_mm": 0.9,
+            "pass": true
+          },
+          "Mesh_Rotor": {
+            "enabled": true,
+            "max_length_mm": 1.2,
+            "pass": true
+          },
+          "Mesh_PM": {
+            "enabled": true,
+            "max_length_mm": 0.5,
+            "pass": true
+          }
+        }
+      },
+      "band_max_length_le_0p25mm": {
+        "pass": true,
+        "max_length_mm": 0.25,
+        "limit_mm": 0.25
+      },
+      "all_object_groups_nonzero": {
+        "pass": true,
+        "detail": {
+          "Band": {
+            "num_objects": 1,
+            "num_elements": 4170
+          },
+          "Stator": {
+            "num_objects": 1,
+            "num_elements": 9543
+          },
+          "Rotor": {
+            "num_objects": 1,
+            "num_elements": 10194
+          },
+          "PM": {
+            "num_objects": 16,
+            "num_elements": 4538
+          },
+          "AirgapRing": {
+            "num_objects": 1,
+            "num_elements": 4466
+          },
+          "Coil": {
+            "num_objects": 96,
+            "num_elements": 1574
+          }
+        }
+      },
+      "quality_metrics": {
+        "status": "unavailable",
+        "reason": "2021.1 ExportMeshStats 仅导出 8 列单元统计（Num Elements/min/max/RMS edge/min/max/mean/stdev area），无 skewness/aspect/orthogonal；dir(oDesign) 仅 ApplyMeshOps/ExportMeshStats/GenerateMesh，无质量 getter（§18.3）"
+      },
+      "node_count": {
+        "status": "unavailable",
+        "reason": "ExportMeshStats 不导出节点数；2021.1 未发现可读节点统计的 API（§18.3）"
+      }
+    },
+    "overall_pass": true
+  },
+  "evidence": {
+    "api_doc": "docs/MAXWELL_INTERNALS.md §18",
+    "probe_logs": [
+      "D:/ANSYS_Run/probe_mesh_api.log",
+      "D:/ANSYS_Run/probe_mesh_api2.log",
+      "D:/ANSYS_Run/probe_mesh_api3.log"
+    ],
+    "meshstats_txt": "D:/ANSYS_Run/meshstats_m2_cps10.txt",
+    "aedt": "D:/ANSYS_Run/IPM_8p48s_M2_cps10.aedt"
+  }
+}

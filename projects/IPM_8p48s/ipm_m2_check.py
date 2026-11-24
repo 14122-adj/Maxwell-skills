@@ -72,7 +72,7 @@ F_ELEC = 100.0
 SLOTS = 48
 POLES = 8
 STACK_MM = 160.0
-CPS_MODEL = 5              # M1'/M2' 的 TEMP 值（I3 未定源）
+CPS_MODEL = 10             # I3 定源（2026-11-24）：cps=5 实测 63.8721 V → 125 V 反推 10
 COILS_PER_PHASE = 16       # I2 定源：每相 16 线圈
 
 # 转矩单位换算（2026-11-22 踩坑）：AEDT 2021.1 的 `Moving1.Torque` 在本工程导出的是

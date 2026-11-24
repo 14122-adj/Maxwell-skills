@@ -80,9 +80,19 @@ class IPMConfig:
     coil_pitch: int = 5          # 槽距数（全距 6，短距 1 槽）
     layers: int = 2
 
-    # D3 预置（I3 用，M1' 只用于 AssignCoil 的 Conductor number，属 TEMP）
-    conductors_per_slot: int = 5
+    # D3 —— I3 匝数定源（2026-11-24）。cps=5 时 cps=5 空载 401 点实测 BEMF
+    # 63.8721 V（BH 修复后 Bg=0.6621 T 可信）；线性反推 125 V → cps=10
+    # （N_ph=16·cps=160 匝，预测 127.744 V，落 118–145 V 窗）。故 cps 5→10
+    # 定源，直接写进 baseline 配置（不再是 TEMP）。FEA 侧只改 AssignCoil 的
+    # Conductor number，几何不动（槽按 Ø1.5 余量设计，见下）。
+    conductors_per_slot: int = 10
+    # 槽几何定标参考线径（derive_slot 的 Bs0/Bs2 由它推，保持 1.50 不改，
+    # 否则槽宽/槽面积连锁变化会破坏已 green 的 M1'/M2' 几何证据链）。
     wire_diameter_mm: float = 1.50
+    # 制造实际绕线线径（I3/G7 槽满率口径）：cps=10 → 每槽 2 边 × 10 根 = 20 根，
+    # Ø1.5 时 fill=0.9016>0.78 FAIL；Ø1.35 时 fill=0.7303 PASS。
+    # assumption=待验证：需物料 BOM 给出真实漆包线规格；FEA 不依赖此字段。
+    wind_wire_mm: float = 1.35
 
     # D4（I4：单层 V，用户 2026-11-22 定）
     rotor_id: float = 30.0
@@ -276,6 +286,36 @@ class _SlotOnly:
 def slot_only(cfg: IPMConfig) -> _SlotOnly:
     return _SlotOnly(cfg, cfg.slot_Bs0, cfg.slot_Hs0, cfg.slot_Bs1,
                      cfg.slot_Hs1, cfg.slot_Bs2, cfg.slot_Rs, cfg.slot_Hs2)
+
+
+# ------------------------------------------------------------------- I3 槽满率
+def slot_fill_factor(cfg: IPMConfig, cps: int | None = None,
+                     wire_mm: float | None = None,
+                     slot_area_mm2: float | None = None) -> dict:
+    """I3/I5 槽满率：每槽 2 条边 × cps 根圆线铜面积 / 槽实切面积。
+
+    判据（`docs/ENGINEERING_ACCEPTANCE.md` G7）：fill ≤ 0.78。
+    cps=10 → 每槽 20 根；几何按 `wire_diameter_mm=1.5` 定标（槽宽 Bs2=3.5），
+    但制造绕线口径 `wind_wire_mm=1.35`（Ø1.5 时 fill=0.9016 越界）。
+    纯解析制造口径，不做 FEA 结论；assumption=待验证（真实漆包线规格/BOM）。
+    """
+    cps = cfg.conductors_per_slot if cps is None else cps
+    wire = cfg.wind_wire_mm if wire_mm is None else wire_mm
+    i1 = derive_slot(cfg)
+    a_slot = i1["areas"]["slot_effective"] if slot_area_mm2 is None else slot_area_mm2
+    n_wires = 2 * cps                       # 每槽 2 条边（T/B 双层）各 cps 根
+    a_wire = math.pi * (wire / 2.0) ** 2
+    a_cu = n_wires * a_wire
+    fill = a_cu / a_slot
+    return {
+        "cps": cps, "turns_per_phase": cps * 16,
+        "wires_per_slot": n_wires, "wire_diameter_mm": wire,
+        "slot_area_mm2": round(a_slot, 4), "cu_area_mm2": round(a_cu, 4),
+        "fill": round(fill, 6), "limit": 0.78,
+        "status": "PASS" if fill <= 0.78 else "FAIL",
+        "assumption": "wind_wire_mm=1.35 为制造口径待 BOM 验证；"
+                      "槽几何仍按 wire_diameter_mm=1.50 定标未动",
+    }
 
 
 # ------------------------------------------------------------------- 线圈分层

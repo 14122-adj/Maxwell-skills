@@ -212,3 +212,27 @@ def test_magnet_directions_unit(cfg):
     assert len(dirs) == 16
     for _pole, gx, gy in dirs:
         assert math.hypot(gx, gy) == pytest.approx(1.0, abs=1e-9)
+
+
+# ------------------------------------------------------------ I3 匝数/槽满率
+def test_i3_cps_sourced_at_10(cfg):
+    """I3 定源：cps=10（160 匝/相），不再是 TEMP 值 5。"""
+    assert cfg.conductors_per_slot == 10
+    assert cfg.conductors_per_slot * 16 == 160
+
+
+def test_i3_slot_fill_passes_at_1p35(cfg):
+    """cps=10 / Ø1.35 绕线 fill ≤0.78；Ø1.5 越界（0.9016）必须 FAIL。"""
+    good = ipm_geom.slot_fill_factor(cfg)
+    assert good["cps"] == 10 and good["wires_per_slot"] == 20
+    assert good["status"] == "PASS" and good["fill"] <= 0.78
+    bad = ipm_geom.slot_fill_factor(cfg, wire_mm=1.5)
+    assert bad["status"] == "FAIL" and bad["fill"] > 0.78
+
+
+def test_i3_build_script_has_cps_10(cfg):
+    """M1' 生成物里 Conductor number 必须是定源后的 10。"""
+    import ipm_build
+    src = ipm_build.build_script(cfg)
+    assert "CPS = 10" in src
+    assert 'str(CPS), "PolarityType:="' in src

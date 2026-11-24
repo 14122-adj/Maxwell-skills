@@ -1,0 +1,139 @@
+{
+  "expect": {
+    "stator_area": 9018.262,
+    "rotor_area": 5307.8683,
+    "airgap_ring_area": 98.2489,
+    "coil_T": 9.8,
+    "coil_B": 9.8,
+    "magnet_total": 582.4,
+    "v_single": [
+      33.0,
+      38.0,
+      13.0,
+      3.0
+    ]
+  },
+  "measured": {
+    "sheets": 117,
+    "areas": {
+      "Region": 11601.3403,
+      "StatorOuter": 9017.8249,
+      "RotorOuter": 5307.8683,
+      "Band": 6694.6598,
+      "AirgapRing": 98.2489
+    },
+    "coil": {
+      "min": 9.8,
+      "max": 9.8
+    },
+    "n_pm": 16,
+    "validate": "OK"
+  },
+  "checks": [
+    {
+      "name": "SHEETS = 5 + 16 + 96",
+      "value": 117,
+      "limit": 117,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Coil = 96",
+      "value": 96,
+      "limit": 96,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 PM = 16",
+      "value": 16,
+      "limit": 16,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Region = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 StatorOuter = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 RotorOuter = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Band = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 AirgapRing = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "定子面积 = 环 − 48 槽（偏差 %）",
+      "value": 0.00485,
+      "limit": 0.05,
+      "status": "PASS"
+    },
+    {
+      "name": "转子面积 = 环 − Σ 磁钢（偏差 %）",
+      "value": 0.0,
+      "limit": 0.05,
+      "status": "PASS"
+    },
+    {
+      "name": "气隙环面积 = π(46.5²−46.1625²)（偏差 %）",
+      "value": 1e-05,
+      "limit": 0.05,
+      "status": "PASS"
+    },
+    {
+      "name": "96 线圈面积（最大偏差 %）",
+      "value": 0.0,
+      "limit": 1.0,
+      "status": "PASS"
+    },
+    {
+      "name": "16 块磁钢面积 = L×t（最大偏差 %）",
+      "value": 0.0,
+      "limit": 0.1,
+      "status": "PASS"
+    },
+    {
+      "name": "磁钢中心镜像对称（最大不对称 mm）",
+      "value": 0.0,
+      "limit": 0.02,
+      "status": "PASS"
+    },
+    {
+      "name": "AEDT 设计校验",
+      "value": "OK",
+      "limit": "OK",
+      "status": "PASS"
+    },
+    {
+      "name": "工程存盘",
+      "value": true,
+      "limit": true,
+      "status": "PASS"
+    },
+    {
+      "name": ".aedt 文件存在",
+      "value": true,
+      "limit": true,
+      "status": "PASS"
+    }
+  ],
+  "status": "PASS",
+  "log": "D:/ANSYS_Run/ipm_m1.log",
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M1_cps10.aedt"
+}
