@@ -1,0 +1,66 @@
+{
+  "case": "skew_bs10",
+  "skew_slot": 0.75,
+  "rotor_init_deg_mech": [
+    -2.8125,
+    0.0,
+    2.8125
+  ],
+  "gamma_elec_deg": 22.5,
+  "imax": 14.5019,
+  "phi_rel_deg": 0.0,
+  "slices": [
+    {
+      "idx": 0,
+      "angle_deg": -2.8125,
+      "csvdir": "D:/ANSYS_Run/csv_ipm_m3_skew_bs10_s0",
+      "aedt": "D:/ANSYS_Run/IPM_8p48s_M3_skew_bs10_s0.aedt"
+    },
+    {
+      "idx": 1,
+      "angle_deg": 0.0,
+      "csvdir": "D:/ANSYS_Run/csv_ipm_m3_skew_bs10_s1",
+      "aedt": "D:/ANSYS_Run/IPM_8p48s_M3_skew_bs10_s1.aedt"
+    },
+    {
+      "idx": 2,
+      "angle_deg": 2.8125,
+      "csvdir": "D:/ANSYS_Run/csv_ipm_m3_skew_bs10_s2",
+      "aedt": "D:/ANSYS_Run/IPM_8p48s_M3_skew_bs10_s2.aedt"
+    }
+  ],
+  "method": "3-slice FEA + harmonic-shift average (rotor position)",
+  "torque": {
+    "t_avg_nm": 27.0286,
+    "pp_nm": 0.888,
+    "pp_pct": 3.2855,
+    "main_harmonic_order": 12,
+    "main_harmonic_nm": 0.2199,
+    "main_harmonic_pct": 0.8137,
+    "jump_max_nm": 0.2465,
+    "jump_max_pct": 0.9122,
+    "checks": [
+      {
+        "name": "T_avg ∈ 22.5–27.5",
+        "value": 27.0286,
+        "status": "PASS"
+      },
+      {
+        "name": "pp ≤ 10% T_avg",
+        "value": 3.2855,
+        "status": "PASS"
+      },
+      {
+        "name": "主谐波 ≤ 5% T_avg",
+        "value": 0.8137,
+        "status": "PASS"
+      },
+      {
+        "name": "跳变 ≤ 15% T_avg",
+        "value": 0.9122,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS"
+  }
+}

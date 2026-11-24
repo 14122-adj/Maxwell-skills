@@ -1,0 +1,23 @@
+{
+  "case": "bs10",
+  "excitation": {
+    "current_A": 14.5019,
+    "current_unit": "A_peak",
+    "phase_deg": 0.0,
+    "phase_abs_deg": 90.0,
+    "bemf_offset_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "explicit",
+    "expressions": {
+      "A": "-14.501900*sin(628.318531*Time)",
+      "B": "-14.501900*sin(628.318531*Time-2.094395102)",
+      "C": "-14.501900*sin(628.318531*Time+2.094395102)"
+    },
+    "formula": "phi_abs=90+phi_rel"
+  },
+  "imax_source": "explicit",
+  "p_mech_w": 3926.9908169872415,
+  "solved": true
+}

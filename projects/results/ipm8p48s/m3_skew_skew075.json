@@ -31,36 +31,36 @@
   ],
   "method": "3-slice FEA + harmonic-shift average (rotor position)",
   "torque": {
-    "t_avg_nm": -0.0004,
-    "pp_nm": 1.0901,
-    "pp_pct": 296399.5967,
-    "main_harmonic_order": 24,
-    "main_harmonic_nm": 0.4278,
-    "main_harmonic_pct": 116306.2044,
-    "jump_max_nm": 0.4053,
-    "jump_max_pct": 110211.1562,
+    "t_avg_nm": 27.0085,
+    "pp_nm": 0.8957,
+    "pp_pct": 3.3163,
+    "main_harmonic_order": 12,
+    "main_harmonic_nm": 0.2246,
+    "main_harmonic_pct": 0.8316,
+    "jump_max_nm": 0.2555,
+    "jump_max_pct": 0.946,
     "checks": [
       {
         "name": "T_avg ∈ 22.5–27.5",
-        "value": -0.0004,
-        "status": "FAIL"
+        "value": 27.0085,
+        "status": "PASS"
       },
       {
         "name": "pp ≤ 10% T_avg",
-        "value": 296399.5967,
-        "status": "FAIL"
+        "value": 3.3163,
+        "status": "PASS"
       },
       {
         "name": "主谐波 ≤ 5% T_avg",
-        "value": 116306.2044,
-        "status": "FAIL"
+        "value": 0.8316,
+        "status": "PASS"
       },
       {
         "name": "跳变 ≤ 15% T_avg",
-        "value": 110211.1562,
-        "status": "FAIL"
+        "value": 0.946,
+        "status": "PASS"
       }
     ],
-    "status": "FAIL"
+    "status": "PASS"
   }
 }
