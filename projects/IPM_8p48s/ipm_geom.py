@@ -71,9 +71,9 @@ class IPMConfig:
     # 槽口宽：2026-11-24 按书本案例（Bs0=1.0）定制，从 2.2 收窄以压制 1200 Hz 槽谐波。
     # 联动 Bs1=1.5、Hs2=13.5（yoke 15.0），槽面积 37.836、满率 0.7606（原 0.7387）。
     slot_Bs0: float = 1.0
-    slot_Hs0: float = 1.2
+    slot_Hs0: float = 0.5
     slot_Bs1: float = 1.5
-    slot_Hs1: float = 5.3
+    slot_Hs1: float = 6.0
     slot_Bs2: float = 3.5
     slot_Rs: float = 1.75
     slot_Hs2: float = 13.5
@@ -169,11 +169,13 @@ def derive_slot(cfg: IPMConfig) -> dict:
                       note="2026-11-24 按书本案例 Bs0=1.0 压 1200 Hz 槽谐波；"
                            "槽口小于线径属半闭口槽，制造性待复核"))
 
-    # ③ 颈高：槽楔 + 槽绝缘
-    hs0 = math.ceil((max(3.0 * LAMINATION_MM, 1.0) + 0.1) * 10.0) / 10.0
-    steps.append(dict(step="③ 颈高 Hs0", formula="ceil(max(3·t_lam, 1.0)+0.1, 0.1)",
-                      expr="ceil(max(%.2f, 1.0)+0.1, 0.1)" % (3.0 * LAMINATION_MM),
-                      value_mm=hs0, note="槽楔 + 槽绝缘的机械高度"))
+    # ③ 颈高：2026-11-24 按书本案例收窄 1.2→0.5 mm（用户要求"Hs0 跟着小一点"）。
+    #    槽楔薄型化，让矩形绕组往槽口延伸（线圈 6.795→7.823 mm²/条），
+    #    Hs2 相应加长（yoke 15 → Hs2 13.5）保持槽面积 ≥ 铜耗所需。
+    hs0 = 0.5
+    steps.append(dict(step="③ 颈高 Hs0", formula="0.5 —— 案例定制（原 ceil(max(3·t_lam,1.0)+0.1)=1.2）",
+                      expr="书本案例 Hs0=0.5",
+                      value_mm=hs0, note="2026-11-24 用户要求随 Bs0 收窄；矩形绕组受益"))
 
     # ④ 肩宽：比槽口宽 0.7 mm，供线圈扩散；同时校验 x1 处齿宽
     bs1 = round(bs0 + 0.5, 2)

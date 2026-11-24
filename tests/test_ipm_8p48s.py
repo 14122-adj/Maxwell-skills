@@ -7,8 +7,8 @@
 这三件事都能建出「看起来像电机」的模型，但 FEA 出来全是废数。本文件把
 `projects/IPM_8p48s/ipm_geom.py` 与 `ipm_winding.py` 的定源结论钉死：
 
-1. **I1**：7 个槽尺寸由约束链算出（齿宽/轭厚/槽满/铜耗），槽面积 37.836 mm²（2026-11-24 Bs0=1.0+yoke15）、
-   齿部最窄 3.44 mm、轭厚 16.0 mm、`Rs = Bs2/2` 是相切恒等式；
+1. **I1**：7 个槽尺寸由约束链算出（齿宽/轭厚/槽满/铜耗），槽面积 38.886 mm²（2026-11-24 Bs0=1.0+Hs0=0.5+yoke15）、
+   齿部最窄 3.44 mm、轭厚 15.0 mm、`Rs = Bs2/2` 是相切恒等式；
 2. **I2**：q=2、y=5 的双层 60° 相带 ⇒ 96 边、每相 16 线圈、k_w1=0.9330、
    k_w5=k_w7=0.0670（短距 1 槽的直接效果）；
 3. **I4**：每极 1 组 V × 2 块 × 8 极 = 16 块（单层 V），块块在转子内且桥厚达标。
@@ -70,7 +70,7 @@ def test_i1_config_matches_derivation(cfg, i1):
 
 def test_i1_slot_area_and_yoke(i1):
     # 2026-11-24 Bs0 2.2→1.0（案例定制），槽面积 39.2→34.336
-    assert i1["areas"]["slot_analytic"] == pytest.approx(37.836, abs=0.3)
+    assert i1["areas"]["slot_analytic"] == pytest.approx(38.886, abs=0.3)
     assert i1["radii"]["h_yoke"] == pytest.approx(15.0, abs=1e-9)
     assert i1["flux"]["B_tooth_min"] <= 1.65
     assert i1["flux"]["B_yoke"] <= 1.45
