@@ -26,7 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 → ④三种槽型批量 → ⑤36槽 q=3 泛化 → ⑥BLDC 方波 → ⑦SRM → ⑧IM。
 ③④ 成本最低（代码已写好、只差跑真机），应优先于 ⑦⑧。SRM/IM 不在 2026 年内排期。
 
-（本次仅新增文档，未改代码；假实现改显式报错列为后续动作。）
+**禁令已当场执行**（不只写文档）：
+- `scripts/pm_builder.py::_build_ipm_spoke_magnet` 由 `return self._build_ipm_flat_magnet(...)`
+  改为 `raise NotImplementedError`，报错文案说明"只有一字型与 V 型生成器"并指向本文排期。
+- `SKILL.md` / `SKILL_zh.md` 拓扑表由"特点"改为"状态"四列，逐项标注
+  ✅已真机验证 / ⚠️生成器完整未真机 / ❌预留未实现；能力声明与触发词段加"能力边界"说明块。
+- 新增 2 条护栏测试（`tests/test_motor_config.py`）：调用必抛 `NotImplementedError`；
+  静态检查实现体内不得再出现一字型生成器调用。481 tests passed。
 
 ### Docs — 2026-11-24 夜（转矩不稳定排查指导书本地化 + 气隙网格缺陷发现）
 

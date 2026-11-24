@@ -114,3 +114,39 @@ class TestUpdateAndValidation:
 def create_motor_input(params: str) -> MotorConfig:
     """关键词串 → MotorConfig，走与 ``scripts/main.py --params`` 相同的入口。"""
     return create_motor_from_input(params, input_type="keyword")
+
+
+# ---------------------------------------------------------------- IPM_Spoke 护栏
+def test_ipm_spoke_raises_not_implemented():
+    """`IPM_Spoke` 必须显式抛 NotImplementedError，不得静默退化成一字型。
+
+    背景（docs/MOTOR_TYPE_ROADMAP.md 禁令 3）：该分支历史上是
+    `return self._build_ipm_flat_magnet(pm_index)`，即"辐条型"实际产出一字型磁钢。
+    这种静默退化比报错更有害——几何自检只数磁钢块数、不检查排布方向，
+    错误要到看性能才暴露，且容易被误判成"辐条型性能不如预期"。
+    """
+    import pytest as _pytest
+
+    from scripts.motor_config import MotorConfig, PMTopology
+    from scripts.pm_builder import PMBuilder
+
+    cfg = MotorConfig(pm_topology=PMTopology.IPM_SPOKE)
+    builder = PMBuilder(cfg)
+    with _pytest.raises(NotImplementedError) as ei:
+        builder.build_single_pm(1)
+    msg = str(ei.value)
+    assert "IPM_Spoke" in msg and "尚未实现" in msg
+    # 报错信息必须给出下一步，而不是只说"不支持"
+    assert "ROADMAP" in msg or "排期" in msg
+
+
+def test_ipm_spoke_not_silently_aliased():
+    """静态护栏：`_build_ipm_spoke_magnet` 里不得再出现对一字型生成器的调用。"""
+    import inspect
+
+    from scripts.pm_builder import PMBuilder
+
+    src = inspect.getsource(PMBuilder._build_ipm_spoke_magnet)
+    body = src.split('"""')[-1] if '"""' in src else src   # 去掉 docstring 再看实现
+    assert "raise NotImplementedError" in body
+    assert "_build_ipm_flat_magnet(pm_index)" not in body

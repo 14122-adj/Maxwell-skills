@@ -12,7 +12,7 @@ skill 当前声明支持 4 种槽型 × 4 种磁钢拓扑 × 4 种电机类型�
 
 | 声称 | 实际 | 证据 |
 |---|---|---|
-| `IPM_Spoke`（辐条聚磁型） | **假实现**：`pm_builder._build_ipm_spoke_magnet` 直接 `return self._build_ipm_flat_magnet(...)`，退化成一字型 | `scripts/pm_builder.py:423-430` |
+| `IPM_Spoke`（辐条聚磁型） | **曾为假实现**：`pm_builder._build_ipm_spoke_magnet` 直接 `return self._build_ipm_flat_magnet(...)`，退化成一字型。**2026-11-24 已改为显式 `NotImplementedError`**，并由 `tests/test_motor_config.py` 两条护栏钉住 | `scripts/pm_builder.py`、`tests/test_motor_config.py` |
 | `BLDC` / `SRM` / `IM` | **只有枚举**：`MotorType` 里三个值零实现、零调用 | `grep` 全仓仅 `motor_config.py:39-41` 命中 |
 | `IPM_Flat`、矩形/梯形/圆形槽 | 有完整生成代码，**从未跑过真机** | `pm_builder._build_ipm_flat_magnet`、`slot_builder._build_*_slot` 均存在但无对应 `.aedt` |
 | `IM` 的鼠笼 | 结构上 `pm_builder` 覆盖不了（无永磁） | 需新转子模块 |
@@ -62,10 +62,13 @@ skill 当前声明支持 4 种槽型 × 4 种磁钢拓扑 × 4 种电机类型�
 
 1. **禁止在枚举里加类型而不实现**。`MotorType.BLDC/SRM/IM` 现状就是这个反例，
    重构时应改为"未实现即抛 `NotImplementedError`"而不是静默走默认分支。
-2. **禁止在 `SKILL.md` 写"支持 X"直到 X 通过 §2 的 6 条门禁**。当前 §5 表格里的
-   `IPM_Spoke` 必须先改成"预留，未实现"，或把假实现改成显式报错。
-3. **禁止为"看起来支持多"而保留退化实现**。`_build_ipm_spoke_magnet` 静默返回一字型，
-   比直接报错更有害——用户会拿到一个"能跑但不是辐条型"的模型。
+2. **禁止在 `SKILL.md` 写"支持 X"直到 X 通过 §2 的 6 条门禁**。~~当前 §5 表格里的
+   `IPM_Spoke` 必须先改成"预留，未实现"~~ —— **2026-11-24 已执行**：`SKILL.md` 与
+   `SKILL_zh.md` 的拓扑表改为四列"状态"，逐项标注 ✅已真机验证 / ⚠️未真机 / ❌预留未实现；
+   §5 能力声明与触发词段同步加了"能力边界"说明块。
+3. **禁止为"看起来支持多"而保留退化实现**。`_build_ipm_spoke_magnet` 曾静默返回一字型，
+   比直接报错更有害——用户会拿到一个"能跑但不是辐条型"的模型。**2026-11-24 已改为抛
+   `NotImplementedError`**，报错文案给出下一步（去本文排期 + 新写径向排布生成器）。
 
 ## 6. 近期三步（与每日任务对齐）
 

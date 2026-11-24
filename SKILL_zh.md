@@ -150,7 +150,13 @@ Phase:    A+   A-   A+   A-   B+   B-   B+   B-   C+  C-   C+   C-
 
 **双模域能力：**
 
-1. **电机电磁设计（v3.0 原有能力）** — 从最少2个参数出发，自动推导全部设计参数、寻找Pareto最优解、在Maxwell中构建完整FEA模型、运行全部仿真类型、生成含图表的工程报告。支持多槽型（矩形/梨形/梯形/圆形）和多永磁拓扑（SPM/IPM_Flat/IPM_V/IPM_Spoke）一键切换。
+1. **电机电磁设计（v3.0 原有能力）** — 从最少2个参数出发，自动推导全部设计参数、寻找Pareto最优解、在Maxwell中构建完整FEA模型、运行全部仿真类型、生成含图表的工程报告。支持多槽型（矩形/梨形/梯形/圆形）和多永磁拓扑（SPM/IPM_Flat/IPM_V；`IPM_Spoke` 预留未实现，调用会抛 `NotImplementedError`）一键切换。
+
+> **能力边界（2026-11-24 新增，见 `docs/MOTOR_TYPE_ROADMAP.md`）**：拓扑/槽型的复选框不等于已验证。
+> 真机跑通并有 401 点性能数据的是 **SPM 8p12s** 与 **IPM 8p48s 单层V** 两个机型；
+> `IPM_Flat` 与矩形/梯形/圆形槽有完整生成代码但尚未真机验证；`BLDC/SRM/IM` 仅有
+> `MotorType` 枚举与触发词，**无几何生成器**。判断某类型是否"支持"以路线图 §2 的
+> 6 条门禁为准，不以本节列举为准。
 
 2. **多物理场多学科仿真编排（v4.0 新增）** — 电磁-结构-热三场联合仿真、IGBT封装热-电-力耦合可靠性分析、疲劳寿命预测（Coffin-Manson/Darveaux）、参数化扫描（孔洞率/焊层厚度）。基于中车株洲所IGBT和比亚迪轮毂电机获奖论文技术方案。
 
@@ -158,6 +164,7 @@ Phase:    A+   A-   A+   A-   B+   B-   B+   B-   C+  C-   C+   C-
 
 **电机电磁设计：**
 - 电机设计、电机仿真、motor design、PMSM、BLDC、SRM、IM
+  （触发词保留以便识别意图；**当前只有 PMSM 有几何生成器**，BLDC/SRM/IM 会明确提示未实现）
 - Maxwell自动化、参数化建模、槽型切换、永磁拓扑
 - 反电动势分析、转矩仿真、效率优化、NVH
 
@@ -273,12 +280,16 @@ python scripts/motor_optimizer.py \
 
 ### 5. 永磁拓扑切换系统
 
-| 拓扑 | 结构 | 适用 | 特点 |
+| 拓扑 | 结构 | 适用 | 状态 |
 |------|------|------|------|
-| `SPM` | 磁钢贴转子表面 | 伺服/低速 | 结构简单、弱磁弱 |
-| `IPM_Flat` | 矩形磁钢埋入 | EV驱动 | 弱磁强、凸极效应 |
-| `IPM_V` | V型双磁钢 | 高性能EV | 最强弱磁、高功率密度 |
-| `IPM_Spoke` | 辐条状 | 高转矩密度 | 聚磁效应 |
+| `SPM` | 磁钢贴转子表面 | 伺服/低速 | ✅ 已真机验证（SPM 8p12s） |
+| `IPM_Flat` | 矩形磁钢埋入 | EV驱动 | ⚠️ 生成器完整，**未真机验证** |
+| `IPM_V` | V型双磁钢 | 高性能EV | ✅ 已真机验证（IPM 8p48s 单层V） |
+| `IPM_Spoke` | 辐条状 | 高转矩密度 | ❌ **预留未实现**，调用抛 `NotImplementedError` |
+
+> `IPM_Spoke` 历史上是 `return self._build_ipm_flat_magnet(pm_index)` 的静默退化，
+> 产出拓扑错误的一字型几何且自检不会报警。2026-11-24 已改为显式抛错，
+> 理由见 `docs/MOTOR_TYPE_ROADMAP.md` 禁令 3。
 
 ### 6. 仿真收敛保证
 
@@ -634,7 +645,7 @@ SYSTEM: 你是Maxwell电机设计和FEA自动化智能体。
 | `scripts/motor_config.py` | 中心配置类（MotorConfig dataclass、N/S极材料、自定义输入） |
 | `scripts/param_validator.py` | 参数合法性校验（11个尺寸约束） |
 | `scripts/slot_builder.py` | 槽型几何生成器（矩形/梨形/梯形/圆形） |
-| `scripts/pm_builder.py` | 永磁体几何生成器（SPM/IPM_Flat/IPM_V/IPM_Spoke） |
+| `scripts/pm_builder.py` | 永磁体几何生成器（SPM/IPM_Flat/IPM_V；IPM_Spoke 预留抛 NotImplementedError） |
 | `scripts/pmsm_winding_builder.py` | **PMSM绕组生成器（星形图法自动分配线圈-相位，支持任意槽极配合）** |
 | `scripts/main.py` | 主入口（MotorModelBuilder一键建模，支持预设/JSON/CSV/关键词/交互式输入） |
 | `scripts/mdao_orchestrator.py` | **多物理场仿真编排器：电机MDAO + IGBT可靠性 + 疲劳寿命 + 参数化扫描 + SQLite数据库** |
