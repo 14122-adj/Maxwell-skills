@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs — 2026-11-24 夜（转矩不稳定排查指导书本地化 + 气隙网格缺陷发现）
+
+用户提交《ANSYS Maxwell 电机仿真转矩不稳定排查指导书》，要求并入每日迭代。逐条甄别后
+落地为 `docs/TORQUE_TROUBLESHOOTING.md`，**发现一处真实网格缺陷**。
+
+- 新增 `docs/TORQUE_TROUBLESHOOTING.md`：本地化排查书。含工况分辨（稳态 vs 起动判据不通用）、
+  五方向排查（每条标注本项目状态）、波形诊断表（带实测对照）、6 步 SOP、
+  **与原文的 3 处出入**（恒速+Load Torque 不能共存 / 不是拍频 / 不是 J 问题）。
+- **发现缺陷**：`AirgapRing` 径向只有 ≈1.48 层（`mesh_m4_chirp2.json` 实测 rms_edge 0.2277 mm
+  ÷ 气隙 0.3375 mm），且 `ipm_build.py` 的 4 组 `AssignLengthOp` 完全没覆盖它。
+  这可能与 h=12（1200 Hz 槽通过频率）主谐波相关——转矩是气隙应力张量的积分，
+  1.5 层时高度依赖插值。
+- `PROJECT_SPEC.md` §9：新增 4 条契约（AirgapRing 必须有独立 LengthOp、气隙层数 ≥2.0
+  计入 §8 判据、起动工况必须导 Speed、读数先看表头单位）。
+- 每日任务 prompt 更新：第一优先改为「气隙网格层数单变量复测」，并把 3 处纠正写成禁令，
+  防止明天照着原文去"修"一个不存在的 Load Torque 问题。rrule 未动（仍是每日 14:30）。
+
 ### Added — 2026-11-24（IPM M4 起动工况：机械瞬态 401 点 / 200 ms）
 
 用户提问「为什么没有转矩从零开始上升的曲线」。根因不是画错，是**口径**：M1'–M3' 全部
