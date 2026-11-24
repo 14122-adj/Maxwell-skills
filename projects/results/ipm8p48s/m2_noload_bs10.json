@@ -1,0 +1,196 @@
+{
+  "stage": "M2' 401 点空载（8p48s / 双层绕组 / 16 块单层 V / 无斜槽）",
+  "cps_temp": 10,
+  "bemf": {
+    "sources": {
+      "A": "d(FluxLinkage(WindingA))/dt",
+      "B": "d(FluxLinkage(WindingB))/dt",
+      "C": "d(FluxLinkage(WindingC))/dt"
+    },
+    "phase": {
+      "A": {
+        "rms": 133.73626721077272,
+        "peak": 213.34826918240367,
+        "thd_pct": 14.093067791269958,
+        "n_samples": 200
+      },
+      "B": {
+        "rms": 133.73653704266735,
+        "peak": 213.29285244810887,
+        "thd_pct": 14.09301817474982,
+        "n_samples": 200
+      },
+      "C": {
+        "rms": 133.73645964031445,
+        "peak": 213.2962507544888,
+        "thd_pct": 14.092886067473664,
+        "n_samples": 200
+      }
+    },
+    "line": {
+      "AB": {
+        "rms": 229.57156567864922,
+        "peak": 331.8735754562447,
+        "thd_pct": 4.255007606665205,
+        "n_samples": 200
+      },
+      "BC": {
+        "rms": 229.5713574342711,
+        "peak": 331.52869571721305,
+        "thd_pct": 4.254663644856863,
+        "n_samples": 200
+      },
+      "CA": {
+        "rms": 229.57120934713606,
+        "peak": 331.8169780162749,
+        "thd_pct": 4.254800100714295,
+        "n_samples": 200
+      }
+    },
+    "phase_rms_mean": 133.73642129791816,
+    "imbalance_pct": 0.00020176395630190213,
+    "line_thd_max": 4.255007606665205
+  },
+  "torque": {
+    "pp_nm": 1.1301687366139688,
+    "max": 0.5651484462661279,
+    "min": -0.565020290347841,
+    "mean": 7.116143524418608e-05,
+    "cogging_pct": 4.520674946455875,
+    "window_samples": 201
+  },
+  "flux_density": {
+    "gap": {
+      "n_points": 181,
+      "b_max": 0.6188791520033037,
+      "angle_at_peak_deg": 8.375000000118662,
+      "r_at_peak_mm": 46.30249999959194,
+      "b_min": 6.580424997130508e-05,
+      "Br_max": 0.6151362339224163,
+      "Br_max_angle_deg": 8.375000000118662,
+      "Bt_max": 0.13430113911529246,
+      "Bt_max_angle_deg": 7.999999999979707,
+      "Br_at_pole_axis": 0.3760668619104121,
+      "Br_mean_one_slot_pitch": 0.5493673540942441,
+      "verdict": "FAIL"
+    },
+    "tooth": {
+      "n_points": 46,
+      "b_max": 0.9476673121910237,
+      "r_at_peak_mm": 53.555555555444435,
+      "r_span_mm": [
+        47.99999999954493,
+        58.00000000015749
+      ],
+      "verdict": "PASS"
+    },
+    "yoke": {
+      "n_points": 91,
+      "b_max": 0.8727075242084595,
+      "angle_at_peak_deg": 14.999999999680588,
+      "r_mm": 61.00000000028866,
+      "verdict": "PASS"
+    }
+  },
+  "analytic_crosscheck": {
+    "bg_used_T": 0.6151362339224163,
+    "phi1_Wb": 0.002288306790191389,
+    "kw1": 0.933013,
+    "n_ph": 160,
+    "e_analytic_v": 151.77030169840174,
+    "delta_pct": -11.882351289200535
+  },
+  "turns_backcalc": {
+    "cps_model": 10,
+    "turns_per_phase_model": 160,
+    "bemf_per_turn_v": 0.8358526331119884,
+    "targets": {
+      "lower_118V": {
+        "target_v": 118.0,
+        "cps_exact": 8.823325677089647,
+        "cps_int": 9,
+        "turns_int": 144,
+        "bemf_at_int_v": 120.36277916812634
+      },
+      "design_125V": {
+        "target_v": 125.0,
+        "cps_exact": 9.346743302001745,
+        "cps_int": 9,
+        "turns_int": 144,
+        "bemf_at_int_v": 120.36277916812634
+      },
+      "upper_145V": {
+        "target_v": 145.0,
+        "cps_exact": 10.842222230322024,
+        "cps_int": 11,
+        "turns_int": 176,
+        "bemf_at_int_v": 147.11006342770997
+      }
+    }
+  },
+  "solve": {
+    "analyze_s": 665.0,
+    "sheets": 117,
+    "prefix": "AirgapRing=1 Band=1 Coil=96 PM=16 Region=1 RotorOuter=1 StatorOuter=1",
+    "setups": "Setup1",
+    "motions": "MotionSetup1"
+  },
+  "checks": [
+    {
+      "name": "相 BEMF RMS ∈ 118–145 V",
+      "value": 133.73642129791816,
+      "limit": [
+        118.0,
+        145.0
+      ],
+      "op": "in",
+      "status": "PASS"
+    },
+    {
+      "name": "线 BEMF THD ≤ 10%",
+      "value": 4.255007606665205,
+      "limit": 10.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "齿槽峰峰值 ≤ 5% (1.25 N·m)",
+      "value": 1.1301687366139688,
+      "limit": 5.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "三相不平衡 ≤ 2%",
+      "value": 0.00020176395630190213,
+      "limit": 2.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "Bg ∈ 0.70–0.90 T",
+      "value": 0.6188791520033037,
+      "limit": [
+        0.7,
+        0.9
+      ],
+      "op": "in",
+      "status": "FAIL"
+    },
+    {
+      "name": "B_tooth ≤ 1.65 T",
+      "value": 0.9476673121910237,
+      "limit": 1.65,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "B_yoke ≤ 1.50 T",
+      "value": 0.8727075242084595,
+      "limit": 1.5,
+      "op": "<=",
+      "status": "PASS"
+    }
+  ],
+  "status": "FAIL"
+}

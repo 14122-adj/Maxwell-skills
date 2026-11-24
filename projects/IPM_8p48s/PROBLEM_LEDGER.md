@@ -82,7 +82,7 @@
 | **I13** | **blocker** | 材料 | `M270_35A` 无有效 BH：旧 `EditMaterial` 手工塞 BH 被静默丢弃 ⇒ 铁芯按 **μr=1** 求解 ⇒ Bg 塌陷（旧 0.182 T）。真因不是桥饱和/埋深 | `m2_noload_bhfix.json`（Bg 0.662 T vs 旧 0.182，+264%，401 点）；`m2_noload_apex33.json` | Bg ≥0.45 T（I16）；401 点 FEA 实测 | **closed（11-22 夜：CloneMaterial 修复，Bg 0.662 T 达标；见文末闭环节）** | Bg 已回填 I8=0.662 T；残余 BEMF 63.87 V 转 I3 匝数（cps≈10）、齿槽转 I22 |
 | **I14** | major | 材料 | BH 写入方式：2021.1 上 `AddMaterial`/`EditMaterial` 的 `Points`/`Coordinates`/`NAME:Coordinate` 4 种写法**全部不落数值**（探针 bh_probe~7 实证） | `D:/ANSYS_Run/bh_probe*.py`（TEMP）；`ipm_build.py` 改用 `CloneMaterial("JFE_Steel_35JN270","M270_35A")` | 找到 2021.1 真正生效写法 | **closed（11-22 夜：CloneMaterial 克隆系统库厂商 BH，`.aedt` 文本 grep 到 `nonlinear` + `Points[66:]`；见文末）** | 材料名保留 M270_35A（契约）；厂商曲线偏软 ~9% 标 assumption=待验证，FEA 已验 Bg |
 | **I15** | major | 材料 | BH 曲线本身缺厂商原始数据，现用「M270-35A 级高磁导 0.35 mm 硅钢」公开量级构造（1.5 T@≈400 A/m、膝点 1.85–1.95 T、50 kA/m@2.05 T） | `ipm_build.py::BH_M270_35A` 注释 | 拿到 datasheet 后替换；膝点 ±5% 对 Bg 的敏感性在 M4' 复算 | open（assumption=待验证） |
-| **I22** | **blocker** | 电磁/齿槽 | BH 修复（铁芯真导磁）后齿槽从假象 0.0025 N·m 暴露为真实 **3.4729 N·m（13.9% 额定）**，超 ≤1.25 N·m 判据；极轴/峰 Br=0.438 波形顶部塌陷 | `m2_noload_bhfix.json::torque.pp_nm`；`m2_noload_bhfix.json::flux_density.gap` | 齿槽 ≤1.25 N·m（5%）；主因待定（极间漏磁 / 斜槽 / 槽口） | **open（本轮新暴露；本轮不动，明日单一焦点）** | 候选：①查 V 磁钢极间漏磁（apex33 后极间桥仍 10 mm）；②D5 斜槽 0.5 槽距（SPM 历史 0.88→0.00058）；③齿形微调。一次一个变量，401 点 |
+| **I22** | **blocker** | 电磁/齿槽 | BH 修复（铁芯真导磁）后齿槽从假象 0.0025 N·m 暴露为真实 **3.4729 N·m（13.9% 额定）**，超 ≤1.25 N·m 判据；极轴/峰 Br=0.438 波形顶部塌陷 | `m2_noload_bhfix.json::torque.pp_nm`（3.4729）→ `m2_noload_bs10.json::torque.pp_nm`（**1.1302**，Bs0=1.0 新几何 401 点） | 齿槽 ≤1.25 N·m（5%） | **closed（2026-11-24：Bs0 2.2→1.0 槽口收窄后齿槽 3.4729→1.1302 N·m，降 67.5%，PASS；见文末当日闭环段）** | 已闭环；斜槽仅作负载脉动优化（I26），不是齿槽达标必要条件 |
 | **I16** | **blocker** | 转子 | **单层 V 几何把磁钢埋得太深**：mag 外角到转子 OD 的「桥」实测 **8.356 mm**、极间 **4.783 mm**、到轴孔 9.557 mm。桥区磁密只有 **0.085 T**，离饱和（2 T）差一个数量级 ⇒ 聚磁比 0.72 的设计拿不到气隙磁通，实测 Bg 0.0623 T（异形）/ **0.0630 T（矩形）** vs 解析 0.59 T（只有 **11%** 到气隙） | `i4_rotor.json::radial`、`csv_ipm_points_c/points_mag.csv`、`m2_noload_rect.json::flux_density.gap` | 磁钢外角到 OD ≤ **2.0 mm**、极间 ≤ **2.0 mm**（桥要薄到能被 2 T 饱和，否则"桥饱和"机制不存在）；重跑 M1'/M2' 后 Bg ≥ 0.45 T | **open（最高优先级，矩形版 M2' 复核后仍 FAIL，确认为根因）** | 明日：重定源 `v_single` 使磁钢外角到 OD ≤2.0 mm，改 `derive_rotor` + `IPMConfig`，先几何自检再真机 M1'/M2' |
 
 **I16 定源预研（11-22 解析扫描，assumption=待验证）**：用 `ipm_geom.derive_rotor` 扫
@@ -541,11 +541,30 @@ B/C 相同量级（空载 10.4635 V）。CSV：`csv_ipm_m2_apex33/`、`csv_ipm_m
 | 新几何 Bs0=1.0 无斜槽 | 27.0306 | 14.08% | 5.94% | FAIL（收窄有效但不够） |
 | **新几何 + 斜槽 0.75** | **27.0286** | **3.29%** | **0.81%** | **PASS（今日目标达成）** |
 
+### 新几何空载 M2' 401 点（同日补跑，闭环 BEMF/齿槽判据）
+`IPM_8p48s_M2_bs10.aedt`，`ANALYZE_OK 665.0 s`，flux/tq 各 402 行，探针 181/46/91。
+`m2_noload_bs10.json` + `mesh_m2_bs10.json`（45284 单元 PASS）：
+
+| 量 | 旧几何 Bs0=2.2 | 新几何 Bs0=1.0 | 判据 | 判定 |
+|---|---:|---:|---|---|
+| 相 BEMF RMS | 127.7440 V | **133.7364 V** | 118–145 V | **PASS** |
+| 齿槽峰峰 | 3.4729 N·m | **1.1302 N·m（4.52%）** | ≤1.25 N·m | **PASS（I22 闭环）** |
+| 线 BEMF THD | 4.4988% | 4.2550% | ≤10% | PASS |
+| 三相不平衡 | 0.0003% | 0.0002% | ≤2% | PASS |
+| 气隙 \|B\|峰 Bg | 0.6621 T | 0.6189 T | 0.70–0.90（G4） | FAIL（I16 的 ≥0.45 仍 PASS） |
+| 齿身 / 轭部 B | 0.922 / 0.812 T | 0.948 / 0.873 T | ≤1.65 / ≤1.50 | PASS |
+
+**齿槽下降机理（不靠斜槽）**：Bs0 2.2→1.0 收窄槽口，槽口磁导调制减弱 ⇒ 齿槽 3.4729→1.1302
+（−67.5%），同时槽口窄使气隙磁通略降（Bg 0.6621→0.6189）但 BEMF 反升（127.74→133.74，
+因齿身/轭部磁阻重新分配）。斜槽只用于压负载段残余脉动（I26），不是齿槽达标的必要条件。
+
 - **未做（禁越界）**：未改判据、未改 Imax 凑幅值、未碰探索（LOCKED）、未动 SPM baseline。
 - **遗留风险**：①T_avg 27.03 距上限 27.5 仅 1.7%，若后续调参需留余量；②3 离散切片忽略
   轴向场/斜槽漏抗，属近似上限口径（SPM G7 同款局限）；③Bs0=1.0 < Ø1.35 线径属半闭口槽，
-  制造工艺待 BOM 复核；④空载齿槽绝对值未复测（新几何 M2' 空载 401 点未跑，仅有负载）。
+  制造工艺待 BOM 复核；④Bg 0.6189 T 低于 G4 下限 0.70 T（G4 仍 FAIL，属磁钢/聚磁设计问题，
+  与转矩曲线目标无关）。
 - 新增 KEEP：`m1_build_check_bs10.json`、`mesh_m1_bs10.json`、`m3_load_bs10.json`、
   `m3_load_check_bs10.json`、`mesh_m3_bs10.json`、`m3_skew_skew_bs10.json`、
-  `mesh_m3_skew_bs10_s{0,1,2}.json`、`ipm_skew_slices.py`。
+  `mesh_m3_skew_bs10_s{0,1,2}.json`、`m2_noload_bs10.json`、`mesh_m2_bs10.json`、
+  `ipm_skew_slices.py`。
   TEMP：`TEMP/ipm_skew_predict.py`（斜槽频域预研）。
