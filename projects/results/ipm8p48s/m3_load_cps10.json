@@ -1,0 +1,29 @@
+{
+  "case": "cps10",
+  "excitation": {
+    "current_A": 14.5019,
+    "current_unit": "A_peak",
+    "phase_deg": 0.0,
+    "phase_abs_deg": 90.0,
+    "bemf_offset_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "explicit",
+    "expressions": {
+      "A": "-14.501900*sin(628.318531*Time+1.570796327)",
+      "B": "-14.501900*sin(628.318531*Time-0.523598776)",
+      "C": "-14.501900*sin(628.318531*Time+3.665191429)"
+    },
+    "formula": "Imax*sin(2*pi*f*Time + phi_abs), B=phi_abs-120deg, C=phi_abs+120deg; phi_abs=bemf_offset+phi_rel, bemf_offset=90 (I20)"
+  },
+  "bemf_input": null,
+  "imax_source": "explicit",
+  "p_mech_w": 3926.9908169872415,
+  "build_script": "D:/ANSYS_Run/ipm_m3_build_cps10.py",
+  "solve_script": "D:/ANSYS_Run/ipm_m3_solve_cps10.py",
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M3_cps10.aedt",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m3_cps10",
+  "generated": true,
+  "solved": true
+}

@@ -68,13 +68,15 @@ class IPMConfig:
     stack_length: float = 160.0
 
     # D1（I1 定源结果，derive_slot 会重算并断言与这里一致）
-    slot_Bs0: float = 2.2
+    # 槽口宽：2026-11-24 按书本案例（Bs0=1.0）定制，从 2.2 收窄以压制 1200 Hz 槽谐波。
+    # 联动 Bs1=1.5、Hs2=13.5（yoke 15.0），槽面积 37.836、满率 0.7606（原 0.7387）。
+    slot_Bs0: float = 1.0
     slot_Hs0: float = 1.2
-    slot_Bs1: float = 2.7
+    slot_Bs1: float = 1.5
     slot_Hs1: float = 5.3
     slot_Bs2: float = 3.5
     slot_Rs: float = 1.75
-    slot_Hs2: float = 12.5
+    slot_Hs2: float = 13.5
 
     # D2（I2 定源）
     coil_pitch: int = 5          # 槽距数（全距 6，短距 1 槽）
@@ -92,6 +94,8 @@ class IPMConfig:
     # 制造实际绕线线径（I3/G7 槽满率口径）：cps=10 → 每槽 2 边 × 10 根 = 20 根，
     # Ø1.5 时 fill=0.9016>0.78 FAIL；Ø1.35 时 fill=0.7303 PASS。
     # assumption=待验证：需物料 BOM 给出真实漆包线规格；FEA 不依赖此字段。
+    # 制造绕线口径（不进 FEA 几何）：2026-11-24 Bs0=1.0 + yoke 16→15 重定标后，
+    # 槽面积 37.836、Ø1.35 满率 0.7606（≤0.78），比旧口径 0.7387 提高。
     wind_wire_mm: float = 1.35
 
     # D4（I4：单层 V，用户 2026-11-22 定）
@@ -109,11 +113,18 @@ class IPMConfig:
     # 已交周检裁定；本阶段只按 OD 桥≤2.0 推进（PROJECT_SPEC §7.2）。
     v_single: tuple = (33.0, 38.0, 13.0, 3.0)
 
+    # D5 斜槽多切片转角（机械度）：0=基线；3 切片取 ±γ/2, 0，
+    # γ = 0.75 槽距 × (360/48) = 5.625° 机械（=22.5° 电角）。
+    # 只影响转子 V 槽/磁钢几何与磁化方向，定子/绕组不动。
+    rotor_init_deg: float = 0.0
+
     # 材料/工况（§1）
     Bg_assumed: float = 0.85     # 假设：V 型聚磁后气隙工作磁密（M2' FEA 验证）
     B_tooth_limit: float = 1.65
     B_yoke_limit: float = 1.45
-    yoke_min: float = 16.0
+    # 2026-11-24: 16→15 mm，配合 Bs0=1.0 使槽面积回到 37.836（铜耗判据需 ≥37.776）。
+    # B_yoke 实测 1.089 T ≤1.45，留有余量；轭厚削薄 1 mm 由 FEA 复核。
+    yoke_min: float = 15.0
     J_design: float = 6.0        # A/mm²（自然冷却小机常用 5–7）
     fill_design: float = 0.55
     P_cu_budget: float = 140.0
@@ -145,13 +156,18 @@ def derive_slot(cfg: IPMConfig) -> dict:
 
     # ② 槽口宽：齿部在气隙侧不窄于 b_t，且开口 ≥ 入线间隙
     bs0_max = tau_bore - b_tooth_min
-    bs0_practice = round(0.36 * tau_bore, 1)          # 半闭口槽常见 0.30–0.40 τ
-    bs0_wire = round(cfg.wire_diameter_mm + 0.4, 1)   # 单根线 + 绝缘/槽楔余量
-    bs0 = min(bs0_max, max(bs0_practice, bs0_wire))
-    steps.append(dict(step="② 槽口宽 Bs0", formula="min(τ−b_t, max(0.36τ, d_wire+0.4))",
-                      expr="min(%.4f, max(%.2f, %.2f))" % (bs0_max, bs0_practice, bs0_wire),
+    # 2026-11-24：系数 0.36→0.164，使 Bs0=1.0 mm 与书本案例（图2表1-1）一致，
+    # 目的是压 1200 Hz 槽谐波（cps=10 实测 h=12 幅值 2.208 N·m = 8.58% T_avg）。
+    # 形状定制，不重推槽面积/线圈（见 config.slot_Bs0 注释）。
+    bs0_practice = round(0.164 * tau_bore, 1)         # 案例定制 ≈1.0 mm（原 0.36τ=2.2）
+    # 2026-11-24：不再用 `d_wire+0.4` 拉高槽口。案例 Bs0=1.0 < Ø1.35 线径，
+    # 属成型/半闭口槽（绕组从槽口压入），制造性由 I3 槽满率与下周检复核。
+    bs0 = min(bs0_max, bs0_practice)
+    steps.append(dict(step="② 槽口宽 Bs0", formula="min(τ−b_t, 0.164τ) —— 案例定制，不拉宽",
+                      expr="min(%.4f, %.2f)" % (bs0_max, bs0_practice),
                       value_mm=round(bs0, 2),
-                      note="半闭口槽开口 0.30–0.40τ；同时保证 Ø%.1f 线可下" % cfg.wire_diameter_mm))
+                      note="2026-11-24 按书本案例 Bs0=1.0 压 1200 Hz 槽谐波；"
+                           "槽口小于线径属半闭口槽，制造性待复核"))
 
     # ③ 颈高：槽楔 + 槽绝缘
     hs0 = math.ceil((max(3.0 * LAMINATION_MM, 1.0) + 0.1) * 10.0) / 10.0
@@ -314,7 +330,7 @@ def slot_fill_factor(cfg: IPMConfig, cps: int | None = None,
         "fill": round(fill, 6), "limit": 0.78,
         "status": "PASS" if fill <= 0.78 else "FAIL",
         "assumption": "wind_wire_mm=1.35 为制造口径待 BOM 验证；"
-                      "槽几何仍按 wire_diameter_mm=1.50 定标未动",
+                      "2026-11-24 Bs0=1.0+yoke15 后槽面积 37.836、fill 0.7606",
     }
 
 
@@ -539,10 +555,13 @@ def _v_legs(apex_r: float, tilt_deg: float, length: float, gap_in: float, thick:
     return out
 
 
-def derive_rotor(cfg: IPMConfig) -> dict:
+def derive_rotor(cfg: IPMConfig, rotor_init_deg: float = 0.0) -> dict:
     """I4：每极**一组** V、共 16 块（单层 V）；逐块自检并返回全局多边形。
 
     用户 2026-11-22 要求永磁体单层，取消原双层 V 的 outer/inner 两层。
+    `rotor_init_deg`（D5 斜槽多切片）：把整个转子绕 Z 转该电角 —— V 槽与磁钢
+    一起转，定子不动；磁化方向必须同步转（见 `ipm_build.magnet_directions`）。
+    轴对称的 RotorOuter/Band 转动不改变几何，故只转 V 多边形即可。
     """
     r_rot = cfg.rotor_od / 2.0
     r_shaft = cfg.rotor_id / 2.0
@@ -552,7 +571,7 @@ def derive_rotor(cfg: IPMConfig) -> dict:
 
     local = []   # (layer, side, pole, pts_local) —— 单层，layer 恒为 "single"
     for pole in range(cfg.poles):
-        ang = pole * pole_pitch
+        ang = pole * pole_pitch + rotor_init_deg
         for side, pts in _v_legs(ra, tilt, length, gap_in, t):
             local.append(("single", side, pole, rotate(pts, ang)))
 

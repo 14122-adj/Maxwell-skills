@@ -1,0 +1,130 @@
+{
+  "stage": "M3' 401 点负载（I18 电流 + I19 平直）",
+  "torque": {
+    "t_avg_nm": 25.736715,
+    "pp_nm": 5.129872,
+    "pp_pct": 19.9321,
+    "main_harmonic_order": 12,
+    "main_harmonic_nm": 2.20765,
+    "main_harmonic_pct": 8.5778,
+    "jump_max_nm": 1.33218,
+    "jump_max_pct": 5.1762,
+    "window_samples": 200,
+    "total_rows": 401,
+    "torque_unit": "NewtonMeter",
+    "torque_scale": 1.0,
+    "spectrum_top5": [
+      [
+        12,
+        2.20765
+      ],
+      [
+        24,
+        0.751847
+      ],
+      [
+        6,
+        0.393195
+      ],
+      [
+        36,
+        0.091134
+      ],
+      [
+        48,
+        0.05696
+      ]
+    ]
+  },
+  "excitation": {
+    "current_A": 14.5019,
+    "current_unit": "A_peak",
+    "phase_deg": 0.0,
+    "phase_abs_deg": 90.0,
+    "bemf_offset_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "explicit",
+    "expressions": {
+      "A": "-14.501900*sin(628.318531*Time+1.570796327)",
+      "B": "-14.501900*sin(628.318531*Time-0.523598776)",
+      "C": "-14.501900*sin(628.318531*Time+3.665191429)"
+    },
+    "formula": "Imax*sin(2*pi*f*Time + phi_abs), B=phi_abs-120deg, C=phi_abs+120deg; phi_abs=bemf_offset+phi_rel, bemf_offset=90 (I20)"
+  },
+  "bemf_load": {
+    "sources": {
+      "A": "d(FluxLinkage(WindingA))/dt",
+      "B": "d(FluxLinkage(WindingB))/dt",
+      "C": "d(FluxLinkage(WindingC))/dt"
+    },
+    "phase": {
+      "A": {
+        "fundamental_amp_v": 339.1776,
+        "rms_v": 240.7463,
+        "phase_deg": 147.487,
+        "n_samples": 201
+      },
+      "B": {
+        "fundamental_amp_v": 338.8686,
+        "rms_v": 240.4958,
+        "phase_deg": 27.8239,
+        "n_samples": 201
+      },
+      "C": {
+        "fundamental_amp_v": 339.8647,
+        "rms_v": 241.2401,
+        "phase_deg": -92.2945,
+        "n_samples": 201
+      }
+    },
+    "note": "I21: 负载 BEMF = d(FluxLinkage)/dt，第二电周期基波 DFT",
+    "fundamental_amp_mean_v": 339.3036,
+    "rms_vs_noload_pct": 88.5235,
+    "noload_rms_reference_v": 127.744
+  },
+  "checks": [
+    {
+      "name": "T_avg ∈ 22.5–27.5 N·m",
+      "value": 25.7367,
+      "limit": [
+        22.5,
+        27.5
+      ],
+      "op": "in",
+      "status": "PASS"
+    },
+    {
+      "name": "峰峰值 ≤ 10% T_avg",
+      "value": 19.9321,
+      "limit": 10.0,
+      "op": "<=",
+      "status": "FAIL"
+    },
+    {
+      "name": "主谐波幅值 ≤ 5% T_avg",
+      "value": 8.5778,
+      "limit": 5.0,
+      "op": "<=",
+      "status": "FAIL"
+    },
+    {
+      "name": "单点跳变 ≤ 15% T_avg",
+      "value": 5.1762,
+      "limit": 15.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "负载 excitation.current_A > 0（真施加电流）",
+      "value": 14.5019,
+      "limit": 0,
+      "op": ">",
+      "status": "PASS"
+    }
+  ],
+  "status": "FAIL",
+  "source_json": "projects/results/ipm8p48s/m3_load_cps10.json",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m3_cps10"
+}

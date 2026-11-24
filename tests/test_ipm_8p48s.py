@@ -7,7 +7,7 @@
 这三件事都能建出「看起来像电机」的模型，但 FEA 出来全是废数。本文件把
 `projects/IPM_8p48s/ipm_geom.py` 与 `ipm_winding.py` 的定源结论钉死：
 
-1. **I1**：7 个槽尺寸由约束链算出（齿宽/轭厚/槽满/铜耗），槽面积 39.2 mm²、
+1. **I1**：7 个槽尺寸由约束链算出（齿宽/轭厚/槽满/铜耗），槽面积 37.836 mm²（2026-11-24 Bs0=1.0+yoke15）、
    齿部最窄 3.44 mm、轭厚 16.0 mm、`Rs = Bs2/2` 是相切恒等式；
 2. **I2**：q=2、y=5 的双层 60° 相带 ⇒ 96 边、每相 16 线圈、k_w1=0.9330、
    k_w5=k_w7=0.0670（短距 1 槽的直接效果）；
@@ -69,8 +69,9 @@ def test_i1_config_matches_derivation(cfg, i1):
 
 
 def test_i1_slot_area_and_yoke(i1):
-    assert i1["areas"]["slot_analytic"] == pytest.approx(39.2, abs=0.3)
-    assert i1["radii"]["h_yoke"] == pytest.approx(16.0, abs=1e-9)
+    # 2026-11-24 Bs0 2.2→1.0（案例定制），槽面积 39.2→34.336
+    assert i1["areas"]["slot_analytic"] == pytest.approx(37.836, abs=0.3)
+    assert i1["radii"]["h_yoke"] == pytest.approx(15.0, abs=1e-9)
     assert i1["flux"]["B_tooth_min"] <= 1.65
     assert i1["flux"]["B_yoke"] <= 1.45
 
@@ -222,7 +223,7 @@ def test_i3_cps_sourced_at_10(cfg):
 
 
 def test_i3_slot_fill_passes_at_1p35(cfg):
-    """cps=10 / Ø1.35 绕线 fill ≤0.78；Ø1.5 越界（0.9016）必须 FAIL。"""
+    """2026-11-24: Bs0=1.0+yoke15 后 cps=10/Ø1.35 fill=0.7606≤0.78；Ø1.5 越界必须 FAIL。"""
     good = ipm_geom.slot_fill_factor(cfg)
     assert good["cps"] == 10 and good["wires_per_slot"] == 20
     assert good["status"] == "PASS" and good["fill"] <= 0.78
@@ -236,3 +237,25 @@ def test_i3_build_script_has_cps_10(cfg):
     src = ipm_build.build_script(cfg)
     assert "CPS = 10" in src
     assert 'str(CPS), "PolarityType:="' in src
+
+
+# ------------------------------------------------------------ D5 斜槽多切片
+def test_rotor_init_deg_identity(cfg):
+    """0° 转角必须与默认逐位相同（防止斜槽改动污染 baseline）。"""
+    import ipm_build
+    assert ipm_geom.derive_rotor(cfg, 0.0)["polygons"] == ipm_geom.derive_rotor(cfg)["polygons"]
+    assert ipm_build.magnet_directions(cfg, 0.0) == ipm_build.magnet_directions(cfg)
+
+
+def test_rotor_init_deg_rotates_rigidly(cfg):
+    """转子转角只改位形：块数/总面积/6 项几何自检不变，磁化方向同步转。"""
+    import ipm_build
+    base = ipm_geom.derive_rotor(cfg, 0.0)
+    rot = ipm_geom.derive_rotor(cfg, 2.8125)
+    assert rot["magnets"] == base["magnets"] == 16
+    assert rot["magnet_area_total"] == pytest.approx(base["magnet_area_total"], abs=1e-6)
+    assert all(c["status"] == "PASS" for c in rot["checks"])
+    d0, d1 = ipm_build.magnet_directions(cfg, 0.0), ipm_build.magnet_directions(cfg, 2.8125)
+    for (_p0, gx0, gy0), (_p1, gx1, gy1) in zip(d0, d1):
+        assert math.hypot(gx1, gy1) == pytest.approx(1.0, abs=1e-9)
+        assert math.hypot(gx0 - gx1, gy0 - gy1) > 1e-3   # 确实转了

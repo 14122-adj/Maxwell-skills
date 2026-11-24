@@ -81,26 +81,29 @@ def _pts_literal(pts) -> str:
     return "[" + ", ".join("(%s, %s)" % (_fmt(x), _fmt(y)) for (x, y) in pts) + "]"
 
 
-def magnet_directions(cfg) -> list:
+def magnet_directions(cfg, rotor_init_deg: float = 0.0) -> list:
     """16 块磁钢（单层 V）的**外法线**单位向量（已旋转到全局）。
 
     厚度沿 +n 偏置（n 指向极轴内侧），故「外侧那条面」是 p1p2 所在面，
     外法线 = (sinβ, −s·cosβ)，s = ±1。偶数极取外法线（N 朝气隙），奇数极反向（S）。
     返回顺序与 `derive_rotor()["polygons"]` 完全一致：
     pole → side(+/-)（单层，无 outer/inner 之分）。
+    `rotor_init_deg`（D5 斜槽多切片）：磁化方向随转子几何同步绕 Z 转该角。
     """
     out = []
     pole_pitch = 360.0 / cfg.poles
     _ra, tilt, _len, _gap = cfg.v_single
     t = math.radians(tilt)
     for pole in range(cfg.poles):
-        a = math.radians(pole * pole_pitch)
+        a = math.radians(pole * pole_pitch + rotor_init_deg)
         for _side, s in (("+", 1.0), ("-", -1.0)):
             ux, uy = math.sin(t), -s * math.cos(t)
             gx = ux * math.cos(a) - uy * math.sin(a)
             gy = ux * math.sin(a) + uy * math.cos(a)
             if pole % 2 == 1:
                 gx, gy = -gx, -gy
+            # 注意：极的奇偶由 pole 序号决定（N/S 交替），转 Δ 后磁钢跟着走但极性不变；
+            # a 已含 rot，上面的 cos(a)/sin(a) 就是把局部外法线转到旋转后的全局方向。
             out.append((pole, gx, gy))
     return out
 
@@ -114,7 +117,7 @@ def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "
     """
     i1 = ipm_geom.derive_slot(cfg)
     layers = ipm_geom.coil_layers(cfg)
-    rotor = ipm_geom.derive_rotor(cfg)
+    rotor = ipm_geom.derive_rotor(cfg, cfg.rotor_init_deg)
     wind = ipm_winding.analyze(cfg)
 
     sc = ipm_geom.slot_only(cfg)
@@ -128,7 +131,7 @@ def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "
         coils.append(("Coil_T%02d" % (s + 1), "T", ipm_geom.rotate(layers["upper"], a)))
         coils.append(("Coil_B%02d" % (s + 1), "B", ipm_geom.rotate(layers["lower"], a)))
 
-    dirs = magnet_directions(cfg)
+    dirs = magnet_directions(cfg, cfg.rotor_init_deg)
     pm_entries = []
     for i, pts in enumerate(rotor["polygons"]):
         pole, gx, gy = dirs[i]
