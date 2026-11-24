@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs — 2026-11-24 夜（电机类型扩展路线图：类型数量不是指标）
+
+用户 22:01 定调「先完整建模并验证一个类型，再逐步扩展到其他类型」。落地为
+`docs/MOTOR_TYPE_ROADMAP.md`，核心是**6 条门禁**（几何/网格/空载/负载/边界/留档）
+与"按代码复用度排"的扩展顺序。
+
+盘点暴露的问题（这是"先广后深"的代价）：
+- `IPM_Spoke` 是**假实现**：`pm_builder._build_ipm_spoke_magnet` 直接
+  `return self._build_ipm_flat_magnet(...)`，退化成一字型而非辐条排布
+- `BLDC` / `SRM` / `IM` 只有 `MotorType` 枚举，零实现零调用
+- `IPM_Flat`、矩形/梯形/圆形槽有完整生成代码但从未真机验证
+
+完成度：SPM 8p12s **5/6**（缺效率/退磁 FEA）、IPM 8p48s **3.5/6**
+（气隙 1.48 层、Bg 0.6189 T 未达 0.70）。**连第一个 IPM 都没走完门禁**。
+
+扩展顺序：①收口 IPM（Bg+气隙）→ ②补两机型 E6/E8 → ③`IPM_Flat` 真机
+→ ④三种槽型批量 → ⑤36槽 q=3 泛化 → ⑥BLDC 方波 → ⑦SRM → ⑧IM。
+③④ 成本最低（代码已写好、只差跑真机），应优先于 ⑦⑧。SRM/IM 不在 2026 年内排期。
+
+（本次仅新增文档，未改代码；假实现改显式报错列为后续动作。）
+
 ### Docs — 2026-11-24 夜（转矩不稳定排查指导书本地化 + 气隙网格缺陷发现）
 
 用户提交《ANSYS Maxwell 电机仿真转矩不稳定排查指导书》，要求并入每日迭代。逐条甄别后
