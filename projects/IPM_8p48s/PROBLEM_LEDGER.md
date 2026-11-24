@@ -568,3 +568,83 @@ B/C 相同量级（空载 10.4635 V）。CSV：`csv_ipm_m2_apex33/`、`csv_ipm_m
   `mesh_m3_skew_bs10_s{0,1,2}.json`、`m2_noload_bs10.json`、`mesh_m2_bs10.json`、
   `ipm_skew_slices.py`。
   TEMP：`TEMP/ipm_skew_predict.py`（斜槽频域预研）。
+
+---
+
+### I27 「为什么没有转矩从零上升的曲线」—— M4 起动工况设立（2026-11-24，DONE-script / 真机进行中）
+
+**用户提问**（20:42）："好奇怪，为什么，没有转矩从零开始上升的转矩曲线？"
+
+**这不是 bug，是口径。** 三条代码事实（不是推断）：
+
+| 环节 | M1'–M3' 实际设置 | 后果 |
+|---|---|---|
+| 转子运动 `ipm_build.py:419` | `Consider Mechanical Transient:=False` + `Angular Velocity:="1500rpm"` | 求解器**从不积分** `J·dω/dt = T_em − T_load`，ω 是给定的常数 |
+| 绕组激励 `:398` | `Type:="Current"`，`Imax·sin(ωt+φ)` | 电流源直接灌入，t=0 即为 `Imax·sin(φ)`；无电压源 L/R 建立过程 |
+| 永磁体 | 剩磁预置于材料 | t=0 气隙已是 0.662 T，无"充磁"过渡 |
+| 求解窗口 `:437` | `StopTime=0.02s`（2 个电周期） | 401 点全部落在稳态区间 |
+
+**硬证据**：`D:/ANSYS_Run/csv_ipm_m3_cps10/tq_load.csv` 首行 `0, 26.5808397855413` ——
+仿真第一个采样点就是 26.58 N·m。不存在"上升慢"，是根本没有上升段。
+
+**处置**：新建独立工况 M4（契约见 `PROJECT_SPEC.md` §7.6），不复用、不覆盖 M1'–M3'。
+参数签名取自本机 `MaxwellScriptingGuide.pdf` P758–760（见 `docs/MAXWELL_INTERNALS.md` §13.11）。
+
+**参数定源**：
+
+| 键 | 值 | 来源 |
+|---|---|---|
+| `Consider Mechanical Transient` | `True` | 官方 P760 示例 |
+| `Angular Velocity` | `"0deg_per_sec"` | 机械瞬态下=初速（非恒转速） |
+| `Moment of Inertia` | `"0.0092"` | 转子本体解析：硅钢 ½·7.43·0.0461625²=7.92e-3 + 磁钢 0.749·0.0415²=1.29e-3；不含轴 |
+| `Damping` | `"0"` | 无额外阻尼 |
+| `Load Torque` | `"0NewtonMeter"` | 空载起动 |
+| `StopTime` / `TimeStep` | `0.2s` / `0.0005s` = 400 步 401 点 | 与 M1'–M3' 同规模（用户要求） |
+| `SaveFieldsType` | `"None"` | 只取转矩/转速，抵消 remesh 开销 |
+
+**文件级验证**（`IPM_8p48s_M4_start.aedt` 二进制直搜，2026-11-24 建模后）：
+`'Consider Mechanical Transient'=true` ×1、`'Angular Velocity'='0deg_per_sec'` ×1、
+`'Moment of Inertia'='0.0092'` ×1、`Damping='0'`、`'Load Torque'='0NewtonMeter'` —— 全部命中。
+
+**踩坑（完整清单见 `docs/MAXWELL_INTERNALS.md` §13.11）**：
+① `DeleteMotionSetup` 要 Structured Array，传字符串失败；② `AssignBand` 对同一 band 重复调用
+报 `Already has motion setup with same band assignment`；③ `ChangeProperty` 的
+`PropServers` 用 `MotionSetup1`/`BandData` 都是 `Invalid PropServer`；
+④ **裸最小工程上连已验证写法都失败**（band 需完整建模上下文），最小工程法不成立。
+
+**遗留**：M4 首跑用 `--bemf 127.744`（旧几何 Bs0=2.2 实测值）插得 Imax=14.502 A；
+新几何实测相 BEMF 为 **133.7364 V**，若按新值应为 Imax≈13.84 A（−4.8%）。
+M4 只用于看起动曲线形状，不参与 25 N·m 判据，故首跑数据有效但需在报告中标注该口径差；
+若要 M4 稳态段精确落在 25 N·m，需用 `--bemf 133.7364` 补跑一次。
+
+---
+
+#### I27 续：机械瞬态跑通 ≠ 转子能起动（同日 21:00–21:30 两次真机证否）
+
+M4 首跑（21:09，`ANALYZE_OK`，16m09s）参数全部生效、工程能解，但**转子根本没转起来**：
+
+| 量 | 实测 | 应有 |
+|---|---:|---|
+| 转速峰值 | 59.3 rpm @122.5 ms | → 1500 |
+| 转速末段 | −8.1 rpm | 1500 |
+| 转矩峰 / 谷 | +33.84 / −33.88 N·m | 单边正 |
+| 转矩末段均值 | 0.381 N·m | ≈0（空载稳态） |
+| `position.csv` 末值 | 358.72° | 单调增 |
+
+**根因（①）**：`Consider Mechanical Transient=true` 只解决"转速从哪来"，不解决"转子能否被
+驱动"。PMSM **没有阻尼绕组**，固定 100 Hz 定子磁场以 1500 rpm 旋转，静止转子被正负交替的
+转矩原地拉扯，平均转矩≈0。异步机能自起动靠鼠笼；PMSM 必须 ①阻尼笼 ②变频器爬坡
+③编码器闭环。首跑等于"直接投额定频率 + 转子静止"这一最恶劣工况。
+
+**证否（②）**：改位置反馈 `i=−Imax·sin(4·Moving1.Position·pi/180+φ)`（极对数 4，★现场
+先误写成极数 8，靠 grep 表达式才抓到）。结果转矩仅 **55 µN·m**（单位自动降到 µN·m）、
+`position.csv` 末值 **0.00029°** ⇒ **`Moving1.Position` 在 winding 电流表达式里未被实时
+求值**（当常量 0），三相退化成固定直流、合成磁动势静止。该路线在本机 2021.1 不可用。
+
+**采纳（③）变频起动**：`f(t)=f0+k·min(t,T)`、`θ(t)=2π[f0·t+k·min(t,T)²/2]`，
+f0=2 Hz → f1=100 Hz、T=0.12 s（余 0.08 s 恒频稳态）。纯时间函数，不依赖任何反馈变量；
+`min()` 在表达式引擎可用，用来"爬到目标频率后封顶"。
+40 ms 快速验证：转速 0 → **490.6 rpm**，理论同步速 (2+816.67×0.04)×60/4 = 520 rpm → **PASS**。
+
+**判据教训（写进 §7.6）**：只导 `Moving1.Torque` 看不出这两种失败——转矩在 ±33 N·m 之间摆
+也能画得像"起动曲线"。**必须同导 `Moving1.Speed`**，它是"转子到底动没动"的唯一硬证据。

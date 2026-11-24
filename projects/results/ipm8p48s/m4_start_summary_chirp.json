@@ -1,0 +1,36 @@
+{
+  "case": "chirp",
+  "torque_unit": "NewtonMeter",
+  "torque_scale": 1.0,
+  "speed_unit": "rpm",
+  "time_unit": "ms",
+  "torque": {
+    "status": "OK",
+    "n": 401,
+    "t_span": [
+      0.0,
+      200.0
+    ],
+    "y_start": 25.18632518951,
+    "y_peak": 32.4742493762042,
+    "t_peak": 140.0,
+    "y_min": -33.0984121230954,
+    "y_ss": 1.6586386645945392,
+    "t_settle": null
+  },
+  "speed": {
+    "status": "OK",
+    "n": 401,
+    "t_span": [
+      0.0,
+      200.0
+    ],
+    "y_start": 0.0,
+    "y_peak": 1379.31774528011,
+    "t_peak": 121.0,
+    "y_min": 0.0,
+    "y_ss": 1336.0188896091931,
+    "t_settle": 90.0000000000001
+  },
+  "csvdir": "D:/ANSYS_Run\\csv_ipm_m4_chirp"
+}

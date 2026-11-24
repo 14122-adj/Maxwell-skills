@@ -108,12 +108,21 @@ def magnet_directions(cfg, rotor_init_deg: float = 0.0) -> list:
     return out
 
 
-def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "M1") -> str:
+def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "M1",
+                 motion=None, stop_time: str = "0.02s", time_step: str = "0.00005s",
+                 save_fields: str = "Every N Steps") -> str:
     """生成 M1' 建模 IronPython。
 
     currents: None（默认，三相 "0A" 空载）或 {"A","B","C"} → Maxwell Current 字面量。
               IronPython 2.7 只收字面量，表达式必须在 CPython 侧算好再传入。
     case_tag: 日志标识，负载版用 "M3_load"。
+    motion: None（默认，恒转速 1500rpm，M1'/M2'/M3' 口径）或 dict → 机械瞬态（M4 起动）。
+            键：init_speed / inertia / damping / load_torque，值均为 Maxwell 字面量。
+            参数名与平铺结构见 `MaxwellScriptingGuide.pdf` P760 "Assign band as
+            rotate, consider mechanical transient" 官方示例；该文档同时说明
+            `Moment of Inertia` 不作单位换算，直接按 SI 数值写。
+    stop_time / time_step: 求解窗口，默认 0.02s / 0.05ms = 400 步（401 点）。
+    save_fields: SaveFieldsType。M4 只看转矩，用 "None" 可省掉每步场快照 IO。
     """
     i1 = ipm_geom.derive_slot(cfg)
     layers = ipm_geom.coil_layers(cfg)
@@ -416,7 +425,16 @@ def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "
     A('    ["NAME:BandData", "Move Type:=", "Rotate", "Coordinate System:=", "Global",')
     A('     "Axis:=", "Z", "Is Positive:=", True, "Init Pos:=", "0deg",')
     A('     "HasRotateLimit:=", False, "NonCylindrical:=", False,')
-    A('     "Consider Mechanical Transient:=", False, "Angular Velocity:=", "1500rpm",')
+    if motion is None:
+        A('     "Consider Mechanical Transient:=", False, "Angular Velocity:=", "1500rpm",')
+    else:
+        # M4 起动：机械瞬态。Angular Velocity 在此模式下是**初始转速**（deg_per_sec），
+        # 之后转速由 J·dω/dt = T_em − T_load 积分得到，不再被固定。
+        A('     "Consider Mechanical Transient:=", True,')
+        A('     "Angular Velocity:=", "' + motion["init_speed"] + '",')
+        A('     "Moment of Inertia:=", "' + motion["inertia"] + '",')
+        A('     "Damping:=", "' + motion["damping"] + '",')
+        A('     "Load Torque:=", "' + motion["load_torque"] + '",')
     A('     "Objects:=", ["Band"]])')
 
     # ----------------------------------------------------------------- mesh
@@ -434,8 +452,8 @@ def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "
     # --------------------------------------------------------------- solver
     A("")
     A('oDesign.GetModule("AnalysisSetup").InsertSetup("Transient",')
-    A('    ["NAME:Setup1", "StopTime:=", "0.02s", "TimeStep:=", "0.00005s",')
-    A('     "SaveFieldsType:=", "Every N Steps", "UseAdaptiveTimeStep:=", False,')
+    A('    ["NAME:Setup1", "StopTime:=", "' + stop_time + '", "TimeStep:=", "' + time_step + '",')
+    A('     "SaveFieldsType:=", "' + save_fields + '", "UseAdaptiveTimeStep:=", False,')
     A('     "NonlinearSolverResidual:=", "0.0001", "SmoothBHCurve:=", False])')
 
     # ------------------------------------------------------------ inventory

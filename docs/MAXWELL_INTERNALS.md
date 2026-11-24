@@ -695,6 +695,138 @@ python projects/25Nm_PMSM/gen_maxwell_model.py --check   # 无漂移 rc=0，有�
 `Conductor number'='40'` × **12**、`VectorPotential1` × 2、`MotionSetup1`（`Move Type='Rotate'`）、
 `Setup1` × 8、`ModelDepth='160mm'` × 1、`Sheets=24`、`Solids=0`。
 
+### 13.11 机械瞬态：`Consider Mechanical Transient=true` 的 5 个键（2026-11-24 实测）
+
+**权威来源**：本机 `D:\Program Files\AnsysEM\AnsysEM21.1\Win64\Help\Maxwell\MaxwellScriptingGuide.pdf`
+P758–760「MotionSetupScriptCommands」。可直接复现：
+
+```python
+from pypdf import PdfReader
+r = PdfReader(r"D:/Program Files/AnsysEM/AnsysEM21.1/Win64/Help/Maxwell/MaxwellScriptingGuide.pdf")
+print(r.pages[759].extract_text())      # Rotate + 机械瞬态完整示例
+```
+
+官方示例（Rotate 旋转 + 机械瞬态）的键**平铺**在 Band 数组里，不嵌套：
+
+```python
+oModule.AssignBand([
+    "NAME:Band", "Move Type:=", "Rotate", "Coordinate System:=", "Global",
+    "Axis:=", "Z", "Is Positive:=", True, "InitPos:=", "0deg",
+    "HasRotateLimit:=", False, "NonCylindrical:=", False,
+    "Consider Mechanical Transient:=", True,
+    "Angular Velocity:=", "0deg_per_sec",   # ← 机械瞬态下它是**初始**转速，单位 deg_per_sec
+    "Moment of Inertia:=", "1",             # ← 纯数字，不写单位
+    "Damping:=", "0",
+    "Load Torque:=", "0NewtonMeter",
+    "Objects:=", ["band"]])
+```
+
+三个反直觉点：
+
+1. **`Moment of Inertia` 不带单位**。写 `"0.0092kg*m^2"` 不会报错但语义未定义；官方示例是
+   `"1"`、官方 .aedt 存的是 `'Moment of Inertia'='0.0024'`（纯数字，按 SI 解释）。
+2. **`Angular Velocity` 语义翻转**。稳态模式下它是"恒转速"（`"1500rpm"`）；机械瞬态模式下
+   它是 t=0 的初速，单位习惯写 `deg_per_sec`（`"0deg_per_sec"` = 静止起动）。
+3. **它改变的是"转速从哪来"**。`False` 时求解器把 ω 当常数，从不积分 `J·dω/dt = T_em − T_load`，
+   所以 t=0 第一点就是稳态转矩（IPM 实测 `tq_load.csv` 首行 26.58 N·m，整条曲线无起动段）；
+   `True` 时才真正解机械方程，才画得出从零爬升。**这两条曲线的判据不能混用**。
+
+#### 改已有 motion setup：`EditMotionSetup`，别用 Delete + Assign
+
+```python
+oModule.EditMotionSetup("MotionSetup1", ["NAME:Data", "Move Type:=", "Rotate", ...])
+```
+
+`EditMotionSetup(SetupName, BandDataArray)` 是官方文档 P760 给出的编辑入口，数组首元素是
+`"NAME:Data"`（不是 `"NAME:Band"`），且多一个 `"PostProcessing Coordinate System:="`。
+
+**为什么不用「先 Delete 再 Assign」**：`AssignBand` 对同一个 band 重复调用会直接失败——
+
+```
+Already has motion setup with same band assignment.
+```
+
+而 `DeleteMotionSetup` 的签名要求 **Structured Array**，传字符串会失败：
+
+```
+DeleteMotionSetup(Structured Array namesArg)(BandData) - call failed
+```
+
+即便删成功了，§14 的教训还在：多余的 `DeleteMotionSetup` 会重建求解列表，让
+`CreateReport(... "Time:=", ["All"])` 绑到残留试算解，导出只剩 5 行。**新建工程一次写对**是唯一干净路径。
+
+#### 两条死路（省下次的探索时间）
+
+| 尝试 | 结果 | 原因 |
+|---|---|---|
+| `oDesign.ChangeProperty(... "ModelSetup", PropServers="MotionSetup1"/"BandData" ...)` | `Invalid PropServer 'MotionSetup1'` / `'BandData'` | Motion 不在这两个属性 tab 下；`GetPropertyValue` 真实签名是 `(tabArg, serverArg, propArg)` 三参，说明它是三层结构，靠猜路径不划算 |
+| 在裸 `NewProject` + 单个圆上验证 `AssignBand` | 连 `False + 1500rpm`（仓库已验证写法）都失败 | band 需要完整建模上下文（Region / ModelDepth / 求解类型设置）；**最小工程法在这里不成立**，必须用真实几何验 |
+
+#### 唯一可靠的验证方式：存盘后从 `.aedt` 二进制直搜
+
+`.aedt` 是 OLE 复合文档，但运动设置块是**明文**（`tr -c '[:print:]\n' '\n'` 或 `grep -a` 可读）。
+`GetPropertyValue` 在 2021.1 上对 Motion 不可用，所以判据只能是文件本身：
+
+```bash
+grep -a -o "Consider Mechanical Transient'=true"  IPM_8p48s_M4_start.aedt | wc -l   # 期望 1
+grep -a -o "Moment of Inertia'='0.0092'"          IPM_8p48s_M4_start.aedt | wc -l   # 期望 1
+```
+
+2026-11-24 实测 M4 产物 `IPM_8p48s_M4_start.aedt` 的 `MotionSetup1` 块：
+
+```
+$begin 'MotionSetup1'
+ID=0
+MotionType='Band'
+'Move Type'='Rotate'
+'Coordinate System'=1
+Axis='Z'
+'Is Positive'=true
+InitPos='0deg'
+HasRotateLimit=false
+NonCylindrical=false
+'Consider Mechanical Transient'=true
+'Angular Velocity'='0deg_per_sec'
+'Moment of Inertia'='0.0092'
+Damping='0'
+'Load Torque'='0NewtonMeter'
+Objects(2622)
+$end 'MotionSetup1'
+```
+
+注意 `'Init Pos'` 被归一化成 `InitPos`、`'Load Torque'` 保留引号而 `Damping` 没有——
+**文件里的写法不能反推脚本该怎么写**（§13.7 的老坑，这里再验证一次）。
+
+#### 机械瞬态下的求解开销与配平
+
+`SaveFieldsType="None"`（P641 确认合法）能让 M4 在同样的 400 步规模下抵消
+band remesh + 运动方程积分的额外开销——M4 只取转矩/转速曲线，不需要每步场快照。
+稳态工况（M1'–M3'）必须保留 `"Every N Steps"`，M2' 的 Bg 场探针依赖它。
+
+实测对比：稳态 401 点 `ANALYZE_OK 723.3 s`（M3' cps10）；机械瞬态 401 点
+`1100 s` 量级（M4，含 remesh + 运动积分），约 1.5×。**"点数相同"不等于"时间相同"**，
+报价时要按 1.5× 估。
+
+#### 机械瞬态能跑通 ≠ 转子能起动（两条死路，2026-11-24 真机）
+
+这是本节最贵的教训：`Consider Mechanical Transient=true` 只解决"转速从哪来"，
+**不解决"转子能不能被驱动起来"**。同一个 M4 工程，两种激励：
+
+| 激励 | 实测 | 死因 |
+|---|---|---|
+| 固定 100 Hz 三相正弦（开环） | `speed.csv` 峰值 59.3 rpm @122.5 ms、末段 −8.1 rpm；转矩 +33.84/−33.88 N·m 正负交替、末段均值 0.381 N·m；`position.csv` 停在 358.72° 抖动 | **PMSM 没有阻尼绕组**。定子磁场以 1500 rpm 旋转，静止转子只能被正负交替的转矩原地拉扯，平均转矩≈0。异步机能自起动靠鼠笼，PMSM 必须变频器爬坡 / 阻尼笼 / 编码器闭环 |
+| 位置反馈 `−Imax·sin(p·Moving1.Position·pi/180+φ)` | 转矩仅 **55 µN·m**（单位自动降到 µN·m）、`position.csv` 末值 0.00029° | **`Moving1.Position` 在 winding 电流表达式里不被实时求值**，当成常量 0 ⇒ 三相退化为固定直流 ⇒ 合成磁动势静止。这条路在 2021.1 上不可用 |
+| 变频起动 `f(t)=f0+k·min(t,T)`、`θ(t)=2π[f0·t+k·min(t,T)²/2]` | 40 ms 验证：转速 0→490.6 rpm，理论同步速 520 rpm | **可行**。纯时间函数、不依赖反馈；`min()` 在表达式引擎里可用，可用于"爬到目标频率后封顶" |
+
+**判据教训**：只导 `Moving1.Torque` 会看不出上面两种失败——转矩在 ±33 N·m 之间摆也能
+画得像"起动曲线"。**必须同时导 `Moving1.Speed`**：它是"转子到底动没动"的唯一硬证据。
+
+#### 两个计数器：极对数 vs 极数
+
+闭环表达式里 `sin(p·θ_m)` 的 p 是**极对数**（8 极 → 4），写 `cfg.poles` 直接进表达式会让
+电角翻倍、驱动频率错一倍。这类错误不会报错，只会让曲线"看起来怪"，所以生成后必须
+`grep` 一次表达式本身（M4 现场就是这么抓到的）。
+
 ## 14. 模板路径「能建 ≠ 能解」的 9 处缺陷与等价性证明（G4，2026-11-13 实测）
 
 §13 让模板脚本"不报错地把 24 个图元建出来"，但**建出来并不等于能解**，更不等于解的数对。

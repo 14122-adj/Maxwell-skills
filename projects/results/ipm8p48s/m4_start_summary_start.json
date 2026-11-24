@@ -1,0 +1,36 @@
+{
+  "case": "start",
+  "torque_unit": "NewtonMeter",
+  "torque_scale": 1.0,
+  "speed_unit": "rpm",
+  "time_unit": "ms",
+  "torque": {
+    "status": "OK",
+    "n": 401,
+    "t_span": [
+      0.0,
+      200.0
+    ],
+    "y_start": 26.4366260530458,
+    "y_peak": 33.8443622774472,
+    "t_peak": 90.5000000000001,
+    "y_min": -33.8790170099941,
+    "y_ss": 0.38062664674603874,
+    "t_settle": null
+  },
+  "speed": {
+    "status": "OK",
+    "n": 401,
+    "t_span": [
+      0.0,
+      200.0
+    ],
+    "y_start": 0.0,
+    "y_peak": 59.3284782176856,
+    "t_peak": 122.5,
+    "y_min": -43.6219621319387,
+    "y_ss": -8.110212036050402,
+    "t_settle": null
+  },
+  "csvdir": "D:/ANSYS_Run\\csv_ipm_m4_start"
+}

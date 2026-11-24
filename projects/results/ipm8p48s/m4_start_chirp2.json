@@ -1,0 +1,73 @@
+{
+  "case": "chirp2",
+  "stage": "M4 起动（机械瞬态 401 点）",
+  "excitation": {
+    "current_A": 13.856103476923076,
+    "current_unit": "A_peak",
+    "phase_abs_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "bemf_interp@E=133.7364",
+    "expressions": {
+      "A": "-13.856103*sin(2*pi*(2.000000*Time+272.222222*min(Time,0.180000)*min(Time,0.180000))+1.570796327)",
+      "B": "-13.856103*sin(2*pi*(2.000000*Time+272.222222*min(Time,0.180000)*min(Time,0.180000))-0.523598776)",
+      "C": "-13.856103*sin(2*pi*(2.000000*Time+272.222222*min(Time,0.180000)*min(Time,0.180000))+3.665191429)"
+    },
+    "mode": "vf_chirp_start",
+    "freq_start_hz": 2.0,
+    "freq_end_hz": 100.0,
+    "ramp_s": 0.18,
+    "note": "变频起动：f(t)=f0+k·min(t,T)，θ(t)=2π[f0·t+k·min(t,T)²/2]；等价变频器 V/f 起动，纯时间函数不依赖反馈"
+  },
+  "motion": {
+    "consider_mechanical_transient": true,
+    "init_speed_deg_per_sec": 0.0,
+    "moment_of_inertia_kg_m2": 0.0092,
+    "damping": 0.0,
+    "load_torque_nm": 0.0,
+    "j_source": "转子本体解析估算：硅钢 ½·7.43·0.0461625² + 磁钢 0.749·0.0415²；不含轴与联轴器"
+  },
+  "timing": {
+    "stop_time": "0.2s",
+    "time_step": "0.0005s",
+    "n_steps": 400,
+    "n_points": 401,
+    "save_fields_type": "None",
+    "note": "与 M1'-M3' 同为 400 步 401 点；M4 不存场以抵消 remesh 开销"
+  },
+  "build_script": "D:/ANSYS_Run/ipm_m4_build_chirp2.py",
+  "solve_script": "D:/ANSYS_Run/ipm_m4_solve_chirp2.py",
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M4_chirp2.aedt",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m4_chirp2",
+  "generated": true,
+  "solved": true,
+  "torque_summary": {
+    "status": "OK",
+    "n": 401,
+    "t_span_s": [
+      0.0,
+      200.0
+    ],
+    "y_start": 25.1863024450454,
+    "y_peak": 32.747116808004,
+    "t_peak_s": 196.5,
+    "y_min": -33.3984151927433,
+    "y_ss": 9.699543846977175,
+    "t_settle_s": null
+  },
+  "speed_summary": {
+    "status": "OK",
+    "n": 401,
+    "t_span_s": [
+      0.0,
+      200.0
+    ],
+    "y_start": 0.0,
+    "y_peak": 1687.08644095254,
+    "t_peak_s": 181.0,
+    "y_min": 0.0,
+    "y_ss": 1588.383536927596,
+    "t_settle_s": null
+  }
+}

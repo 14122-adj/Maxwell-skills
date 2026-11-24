@@ -1,0 +1,42 @@
+{
+  "case": "cltest",
+  "stage": "M4 起动（机械瞬态 401 点）",
+  "excitation": {
+    "current_A": 13.856103476923076,
+    "current_unit": "A_peak",
+    "phase_abs_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "bemf_interp@E=133.7364",
+    "expressions": {
+      "A": "-13.856103*sin(4*Moving1.Position*pi/180+1.570796327)",
+      "B": "-13.856103*sin(4*Moving1.Position*pi/180-0.523598776)",
+      "C": "-13.856103*sin(4*Moving1.Position*pi/180+3.665191429)"
+    },
+    "mode": "closed_loop_self_synchronous",
+    "note": "位置闭环：电角 = p × Moving1.Position(deg)，电流矢量锁在磁极 q 轴"
+  },
+  "motion": {
+    "consider_mechanical_transient": true,
+    "init_speed_deg_per_sec": 0.0,
+    "moment_of_inertia_kg_m2": 0.0092,
+    "damping": 0.0,
+    "load_torque_nm": 0.0,
+    "j_source": "转子本体解析估算：硅钢 ½·7.43·0.0461625² + 磁钢 0.749·0.0415²；不含轴与联轴器"
+  },
+  "timing": {
+    "stop_time": "0.04s",
+    "time_step": "0.0005s",
+    "n_steps": 80,
+    "n_points": 81,
+    "save_fields_type": "None",
+    "note": "与 M1'-M3' 同为 400 步 401 点；M4 不存场以抵消 remesh 开销"
+  },
+  "build_script": "D:/ANSYS_Run/ipm_m4_build_cltest.py",
+  "solve_script": "D:/ANSYS_Run/ipm_m4_solve_cltest.py",
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M4_cltest.aedt",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m4_cltest",
+  "generated": true,
+  "solved": false
+}

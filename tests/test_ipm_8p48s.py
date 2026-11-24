@@ -259,3 +259,93 @@ def test_rotor_init_deg_rotates_rigidly(cfg):
     for (_p0, gx0, gy0), (_p1, gx1, gy1) in zip(d0, d1):
         assert math.hypot(gx1, gy1) == pytest.approx(1.0, abs=1e-9)
         assert math.hypot(gx0 - gx1, gy0 - gy1) > 1e-3   # 确实转了
+
+
+# ------------------------------------------------------------ M4 起动工况护栏
+def test_build_script_default_is_steady_state(cfg):
+    """默认调用（M1'/M2'/M3'）必须是恒转速稳态口径，绝不能漏进机械瞬态。
+
+    判据不是"看起来对"：M1'–M3' 的 25 N·m / 峰峰值 ≤10% 全部建立在
+    `Consider Mechanical Transient=False` + 转速钉死 1500rpm 之上；一旦默认
+    变成 True，那三份历史数据的口径就失效了。
+    """
+    import ipm_build
+    src = ipm_build.build_script(cfg)
+    assert '"Consider Mechanical Transient:=", False' in src
+    assert '"Angular Velocity:=", "1500rpm"' in src
+    assert '"Moment of Inertia' not in src
+    assert '"Load Torque' not in src
+    # 时间口径一并钉住
+    assert '"StopTime:=", "0.02s"' in src
+    assert '"TimeStep:=", "0.00005s"' in src
+
+
+def test_build_script_motion_mechanical_transient(cfg):
+    """传 motion 后必须写出官方示例那 5 个键（MaxwellScriptingGuide P760）。"""
+    import ipm_build
+    motion = dict(init_speed="0deg_per_sec", inertia="0.0092",
+                  damping="0", load_torque="0NewtonMeter")
+    src = ipm_build.build_script(
+        cfg, motion=motion, stop_time="0.2s", time_step="0.0005s", save_fields="None")
+    assert '"Consider Mechanical Transient:=", True' in src
+    assert '"Angular Velocity:=", "0deg_per_sec"' in src
+    assert '"Moment of Inertia:=", "0.0092"' in src
+    assert '"Damping:=", "0"' in src
+    assert '"Load Torque:=", "0NewtonMeter"' in src
+    # 机械瞬态下不能再出现"恒转速"写法
+    assert '"1500rpm"' not in src
+    # 时间口径
+    assert '"StopTime:=", "0.2s"' in src
+    assert '"TimeStep:=", "0.0005s"' in src
+    assert '"SaveFieldsType:=", "None"' in src
+    compile(src, "ipm_m4_build.py", "exec")
+
+
+def test_m4_timing_keeps_401_points(cfg):
+    """M4 的 0.2s / 0.5ms 必须仍是 400 步 401 点 —— 与 M1'–M3' 同规模。"""
+    import ipm_m4_start
+    steps = int(round(ipm_m4_start._sec("0.2s") / ipm_m4_start._sec("0.0005s")))
+    assert steps == 400 and steps + 1 == 401
+    old = int(round(ipm_m4_start._sec("0.02s") / ipm_m4_start._sec("0.00005s")))
+    assert old == steps
+
+
+def test_m4_inertia_is_physical(cfg):
+    """J 必须落在转子本体解析区间内 —— 防止手滑写成 0.9 或 9e-5。
+
+    转子 Ø92.325 x 160mm 全钢实心 J = ½·m·r²，m = π·r²·L·ρ ≈ 8.4 kg ⇒ 8.9e-3。
+    实心是上界，含磁钢后略高一点点（磁钢密度低于钢但靠外圈）。
+    """
+    import ipm_m4_start
+    r = cfg.stator_id / 2.0 - cfg.airgap / 2.0        # 46.1625 mm
+    r_m = r * 1e-3
+    v = math.pi * r_m ** 2 * cfg.stack_length * 1e-3
+    j_upper = 0.5 * v * 7850.0 * r_m ** 2
+    assert 0.6 * j_upper < ipm_m4_start.J_ROTOR < 1.15 * j_upper
+
+
+def test_m4_chirp_phase_is_integral_of_frequency(cfg):
+    """变频相位必须是频率的积分 θ(t)=2π[f0·t + k·min(t,T)²/2]。
+
+    两个常见写错：①直接写 2π·f1·t（等于瞬间跳到终频，不是爬坡）；
+    ②漏掉 1/2（变成 2 倍频）。判据是核对 k/2 = (f1−f0)/(2T) 这个系数本身。
+    """
+    import ipm_m4_start
+    cur = ipm_m4_start.compute_currents_chirp(14.0, 90.0, f0_hz=2.0, f1_hz=100.0, t_ramp_s=0.12)
+    a = cur["A"]
+    k_half = (100.0 - 2.0) / (2.0 * 0.12)          # 408.3333...
+    assert "min(Time,0.120000)" in a
+    assert "%.6f" % k_half in a
+    assert "2*pi" in a
+    # 三相移 120°：A=+90°, B=−30°, C=+210°
+    assert "1.570796327" in cur["A"]
+    assert "-0.523598776" in cur["B"]
+    assert "3.665191429" in cur["C"]
+
+
+def test_m4_closed_loop_uses_pole_pairs(cfg):
+    """闭环表达式必须是极对数（8 极 → 4），写成极数 8 会让电角翻倍。"""
+    import ipm_m4_start
+    cur = ipm_m4_start.compute_currents_closed_loop(14.0, 90.0, 4)
+    assert "sin(4*Moving1.Position*pi/180" in cur["A"]
+    assert "sin(8*Moving1.Position" not in cur["A"]

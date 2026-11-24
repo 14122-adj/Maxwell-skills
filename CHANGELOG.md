@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-11-24（IPM M4 起动工况：机械瞬态 401 点 / 200 ms）
+
+用户提问「为什么没有转矩从零开始上升的曲线」。根因不是画错，是**口径**：M1'–M3' 全部
+`Consider Mechanical Transient=False` + 转速钉死 `1500rpm`，求解器从不积分
+`J·dω/dt = T_em − T_load`，所以 t=0 首点就是额定转矩（`tq_load.csv` 首行 26.58 N·m）。
+新增独立工况 M4 补上起动曲线，不改动 M1'–M3' 任何一个字符。
+
+- 新增 `projects/IPM_8p48s/ipm_m4_start.py`：M4 驱动（建模 + 求解 + 导出）。时间口径
+  `StopTime=0.2s` / `TimeStep=0.0005s` → **400 步 = 401 点**，与稳态工况同规模；
+  叠加 `SaveFieldsType="None"`（只取转矩/转速，不存场快照）抵消机械瞬态 remesh 开销。
+  实测机械瞬态比稳态慢约 1.5×（401 点 16m09s vs 12m03s）。
+- **激励经两次真机证否后定为变频起动**：①固定 100 Hz 开环 → 转速峰 59.3 rpm、
+  `position` 停在 358.7° 抖动（PMSM 无阻尼绕组，静止转子追不上 1500 rpm 旋转磁场）；
+  ②位置反馈 `sin(p·Moving1.Position+φ)` → 转矩仅 55 µN·m、位置末值 0.00029°
+  （`Moving1.Position` 不进 winding 表达式，退化为固定直流）；③变频起动
+  `f(t)=f0+k·min(t,T)`、`θ(t)=2π[f0·t+k·min(t,T)²/2]` 可行性验证 40 ms 得 490.6 rpm
+  （理论同步 520 rpm）。`--mode {chirp,open,closed}` 三条路径都保留，便于复查。
+- 新增 `projects/IPM_8p48s/ipm_m4_plot.py`：起动曲线后处理 + 出图。单位从 CSV 表头读
+  （I22 陷阱：`Moving1.Torque` 可能是 µN·m/mN·m），中文字体自动挑选。
+- `projects/IPM_8p48s/ipm_build.py`：`build_script()` 新增 `motion` / `stop_time` /
+  `time_step` / `save_fields` 四个可选参数。**默认值 = 现有行为**，M1'–M3' 生成物逐字不变
+  （已有测试 `test_build_script_default_is_steady_state` 钉住）。
+- 新增 4 条护栏测试：默认稳态口径、`motion` 写出官方 5 键、401 点规模保持、
+  J 落在转子本体解析区间内。
+- `docs/MAXWELL_INTERNALS.md` §13.11：机械瞬态 5 个键的官方签名（取自本机
+  `MaxwellScriptingGuide.pdf` P758–760）+ 4 条踩坑（`DeleteMotionSetup` 要 Structured
+  Array、`AssignBand` 同名冲突、`ChangeProperty` PropServer 无效、裸最小工程法不成立）
+  + `.aedt` 二进制直搜的验证方法。
+- `projects/IPM_8p48s/PROJECT_SPEC.md` §7.6：M4 契约（含 J 推导与"判据互不通用"禁令）。
+- `projects/IPM_8p48s/PROBLEM_LEDGER.md` I27：问题定性与参数定源。
+
 ### Added — 2026-11-15 夜（G7 斜槽：线 THD 11.180% → 1.998%，齿槽 → 0.002%）
 
 P11（THD 超下限）的单变量实验。结论先行：**斜槽 0.5 槽距把齿槽与 THD 同时打下来，
