@@ -14,9 +14,10 @@
 
 判据（契约 §8.3，失败写 FAIL 不改判据）
 --------------------------------------
-* 4 组 AssignLengthOp 必须 Enabled 且 MaxLength 与契约一致
-  （Band 0.25 / Stator 0.9 / Rotor 1.2 / PM 0.5 mm）；
+* 5 组 AssignLengthOp 必须 Enabled 且 MaxLength 与契约一致
+  （Band 0.25 / Stator 0.9 / Rotor 1.2 / PM 0.5 / AirgapRing 0.15 mm，I28 新增第 5 组）；
 * Band MaxLength ≤ 0.25 mm；
+* AirgapRing 径向层数 = 0.3375 mm / rms_edge ≥ 2.0（契约 §9.2）；
 * Band/Stator/Rotor/PM/AirgapRing/Coil 六类对象单元数均非 0；
 * 质量指标（skewness 等）与节点数：2021.1 ExportMeshStats 不导出，
   写 ``unavailable`` + 原因，**不编数**（§18.3 实测）。
@@ -38,14 +39,19 @@ _ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))
 RESULTS = os.path.abspath(os.path.join(_ROOT, "projects", "results", "ipm8p48s"))
 RUNDIR = r"D:/ANSYS_Run"
 
-# 契约 §8.1 / ipm_build.py:425-433 的 4 组 MaxLength（mm），权威值
+# 契约 §8.1 / §9.2 的 5 组 MaxLength（mm），权威值。
+# I28 (2026-11-25) 新增 Mesh_Airgap：气隙厚 0.3375 mm / 0.15 mm = 2.25 层。
 EXPECTED_LENGTH_OPS = {
     "Mesh_Band": ("Band", 0.25),
     "Mesh_Stator": ("StatorOuter", 0.9),
     "Mesh_Rotor": ("RotorOuter", 1.2),
     "Mesh_PM": ("PM", 0.5),
+    "Mesh_Airgap": ("AirgapRing", 0.15),
 }
 BAND_MAXLEN_MM = 0.25
+# 契约 §9.2：气隙环厚 = airgap/2 = 0.3375 mm；层数 = thickness / rms_edge ≥ 2.0
+AIRGAP_RING_THICKNESS_MM = 0.3375
+AIRGAP_MIN_LAYERS = 2.0
 MM_PER_SI = 1000.0  # 统计长度 SI(m) -> mm（§18.4）
 
 # 六类对象 -> 统计文本里的对象名前缀（PM/Coil 为多实例）
@@ -100,7 +106,7 @@ def gen_ironpython(case: str, aedt_name: str, out_txt: str) -> str:
 
 # ------------------------------------------------------------- .aedt 解析
 def parse_length_ops(aedt_path: str) -> dict:
-    """从真机 .aedt 文本块读 4 组 LengthBased 的 Enabled / MaxLength。"""
+    """从真机 .aedt 文本块读 5 组 LengthBased 的 Enabled / MaxLength。"""
     with open(aedt_path, "r", encoding="utf-8", errors="replace") as f:
         text = f.read()
     ops: dict = {}
@@ -186,7 +192,7 @@ def parse_meshstats(txt_path: str) -> dict:
 # --------------------------------------------------------------- 判定侧
 def judge(stats: dict, ops: dict) -> dict:
     checks: dict = {}
-    # 1) 4 组 LengthOp Enabled + MaxLength 与契约一致
+    # 1) 5 组 LengthOp Enabled + MaxLength 与契约一致
     op_ok = True
     op_detail = {}
     for name, (_, expected) in EXPECTED_LENGTH_OPS.items():
@@ -220,6 +226,23 @@ def judge(stats: dict, ops: dict) -> dict:
                 break
     group_ok = all(v["num_elements"] > 0 for v in by_group.values())
     checks["all_object_groups_nonzero"] = {"pass": group_ok, "detail": by_group}
+
+    # 3b) I28 / 契约 §9.2：AirgapRing 径向层数 ≥ 2.0（thickness / rms_edge）
+    # rms_edge 是周向+径向混合边长，作为层数口径是保守估计（周向拉长会高估 rms、
+    # 从而低估层数）；判据按指导书 §3.4 原文口径执行，assumption=待验证。
+    ag_rows = [r for r in stats["per_object"] if OBJECT_GROUPS["AirgapRing"](r["object"])]
+    ag_rms = ag_rows[0]["rms_edge_mm"] if ag_rows else None
+    ag_n = sum(r["num_elements"] for r in ag_rows)
+    ag_layers = (AIRGAP_RING_THICKNESS_MM / ag_rms) if ag_rms and ag_rms > 0 else None
+    checks["airgap_ring_min_layers"] = {
+        "pass": bool(ag_layers is not None and ag_layers >= AIRGAP_MIN_LAYERS),
+        "thickness_mm": AIRGAP_RING_THICKNESS_MM,
+        "rms_edge_mm": ag_rms,
+        "layers": round(ag_layers, 4) if ag_layers else None,
+        "limit": AIRGAP_MIN_LAYERS,
+        "num_elements": ag_n,
+        "assumption": "rms_edge 作径向层厚代理（指导书 §3.4 口径），周向拉长使其保守偏低",
+    }
 
     # 4) 质量指标 / 节点数：真机不导出，写 unavailable + 原因（不编数）
     checks["quality_metrics"] = {

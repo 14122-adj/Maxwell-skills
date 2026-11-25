@@ -648,3 +648,131 @@ f0=2 Hz → f1=100 Hz、T=0.12 s（余 0.08 s 恒频稳态）。纯时间函数�
 
 **判据教训（写进 §7.6）**：只导 `Moving1.Torque` 看不出这两种失败——转矩在 ±33 N·m 之间摆
 也能画得像"起动曲线"。**必须同导 `Moving1.Speed`**，它是"转子到底动没动"的唯一硬证据。
+
+---
+
+## 2026-11-25 — I28 气隙网格层数单变量复测（指导书唯一命中的真缺陷）
+
+**来源**：用户 2026-11-24 21:54《ANSYS Maxwell 电机仿真转矩不稳定排查指导书》；
+本地化 `docs/TORQUE_TROUBLESHOOTING.md` §3.4/§6 逐条甄别后，整份指导书只有
+「气隙网格 2–3 层」这一条在本项目真没做到。其余 3 条（恒速+Load Torque、拍频、
+J 过大）是原文错误，已纠正，不照抄。
+
+**缺陷定量（改前）**：`mesh_m4_chirp2.json::per_object` 实测 `AirgapRing`
+n=4534、rms_edge=0.2277 mm、max_edge=0.4588 mm；气隙环厚 0.3375 mm
+（`PROJECT_SPEC` §7.1：airgap/2 = 0.675/2）⇒ 层数 0.3375/0.2277 ≈ **1.48 < 2.0**。
+`ipm_build.py` 原 4 组 `AssignLengthOp` 只覆盖 Band/StatorOuter/RotorOuter/PM，
+AirgapRing 不在任何一组 ⇒ 0.2277 mm 是全局网格被动传播值，非设计值。
+
+**处置（严格单变量）**：`ipm_build.py` 新增第 5 组
+`NAME:Mesh_Airgap / Objects:["AirgapRing"] / MaxLength:="0.15mm"`
+（⇒ 2.25 层名义）。其余 4 组 MaxLength、几何、材料、BH、边界、绕组、相位、
+求解窗口逐字未动；`test_build_script_default_is_steady_state` 护栏保持稳态口径。
+`ipm_mesh_check.py` 同步把 `EXPECTED_LENGTH_OPS` 扩为 5 组，并新增
+`airgap_ring_min_layers ≥ 2.0` 判据（契约 §9.2）。
+新增测试 `test_airgap_length_op_is_5th_group` 钉住 5 组/0.15 mm/稳态不变。
+
+**二选一决策（未试第三档）**：任务书允许 0.15 mm（2.25 层）或 0.11 mm（3 层），
+二选一不试第三档。实测 0.15 mm 已使 rms_edge 降到 0.1306 mm ⇒ **2.58 层 PASS**，
+目标达成；0.11 mm 只会进一步增加单元数（与"单元超预期则收紧"的缓解方向相反），
+故**不切换到 0.11 mm**。总单元增幅超指导书预估（见下遗留），但不改档。
+
+**真机证据链**（全部 rc=0）：
+
+| 环节 | 结果 | evidence |
+|---|---|---|
+| M1' 建模 | 117 sheet / VALIDATE_OK / 无 intersect / 槽口 Bs0=1.0 / 线圈 7.1725 mm² | `m1_build_check_airgap.json` 17/17 PASS |
+| .aedt 5 组 | LengthBased=5，MaxLength 0.15/0.25/0.5/0.9/1.2 各一组 | `IPM_8p48s_M1_airgap.aedt` grep 实测 |
+| M1' 剖分 | 总 68068 单元 / AirgapRing 13690 / rms 0.1306 / 2.58 层 | `mesh_m1_airgap.json` all PASS |
+| M3' 401 点 | ANALYZE_OK 1123.0 s / tq 402 行 / 表头 [NewtonMeter] | `m3_load_check_airgap.json` |
+| M3' 剖分 | 总 67680 单元 / AirgapRing 13690 / rms 0.1306 / 2.58 层 | `mesh_m3_airgap.json` all PASS |
+
+**与基线逐项对比**（基线 `m3_load_check_bs10.json`，14.08% 那条 FAIL **保留不删**）：
+
+| 量 | 基线（Imax 14.5019） | 本轮（Imax 13.8561） | 差 | 归因 |
+|---|---:|---:|---:|---|
+| AirgapRing 单元 | 4534 | 13690 | ×3.02 | 网格加密（设计变更） |
+| AirgapRing rms_edge | 0.2277 mm | 0.1306 mm | −42.7% | 网格加密 |
+| 气隙层数 | 1.48 | **2.58** | +74% | 已达 §9.2 ≥2.0 |
+| 总单元 | 45540 | 67680 | +48.6% | AirgapRing + 共面 Band 连锁加密 |
+| T_avg | 27.0306 | 25.8068 | −4.53% | **Imax −4.45% 口径差**，非网格 |
+| **峰峰值** | **14.0757%** | **14.0075%** | **−0.068 pt** | **几乎不变 ⇒ 网格不是主因** |
+| 主谐波 h=12 | 5.9393% | 5.8872% | −0.052 pt | 几乎不变 |
+| 跳变 | 3.9178% | 3.9339% | +0.016 pt | 不变 |
+
+**判据裁定**（按 §9.3 的二分支）：峰峰仅降 0.068 pt（相对 −0.5%），远达不到
+"显著下降"，落在**"几乎不变"分支** ⇒ 网格不是 14.08% 的主因，
+**斜槽 0.75 槽距的 3.2855% 收益结论成立**（`m3_skew_skew_bs10.json`，
+四项全 PASS，稳态 25 N·m 平直目标仍为 PASS，本轮不推翻）。
+
+**口径诚实标注（反自演）**：基线用 Imax=14.5019 A（旧几何 BEMF 反推），
+本轮按任务书用当前几何实测 BEMF 133.7364 V 插值 Imax=13.8561 A
+（`imax_from_bemf`，解析直算 √2·P/3E=13.8422 A，差 0.10%）。
+⇒ 严格说本轮是 **网格 + 电流口径双变量**，不是纯净单变量。
+处理方式：T_avg 变化按电流口径差解释，不归因网格；**峰峰值 % 与主谐波 % 是
+对 T_avg 归一化的量**，电流降 4.45% 会使其分母变小、数值略升，而实测反而略降，
+故"几乎不变"的结论是**保守的**（若电流相同，降幅只会更小）。
+φ_abs=90°、f=100 Hz、sign=−1 均未动。
+
+**遗留风险**：
+1. 总单元 +48.6%（指导书预估 +6% 严重低估）：AirgapRing ×3.02 之外，
+   共面贴边的 Band 从 4778→11980（×2.5）被迫加密。401 点求解 1123 s
+   （基线 718.8 s，+56%），在可接受范围，但后续每次 M3 复测预算需按 ~19 min 计。
+2. rms_edge 作径向层厚代理是保守口径（周向长边抬高 rms ⇒ 低估层数），
+   真机 2021.1 ExportMeshStats 无径向专用列，`assumption=待验证`，
+   验证方法：改用 max_edge 0.2383 mm 时层数 0.3375/0.2383=1.42（更保守），
+   但 max_edge 是周向+径向混合，两者都不精确；层数达标结论以"加密前后数值变化
+   不影响平直判据"为准，不依赖单一层数口径。
+3. 本轮不覆盖 14.08% FAIL 记录，不改任何判据；Bg 0.6189 T（G4 FAIL）、
+   E8 效率 / E6 退磁 FEA、I16 判据周检裁定仍是遗留。
+
+**新增 KEEP**：`m1_build_check_airgap.json`、`mesh_m1_airgap.json`、
+`m3_load_airgap.json`、`m3_load_check_airgap.json`、`mesh_m3_airgap.json`；
+代码改动 `ipm_build.py`（第 5 组）、`ipm_mesh_check.py`（判据+5 组）、
+`tests/test_ipm_8p48s.py`（+1 例）。TEMP：`D:/ANSYS_Run/ipm_*_airgap*` 全部留在运行目录。
+**未做**：未碰 SPM baseline、未改 J/阻尼、未动判据、未删除任何失败记录、
+未跑 M4 0.5 s 窗口（属第二优先，见当日自动化输出）。
+
+---
+
+### I28 续：M4 起动 0.5 s 窗口延长尝试 —— FAIL 留档（2026-11-25，第二优先）
+
+**动机**：`m4_start_chirp2.json`（0.2 s/401 点）转速 0→1687 rpm 峰、末段 1588.4 rpm，
+115 ms 后仍有 ±33 N·m 同步振荡。任务书要求：第一优先完成后有余量则把窗口延到
+0.5 s（1000 点，额外工况不占 401 点口径），看振荡是否自然衰减到 1500 rpm；
+**禁止**改 `Moment of Inertia`（0.0092 解析值）。
+
+**执行**：`ipm_m4_start.py --bemf 133.7364 --mode chirp --ramp 0.18
+--stop 0.5s --dt 0.0005s --case chirp2_05s` 生成两个脚本；核验
+`ipm_m4_solve_chirp2_05s.py` 同时导 `Moving1.Torque/Speed/Position`（三量齐）、
+`Moment of Inertia:="0.0092"` 未动。建模 `BUILD_RC=0`（工程
+`IPM_8p48s_M4_chirp2_05s.aedt` 落盘 2.12 MB）。
+
+**失败证据（两次真机，rc=127）**：
+- 首次：Analyze 运行 ~26 min 后进程无日志退出，`ipm_m4_solve_chirp2_05s.log`
+  止于 `MOTION_NAMES=['MotionSetup1']`，无 `ANALYZE_OK`/`ANALYZE_FAIL`，
+  CSV 目录空（0 文件）。
+- 清理孤儿锁（PID 26264 已死）后**原参数原脚本重试**：38 s 即同样 rc=127、
+  日志同样止于 `MOTION_NAMES`，CSV 仍空 ⇒ **可复现失败，非偶发/非锁残留**。
+- 系统内存 14.0 GB 可用 / 32.4 GB 总，`wmic/tasklist` 无残留 ansysedt 进程 ⇒
+  不是 OOM 或实例冲突。
+- 再次清理第二次的孤儿锁（PID 10612）。
+
+**根因（判断，非编数）**：崩溃发生在 `oDesign.Analyze("Setup1")` 调用本身
+（Python 层 try/except 未捕获 ⇒ 进程级退出，rc=127 是批处理壳返回码，
+不是脚本异常）。0.2 s/401 点同参数同求解器曾 `ANALYZE_OK` 通过
+（`m4_start_chirp2.json`），0.5 s/1001 点 + 加密网格（M4 工程沿用当前
+`ipm_build.py`，AirgapRing 已含第 5 组 0.15 mm ⇒ 单元数 ~2 倍）后不可复现成功。
+区分不了是"瞬态机械积分在长窗口发散"还是"大网格长窗口求解器内部错误"——
+**未做定位实验，不猜结论**。
+
+**处置**：不删失败、不改判据、不改 J/阻尼/电流/网格去"凑"成功。
+`m4_start_chirp2_05s.json` 保留 `generated=true / solved=false` 作 KEEP 证据。
+M4 第二优先对"振荡是否自然衰减"这个问题**未获得答案**，
+0.2 s 基线的 1588 rpm 末段 + 同步振荡仍是唯一有效 M4 数据。
+
+**遗留 / 明日一步**：若继续 M4，先做定位实验而非再跑长窗口——
+在 0.2 s 基线上只延到 0.3 s/601 点（不加密网格，用冻结版工程），
+看是否存在"窗口长度阈值"；若 0.3 s 也崩，则是机械瞬态长窗口求解器问题，
+转用外部后处理外推或直接接受 0.2 s 基线。此项**不阻塞**第一优先的
+25 N·m 平直目标（斜槽 0.75 已 PASS，与 M4 无关）。

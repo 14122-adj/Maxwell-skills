@@ -448,6 +448,12 @@ def build_script(cfg, aedt_out: str = AEDT_OUT, currents=None, case_tag: str = "
     A('                      "MaxLength:=", "1.2mm", "RestrictElem:=", False, "RestrictLength:=", True])')
     A('oMesh.AssignLengthOp(["NAME:Mesh_PM", "Objects:=", [p[0] for p in PM],')
     A('                      "MaxLength:=", "0.5mm", "RestrictElem:=", False, "RestrictLength:=", True])')
+    # ── I28 (2026-11-25) 第 5 组：AirgapRing 独立 LengthOp ──────────────────
+    # 指导书 §3.4 唯一命中的真缺陷：此前 AirgapRing 不在任何 LengthOp 组，
+    # rms_edge 0.2277 mm 是全局网格被动传播值 ⇒ 气隙厚 0.3375/0.2277 ≈ 1.48 层，
+    # 未达 2–3 层。0.15 mm ⇒ 2.25 层；只对 AirgapRing 生效，其余 4 组逐字不动。
+    A('oMesh.AssignLengthOp(["NAME:Mesh_Airgap", "Objects:=", ["AirgapRing"],')
+    A('                      "MaxLength:=", "0.15mm", "RestrictElem:=", False, "RestrictLength:=", True])')
 
     # --------------------------------------------------------------- solver
     A("")

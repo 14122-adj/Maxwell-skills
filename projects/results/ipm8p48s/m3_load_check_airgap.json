@@ -1,0 +1,130 @@
+{
+  "stage": "M3' 401 点负载（I18 电流 + I19 平直）",
+  "torque": {
+    "t_avg_nm": 25.806799,
+    "pp_nm": 3.614897,
+    "pp_pct": 14.0075,
+    "main_harmonic_order": 12,
+    "main_harmonic_nm": 1.519288,
+    "main_harmonic_pct": 5.8872,
+    "jump_max_nm": 1.015225,
+    "jump_max_pct": 3.9339,
+    "window_samples": 200,
+    "total_rows": 401,
+    "torque_unit": "NewtonMeter",
+    "torque_scale": 1.0,
+    "spectrum_top5": [
+      [
+        12,
+        1.519288
+      ],
+      [
+        24,
+        0.399804
+      ],
+      [
+        6,
+        0.357533
+      ],
+      [
+        48,
+        0.051564
+      ],
+      [
+        36,
+        0.050557
+      ]
+    ]
+  },
+  "excitation": {
+    "current_A": 13.856103476923076,
+    "current_unit": "A_peak",
+    "phase_deg": 0.0,
+    "phase_abs_deg": 90.0,
+    "bemf_offset_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "bemf_interp@E=133.7364",
+    "expressions": {
+      "A": "-13.856103*sin(628.318531*Time+1.570796327)",
+      "B": "-13.856103*sin(628.318531*Time-0.523598776)",
+      "C": "-13.856103*sin(628.318531*Time+3.665191429)"
+    },
+    "formula": "Imax*sin(2*pi*f*Time + phi_abs), B=phi_abs-120deg, C=phi_abs+120deg; phi_abs=bemf_offset+phi_rel, bemf_offset=90 (I20)"
+  },
+  "bemf_load": {
+    "sources": {
+      "A": "d(FluxLinkage(WindingA))/dt",
+      "B": "d(FluxLinkage(WindingB))/dt",
+      "C": "d(FluxLinkage(WindingC))/dt"
+    },
+    "phase": {
+      "A": {
+        "fundamental_amp_v": 369.6632,
+        "rms_v": 262.2306,
+        "phase_deg": 148.8879,
+        "n_samples": 201
+      },
+      "B": {
+        "fundamental_amp_v": 369.4692,
+        "rms_v": 262.0681,
+        "phase_deg": 29.2177,
+        "n_samples": 201
+      },
+      "C": {
+        "fundamental_amp_v": 370.4649,
+        "rms_v": 262.8178,
+        "phase_deg": -90.9146,
+        "n_samples": 201
+      }
+    },
+    "note": "I21: 负载 BEMF = d(FluxLinkage)/dt，第二电周期基波 DFT",
+    "fundamental_amp_mean_v": 369.8657,
+    "rms_vs_noload_pct": 96.186,
+    "noload_rms_reference_v": 133.7364
+  },
+  "checks": [
+    {
+      "name": "T_avg ∈ 22.5–27.5 N·m",
+      "value": 25.8068,
+      "limit": [
+        22.5,
+        27.5
+      ],
+      "op": "in",
+      "status": "PASS"
+    },
+    {
+      "name": "峰峰值 ≤ 10% T_avg",
+      "value": 14.0075,
+      "limit": 10.0,
+      "op": "<=",
+      "status": "FAIL"
+    },
+    {
+      "name": "主谐波幅值 ≤ 5% T_avg",
+      "value": 5.8872,
+      "limit": 5.0,
+      "op": "<=",
+      "status": "FAIL"
+    },
+    {
+      "name": "单点跳变 ≤ 15% T_avg",
+      "value": 3.9339,
+      "limit": 15.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "负载 excitation.current_A > 0（真施加电流）",
+      "value": 13.856103476923076,
+      "limit": 0,
+      "op": ">",
+      "status": "PASS"
+    }
+  ],
+  "status": "FAIL",
+  "source_json": "D:/桌面/ANSYS MaxWell_skill/projects/results/ipm8p48s/m3_load_airgap.json",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m3_airgap"
+}

@@ -380,3 +380,61 @@ def test_m4_soft_factor_zero_disables(cfg):
     assert ipm_m4_start._soft_factor(0.0) == ""
     assert ipm_m4_start._soft_factor(-1.0) == ""
     assert ipm_m4_start._soft_factor(0.02) == "min(Time/0.020000,1)*"
+
+
+def test_airgap_length_op_is_5th_group(cfg):
+    """I28：AirgapRing 必须有独立第 5 组 LengthOp，且其余 4 组逐字不动。
+
+    指导书唯一命中的真缺陷是气隙仅 ≈1.48 层。0.15 mm ⇒ 2.25 层。
+    本护栏钉住：5 组齐全、组名/MaxLength 与契约一致、其余 4 组数值不变、
+    frozen baseline 的稳态口径（False/1500rpm）不被本改动破坏。
+    """
+    import ipm_build
+    import ipm_mesh_check as mc
+
+    src = ipm_build.build_script(cfg)
+    assert src.count("AssignLengthOp(") == 5
+    assert '"NAME:Mesh_Airgap", "Objects:=", ["AirgapRing"]' in src
+    assert '"MaxLength:=", "0.15mm"' in src
+    for name, ml in (("Mesh_Band", "0.25mm"), ("Mesh_Stator", "0.9mm"),
+                     ("Mesh_Rotor", "1.2mm"), ("Mesh_PM", "0.5mm")):
+        assert '"NAME:' + name + '"' in src
+        assert '"MaxLength:=", "' + ml + '"' in src
+    # §9.2 判据：5 组 + 层数下限 2.0 + 气隙环厚 0.3375 mm
+    assert list(mc.EXPECTED_LENGTH_OPS) == ["Mesh_Band", "Mesh_Stator", "Mesh_Rotor",
+                                            "Mesh_PM", "Mesh_Airgap"]
+    assert mc.EXPECTED_LENGTH_OPS["Mesh_Airgap"] == ("AirgapRing", 0.15)
+    assert mc.AIRGAP_RING_THICKNESS_MM == 0.3375
+    assert mc.AIRGAP_MIN_LAYERS == 2.0
+    # 稳态口径不被本改动破坏
+    assert '"Consider Mechanical Transient:=", False' in src
+    assert '"Angular Velocity:=", "1500rpm"' in src
+
+
+def test_airgap_length_op_is_5th_group(cfg):
+    """I28：AirgapRing 必须有独立第 5 组 LengthOp，且其余 4 组逐字不动。
+
+    指导书唯一命中的真缺陷是气隙仅 ≈1.48 层。0.15 mm ⇒ 2.25 层。
+    本护栏钉住：5 组齐全、组名/MaxLength 与契约一致、其余 4 组数值不变、
+    frozen baseline 的稳态口径（False/1500rpm）不被本改动破坏。
+    """
+    import ipm_build
+    import ipm_mesh_check as mc
+
+    src = ipm_build.build_script(cfg)
+    assert src.count("AssignLengthOp(") == 5
+    assert '"NAME:Mesh_Airgap", "Objects:=", ["AirgapRing"]' in src
+    assert '"MaxLength:=", "0.15mm"' in src
+    for name, ml in (("Mesh_Band", "0.25mm"), ("Mesh_Stator", "0.9mm"),
+                     ("Mesh_Rotor", "1.2mm"), ("Mesh_PM", "0.5mm")):
+        assert '"NAME:' + name + '"' in src
+        assert '"MaxLength:=", "' + ml + '"' in src
+    # §9.2 判据：5 组 + 层数下限 2.0 + 气隙环厚 0.3375 mm
+    assert list(mc.EXPECTED_LENGTH_OPS) == ["Mesh_Band", "Mesh_Stator", "Mesh_Rotor",
+                                            "Mesh_PM", "Mesh_Airgap"]
+    assert mc.EXPECTED_LENGTH_OPS["Mesh_Airgap"] == ("AirgapRing", 0.15)
+    assert mc.AIRGAP_RING_THICKNESS_MM == 0.3375
+    assert mc.AIRGAP_MIN_LAYERS == 2.0
+    # 稳态口径不被本改动破坏
+    assert '"Consider Mechanical Transient:=", False' in src
+    assert '"Angular Velocity:=", "1500rpm"' in src

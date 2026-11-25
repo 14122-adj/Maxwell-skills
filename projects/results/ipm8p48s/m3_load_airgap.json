@@ -1,0 +1,29 @@
+{
+  "case": "airgap",
+  "excitation": {
+    "current_A": 13.856103476923076,
+    "current_unit": "A_peak",
+    "phase_deg": 0.0,
+    "phase_abs_deg": 90.0,
+    "bemf_offset_deg": 90.0,
+    "frequency_hz": 100.0,
+    "omega_rad_s": 628.3185307179587,
+    "current_sign": -1,
+    "source": "bemf_interp@E=133.7364",
+    "expressions": {
+      "A": "-13.856103*sin(628.318531*Time+1.570796327)",
+      "B": "-13.856103*sin(628.318531*Time-0.523598776)",
+      "C": "-13.856103*sin(628.318531*Time+3.665191429)"
+    },
+    "formula": "Imax*sin(2*pi*f*Time + phi_abs), B=phi_abs-120deg, C=phi_abs+120deg; phi_abs=bemf_offset+phi_rel, bemf_offset=90 (I20)"
+  },
+  "bemf_input": 133.7364,
+  "imax_source": "bemf_interp@E=133.7364",
+  "p_mech_w": 3926.9908169872415,
+  "build_script": "D:/ANSYS_Run/ipm_m3_build_airgap.py",
+  "solve_script": "D:/ANSYS_Run/ipm_m3_solve_airgap.py",
+  "aedt": "D:/ANSYS_Run/IPM_8p48s_M3_airgap.aedt",
+  "csvdir": "D:/ANSYS_Run/csv_ipm_m3_airgap",
+  "generated": true,
+  "solved": true
+}
