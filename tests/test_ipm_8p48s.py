@@ -438,3 +438,41 @@ def test_airgap_length_op_is_5th_group(cfg):
     # 稳态口径不被本改动破坏
     assert '"Consider Mechanical Transient:=", False' in src
     assert '"Angular Velocity:=", "1500rpm"' in src
+
+
+def test_m4_steady_soft_start_fixed_frequency(cfg):
+    """稳态口径：固定 100 Hz + 软启动，t=0 电流为零，不依赖转子位置。
+
+    用户 2026-11-25 15:48 第二次说"不及预期"——机械瞬态 + 变频给不出"稳定在 25"：
+    电流满值后转矩取决于负载角，开环无转差补偿 ⇒ 转矩在 +33/−5 之间摆。
+    稳态口径把转速钉死，转矩 ∝ 电流 ⇒ 0→25 后保持，这才是用户要的图。
+    """
+    import ipm_m4_start
+    cur = ipm_m4_start.compute_currents_fixed(13.856, 90.0, 100.0, t_soft=0.02)
+    a = cur["A"]
+    assert "-13.856000*min(Time/0.020000,1)*sin(" in a
+    assert "628.318531*Time" in a              # 2*pi*100 Hz
+    assert "Moving1.Position" not in a         # 稳态不依赖位置反馈
+    assert "min(Time," not in a                # 无变频爬坡项
+    # 三相 120° 相位差
+    assert "+1.570796327" in cur["A"]
+    assert "-0.523598776" in cur["B"]
+    assert "+3.665191429" in cur["C"]
+
+
+def test_m4_steady_motion_is_none(cfg):
+    """稳态模式必须走 build_script 的默认分支（motion=None ⇒ 恒转速 1500rpm）。
+
+    若误传 motion，会变成机械瞬态、转速从 0 起，转矩不可能稳定在 25。
+    """
+    import ipm_build
+    cfgm = ipm_geom.IPMConfig()
+    cur = {"A": "0A", "B": "0A", "C": "0A"}
+    steady = ipm_build.build_script(cfgm, currents=cur, motion=None)
+    assert '"Consider Mechanical Transient:=", False' in steady
+    assert '"Angular Velocity:=", "1500rpm"' in steady
+    mech = ipm_build.build_script(
+        cfgm, currents=cur,
+        motion=dict(init_speed="0deg_per_sec", inertia="0.0092",
+                    damping="0", load_torque="0NewtonMeter"))
+    assert '"Consider Mechanical Transient:=", True' in mech

@@ -94,6 +94,20 @@ def summarize(rows, scale: float = 1.0) -> dict:
             "y_min": y_min, "y_ss": y_ss, "t_settle": t_set}
 
 
+def _mode_label(case: str) -> str:
+    """从 summary JSON 推断口径标签：转速恒定 → 稳态；转速变化 → 机械瞬态起动。"""
+    p = os.path.join(RESULTS, "m4_start_summary_%s.json" % case)
+    try:
+        d = json.load(open(p, encoding="utf-8"))
+        sp = d.get("speed") or {}
+        lo, hi = sp.get("y_min"), sp.get("y_peak")
+        if lo is not None and hi is not None and abs(hi - lo) < 1e-6:
+            return "恒转速稳态 + 电流软启动"
+        return "机械瞬态起动"
+    except Exception:
+        return "转矩曲线"
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="IPM 8p48s M4 起动曲线后处理")
     ap.add_argument("--case", default="start")
@@ -151,7 +165,7 @@ def main(argv=None) -> int:
         ax1.annotate("t=0: %.2f N·m" % st_tq["y_start"], (0, st_tq["y_start"]),
                      textcoords="offset points", xytext=(12, 14), fontsize=9, color="#c0392b")
         ax1.set_ylabel("转矩 (N·m)")
-        ax1.set_title("IPM 8p48s M4 起动工况 — 转矩（机械瞬态，401 点 / 200 ms）", fontsize=11)
+        ax1.set_title("IPM 8p48s — %s（401 点 / 200 ms）" % _mode_label(args.case), fontsize=11)
         ax1.grid(alpha=0.25, lw=0.5)
         ax1.legend(loc="lower right", fontsize=9, frameon=False)
 

@@ -150,6 +150,39 @@ def _soft_factor(t_soft: float) -> str:
     return "min(Time/%.6f,1)*" % t_soft
 
 
+def compute_currents_fixed(imax: float, phi_deg: float, f_hz: float,
+                          t_soft: float = 0.0, sign: int = -1) -> dict:
+    """固定频率三相正弦（可叠加电流软启动）—— **稳态口径，转速恒定**。
+
+    为什么需要这个函数（2026-11-25 15:48 用户第二次说"不及预期"）
+    ------------------------------------------------------------
+    用户要的是「转矩从 0 升到 25 并**稳定在 25**」。机械瞬态 + 变频起动给不了：
+    电流一旦满值，转矩取决于转子负载角，而开环 V/f 无转差补偿 ⇒ 转矩在
+    +33 / −5 N·m 之间摆，转速也在 730–780 rpm 抖（实测 `soft` case 前 75 ms）。
+
+    稳态口径则完全可控：转速钉死 1500 rpm（`Consider Mechanical Transient=False`），
+    电流从 0 斜坡升到 Imax，转矩 ∝ 电流 ⇒ **0 → 25 N·m 后保持**。
+    物理对应"电机已由原动机拖到额定转速、突加励磁/突加电流"的工况。
+
+    与 `ipm_m3_load.compute_currents` 的唯一差别：多一个 `min(t/T_soft,1)` 因子。
+    """
+    soft = _soft_factor(t_soft)
+
+    def expr(ph_deg: float) -> str:
+        rad = math.radians(ph_deg)
+        if abs(rad) < 1e-12:
+            tail = ""
+        elif rad < 0:
+            tail = "-%.9f" % abs(rad)
+        else:
+            tail = "+%.9f" % rad
+        body = "%.6f*%ssin(%.6f*Time%s)" % (imax, soft, 2.0 * math.pi * f_hz, tail)
+        return body if sign > 0 else "-" + body
+
+    return {"A": expr(phi_deg), "B": expr(phi_deg - 120.0),
+            "C": expr(phi_deg + 120.0)}
+
+
 def compute_currents_chirp(imax: float, phi_deg: float, f0_hz: float,
                            f1_hz: float, t_ramp_s: float,
                            t_soft: float = 0.0) -> dict:
@@ -390,6 +423,9 @@ def main(argv=None) -> int:
     ap.add_argument("--soft-start", type=float, default=0.0, dest="soft_start",
                     help="电流软启动时长 s（默认 0=理想电流源，转矩 t=0 即额定）；"
                          "设 0.02 则电流从 0 斜坡升起，转矩随之从 0 升到额定")
+    ap.add_argument("--steady", action="store_true",
+                    help="稳态口径：转速钉死 1500rpm + 固定 100Hz + 电流软启动。"
+                         "转矩会 0→25 后保持，这是用户要的图；不加则为机械瞬态起动")
     ap.add_argument("--run", action="store_true", help="生成后调用 ansysedt 真机求解")
     args = ap.parse_args(argv)
 
@@ -400,7 +436,9 @@ def main(argv=None) -> int:
 
     phi_abs = ipm_m3_load.BEMF_OFFSET_DEG + args.phi
     cfg = ipm_geom.IPMConfig()
-    if args.mode == "closed":
+    if args.steady:
+        currents = compute_currents_fixed(imax, phi_abs, F_ELEC, t_soft=args.soft_start)
+    elif args.mode == "closed":
         # 极对数 = 极数 // 2（8 极 → 4 对），电角 = 4 × 机械角
         currents = compute_currents_closed_loop(imax, phi_abs, cfg.poles // 2)
     elif args.mode == "chirp":
@@ -416,13 +454,17 @@ def main(argv=None) -> int:
     build_log = "%s/ipm_m4_build_%s.log" % (RUN_DIR, args.case)
     solve_log = "%s/ipm_m4_solve_%s.log" % (RUN_DIR, args.case)
 
-    # 机械瞬态字面量：J 不带单位（官方示例写法），初速 0，负载转矩按 --load
-    motion = {
-        "init_speed": "0deg_per_sec",
-        "inertia": ("%.6f" % args.j).rstrip("0").rstrip("."),
-        "damping": ("%.6f" % args.damping).rstrip("0").rstrip(".") or "0",
-        "load_torque": ("%.6f" % args.load).rstrip("0").rstrip(".") + "NewtonMeter",
-    }
+    # steady 模式不建机械瞬态：转速由 build_script 的默认分支钉死 1500rpm
+    if args.steady:
+        motion = None
+    else:
+        # 机械瞬态字面量：J 不带单位（官方示例写法），初速 0，负载转矩按 --load
+        motion = {
+            "init_speed": "0deg_per_sec",
+            "inertia": ("%.6f" % args.j).rstrip("0").rstrip("."),
+            "damping": ("%.6f" % args.damping).rstrip("0").rstrip(".") or "0",
+            "load_torque": ("%.6f" % args.load).rstrip("0").rstrip(".") + "NewtonMeter",
+        }
 
     build_text = ipm_build.build_script(
         cfg, aedt_out, currents=currents, case_tag="M4_start_" + args.case,
@@ -451,10 +493,15 @@ def main(argv=None) -> int:
     }
     print("M4 起动工况")
     print("  Imax = %.6f A (src=%s), φ_abs=%+.1f°, sign=-1" % (imax, src, phi_abs))
-    print("  驱动   : %s" % _DRIVE_DESC[args.mode])
+    _drive = ("恒转速 1500rpm + 固定 100Hz + 电流软启动（稳态口径，转矩 0→25 后保持）"
+              if args.steady else _DRIVE_DESC[args.mode])
+    print("  驱动   : %s" % _drive)
     print("  电流   : %s" % currents["A"])
-    print("  机械瞬态: J=%s kg*m^2, Damping=%s, Load Torque=%s, 初速 0"
-          % (motion["inertia"], motion["damping"], motion["load_torque"]))
+    if motion is None:
+        print("  机械   : 恒转速 1500rpm（Consider Mechanical Transient=False，稳态口径）")
+    else:
+        print("  机械瞬态: J=%s kg*m^2, Damping=%s, Load Torque=%s, 初速 0"
+              % (motion["inertia"], motion["damping"], motion["load_torque"]))
     print("  时间   : StopTime=%s / TimeStep=%s → %d 步 = %d 点（与 M1'-M3' 同规模）"
           % (args.stop, args.dt, n_steps, n_steps + 1))
     print("  SaveFieldsType=None（只取转矩，不存场快照）")
@@ -472,18 +519,20 @@ def main(argv=None) -> int:
             current_A=imax, current_unit="A_peak", phase_abs_deg=phi_abs,
             frequency_hz=F_ELEC, omega_rad_s=ipm_m3_load.OMEGA_E,
             current_sign=-1, source=src, expressions=currents,
-            mode={"chirp": "vf_chirp_start",
+            mode={"steady": "steady_soft_start", "chirp": "vf_chirp_start",
                   "open": "open_loop_fixed_frequency",
                   "closed": "position_feedback_unsupported"}[args.mode],
             freq_start_hz=args.f0 if args.mode == "chirp" else F_ELEC,
             freq_end_hz=args.f1 if args.mode == "chirp" else F_ELEC,
             ramp_s=args.ramp if args.mode == "chirp" else None,
-            note={"chirp": "变频起动：f(t)=f0+k·min(t,T)，θ(t)=2π[f0·t+k·min(t,T)²/2]；"
+            note={"steady": "稳态口径：转速钉死1500rpm，固定100Hz，电流软启动 ⇒ 转矩0→25后保持",
+                  "chirp": "变频起动：f(t)=f0+k·min(t,T)，θ(t)=2π[f0·t+k·min(t,T)²/2]；"
                            "等价变频器 V/f 起动，纯时间函数不依赖反馈",
                   "open": "固定 100 Hz 开环；PMSM 无阻尼绕组无法自起动（真机证否）",
                   "closed": "位置反馈 Moving1.Position 未被实时求值（真机证否）"}[args.mode]),
         motion=dict(
-            consider_mechanical_transient=True, init_speed_deg_per_sec=0.0,
+            consider_mechanical_transient=(motion is not None),
+            init_speed_deg_per_sec=0.0 if motion is not None else None,
             moment_of_inertia_kg_m2=args.j, damping=args.damping,
             load_torque_nm=args.load,
             j_source="转子本体解析估算：硅钢 ½·7.43·0.0461625² + 磁钢 0.749·0.0415²；"
