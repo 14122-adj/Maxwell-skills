@@ -619,6 +619,7 @@ SYSTEM: 你是Maxwell电机设计和FEA自动化智能体。
 
 | 文档 | 内容 |
 |------|------|
+| `docs/DEMO_CASE_M4_TORQUE.md` | **演示案例：转矩 0→25 N·m** — 稳态+电流软启动正解、三层否证链、GUI 打开步骤与判据陷阱 |
 | `references/motor_design_guide.md` | 设计理论、公式、材料库、绕组拓扑、冷却限制、BOM成本模型；**§4 含槽尺寸反推公式（电负荷/槽满率 → Bs/Hs/Rs）** |
 | `references/mcp_tools_reference.md` | Maxwell MCP工具完整目录（全部工具）含参数签名和用法 |
 | `references/troubleshooting.md` | 调试指南：连接、几何、求解器、多物理场故障 |
@@ -988,3 +989,39 @@ python mdao_orchestrator.py check
 ---
 
 *Skill版本：v4.3 | 电机电磁设计v3.0 + 多物理场MDAO | DryRun→真实FEA切换 | **MCP链接工具接入** | 2026-08-08*
+
+---
+
+### 未发布（docs only，2026-11-25）— M4 转矩演示案例与能力边界校准
+
+新增 `docs/DEMO_CASE_M4_TORQUE.md`（**可直接用作演示**）：从「为什么没有转矩从零上升」
+到「0→25 N·m 后稳定」的完整链路——三层否证（稳态口径 / PMSM 开环起动失败 /
+`Moving1.Position` 不进表达式）、正解（`--steady --soft-start 0.02`）、实测
+`3.46e-05 → 25.788 N·m`、主桌面 GUI 打开步骤、五条判据陷阱。
+
+同期沉淀：
+- `docs/TORQUE_TROUBLESHOOTING.md`：排查 SOP，含 3 处原文纠正（恒速+Load Torque 不可共存 / 不是拍频 / 不是 J 问题）
+- `docs/MOTOR_TYPE_ROADMAP.md`：6 条门禁 + 按代码复用度排序的扩展顺序
+- `scripts/pm_builder.py::_build_ipm_spoke_magnet` 由静默退化改为显式 `NotImplementedError`
+- SKILL 拓扑表改为"状态"列：✅已真机验证 / ⚠️未真机 / ❌预留未实现
+- 481 → 486 tests passed（新增 IPM_Spoke 与软启动护栏）
+
+未升包版本号（`pyproject.toml` 仍 4.5.0）；本条仅记文档与案例变更。
+
+---
+
+### 未发布（docs only，2026-11-25）— M4 转矩演示案例与能力边界校准
+
+新增 `docs/DEMO_CASE_M4_TORQUE.md`（**可直接用作演示**）：从「为什么没有转矩从零上升」
+到「0→25 N·m 后稳定」的完整链路——三层否证（稳态口径 / PMSM 开环起动失败 /
+`Moving1.Position` 不进表达式）、正解（`--steady --soft-start 0.02`）、实测
+`3.46e-05 → 25.788 N·m`、主桌面 GUI 打开步骤、五条判据陷阱。
+
+同期沉淀：
+- `docs/TORQUE_TROUBLESHOOTING.md`：排查 SOP，含 3 处原文纠正（恒速+Load Torque 不可共存 / 不是拍频 / 不是 J 问题）
+- `docs/MOTOR_TYPE_ROADMAP.md`：6 条门禁 + 按代码复用度排序的扩展顺序
+- `scripts/pm_builder.py::_build_ipm_spoke_magnet` 由静默退化改为显式 `NotImplementedError`
+- SKILL 拓扑表改为"状态"列：✅已真机验证 / ⚠️未真机 / ❌预留未实现
+- 481 → 486 tests passed（新增 IPM_Spoke 与软启动护栏）
+
+未升包版本号（`pyproject.toml` 仍 4.5.0）；本条仅记文档与案例变更。

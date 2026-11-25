@@ -80,7 +80,14 @@ skill 当前声明支持 4 种槽型 × 4 种磁钢拓扑 × 4 种电机类型�
 
 SRM / IM **明确推迟**，不在 2026 年内排期。
 
-## 7. 参考
+## 7. 演示案例（可直接复现）
+
+**`docs/DEMO_CASE_M4_TORQUE.md`** — 「让转矩从 0 升到 25 N·m 并稳定」全流程：
+三层否证（稳态口径 / 开环起动失败 / 位置反馈不可用）→ 正解（稳态 + 电流软启动）
+→ 实测 3.46e-05→25.788 N·m → 主桌面 GUI 打开演示 → 五个判据陷阱。
+可直接作为 skill 演示脚本与电机起动仿真参考。
+
+## 8. 参考
 
 - 能力盘点原始依据：`scripts/pm_builder.py`（拓扑分支）、`scripts/slot_builder.py`（槽型分支）、
   `scripts/motor_config.py`（枚举）、`output_scripts/36slot_v2/setup.py`
