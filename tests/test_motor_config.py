@@ -150,3 +150,36 @@ def test_ipm_spoke_not_silently_aliased():
     body = src.split('"""')[-1] if '"""' in src else src   # 去掉 docstring 再看实现
     assert "raise NotImplementedError" in body
     assert "_build_ipm_flat_magnet(pm_index)" not in body
+
+
+def test_spm_magnetization_alternates_n_s():
+    """SPM 平行充磁必须相邻极 180° 反号，不能是辐射状（0°,45°,90°…）。
+
+    2026-11-25 修复前：`pm_builder.set_magnetization_direction` 的 SPM 分支
+    把所有 8 块磁钢矢量设为各自极轴方向（间隔 45°），缺 N/S 交替 ⇒
+    气隙形不成 p 对极旋转磁动势，物理上不成立。SPM 8p12s baseline 走项目
+    自己的生成器所以没暴露，但通用路径一旦用于新设计就会静默出错。
+    """
+    import math
+
+    from scripts.motor_config import MotorConfig, PMTopology
+    from scripts.pm_builder import PMBuilder
+
+    cfg = MotorConfig(pm_topology=PMTopology.SPM, pole_pairs=4)
+    script = PMBuilder(cfg).set_magnetization_direction()
+    # 提取每块的 X/Y 分量（成对出现，单行格式）
+    import re
+    pairs = re.findall(
+        r'Magnetization Vector X", "Value:=", "([-0-9.]+)"\],'
+        r'\s*\["NAME:Magnetization Vector Y", "Value:=", "([-0-9.]+)"', script)
+    assert len(pairs) == 8, "应有 8 块磁钢的磁化矢量，实际 %d" % len(pairs)
+    for i, (sx, sy) in enumerate(pairs):
+        x, y = float(sx), float(sy)
+        # 单位矢量
+        assert math.hypot(x, y) == __import__('pytest').approx(1.0, abs=1e-5)
+        # 极轴方向 = i×45°；N/S 靠符号交替，不是相邻严格反号
+        # （相邻极轴本身差 45°，所以是 +u(θ_i) / −u(θ_{i+1})）
+        angle = math.radians(i * 45.0)
+        expect_sign = 1.0 if i % 2 == 0 else -1.0
+        assert x == __import__('pytest').approx(expect_sign * math.cos(angle), abs=1e-5)
+        assert y == __import__('pytest').approx(expect_sign * math.sin(angle), abs=1e-5)

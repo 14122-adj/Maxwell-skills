@@ -100,11 +100,20 @@ oEditor.DuplicateAroundAxis(
             angle_rad = math.radians(angle_deg)
             
             if pm_topology == "SPM":
-                # 径向向外磁化
-                dx = math.cos(angle_rad)
-                dy = math.sin(angle_rad)
+                # 平行磁化：每极一个恒定矢量，相邻极必须 180° 反号。
+                #
+                # 2026-11-25 修复：原实现 8 块矢量设成 0°,45°,90°…**辐射状**，
+                # 相邻极只差 45° 而非 180°，不构成 N/S 交替，气隙磁场无法形成
+                # p 对极旋转磁动势 —— 物理上不成立。这不影响旧的 SPM 8p12s
+                # baseline（它走 projects/25Nm_PMSM 自己的生成器），但通用路径
+                # 一旦被用于新设计就会静默产出错误磁化。
+                #
+                # 约定：i 为奇数 → N 极（矢量朝该极中心向外）；偶数 → S 极（反向）。
+                sign = 1.0 if i % 2 == 1 else -1.0
+                dx = sign * math.cos(angle_rad)
+                dy = sign * math.sin(angle_rad)
                 scripts.append(f"""
-# {pm_name} 径向磁化
+# {pm_name} 平行磁化（{'N' if sign > 0 else 'S'} 极，极轴 {angle_deg:.1f}°）
 oEditor.ChangeProperty(
     ["NAME:AllTabs",
      ["NAME:MagnetGeometryTab",
