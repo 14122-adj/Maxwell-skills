@@ -349,3 +349,34 @@ def test_m4_closed_loop_uses_pole_pairs(cfg):
     cur = ipm_m4_start.compute_currents_closed_loop(14.0, 90.0, 4)
     assert "sin(4*Moving1.Position*pi/180" in cur["A"]
     assert "sin(8*Moving1.Position" not in cur["A"]
+
+
+def test_m4_soft_start_makes_torque_rise_from_zero(cfg):
+    """软启动必须让 t=0 的电流因子为 0，否则转矩第一点就是额定值。
+
+    用户 2026-11-25 追问"能不能让转矩从 0 升到 25"。理想电流源在 t=0 就灌满
+    Imax·sin(φ)，转矩首点 25.19 N·m。加 `min(Time/T,1)` 因子等价于真实驱动器的
+    电流环上升时间：t=0 → i=0 → T_em≈0。这条测试锁死该因子必须存在且位置正确
+    （必须乘在 sin 之前，不能乘在相位里）。
+    """
+    import ipm_m4_start
+    soft = ipm_m4_start.compute_currents_chirp(
+        13.856, 90.0, f0_hz=2.0, f1_hz=100.0, t_ramp_s=0.12, t_soft=0.02)
+    a = soft["A"]
+    assert "min(Time/0.020000,1)*sin(" in a          # 因子在 sin 之前
+    assert "-13.856000*min(Time/0.020000,1)*sin(" in a
+    # 不启用软启动时不得出现该因子
+    hard = ipm_m4_start.compute_currents_chirp(
+        13.856, 90.0, f0_hz=2.0, f1_hz=100.0, t_ramp_s=0.12)
+    assert "*min(Time/" not in hard["A"]
+    # 三相都带该因子
+    for ph in ("A", "B", "C"):
+        assert "min(Time/0.020000,1)" in soft[ph]
+
+
+def test_m4_soft_factor_zero_disables(cfg):
+    """t_soft<=0 必须返回空串，保证默认行为与历史 M4 数据逐字一致。"""
+    import ipm_m4_start
+    assert ipm_m4_start._soft_factor(0.0) == ""
+    assert ipm_m4_start._soft_factor(-1.0) == ""
+    assert ipm_m4_start._soft_factor(0.02) == "min(Time/0.020000,1)*"

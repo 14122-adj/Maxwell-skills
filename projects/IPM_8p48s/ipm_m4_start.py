@@ -131,8 +131,28 @@ def compute_currents_closed_loop(imax: float, phi_deg: float, pole_pairs: int) -
             "C": expr(phi_deg + 120.0)}
 
 
+def _soft_factor(t_soft: float) -> str:
+    """电流软启动因子（表达式片段）：`min(Time/T,1)*`；T<=0 返回空串。
+
+    为什么要这一项（2026-11-25 用户追问"能不能让转矩从 0 升到 25"）
+    ------------------------------------------------------------
+    理想电流源在 t=0 就灌满 `Imax·sin(φ)`，所以转矩第一点就是 25.19 N·m。
+    真实驱动器做不到——电流环有上升时间（典型几 ms 到几十 ms），
+    早期变频器更是靠"软启动"把电流从 0 斜坡拉起。加上这一项后：
+        i(t) = −Imax · min(t/T_soft, 1) · sin(θ(t)+φ)
+        t=0 → i=0 → T_em≈0；t≥T_soft → i=Imax → T_em≈额定
+    转矩遂从 0 单调升到 25 N·m，且**物理上是真实的**，不是人为凑图。
+
+    取 T_soft=0.02 s（20 ms）为常见伺服驱动器电流环建立时间量级。
+    """
+    if t_soft <= 0:
+        return ""
+    return "min(Time/%.6f,1)*" % t_soft
+
+
 def compute_currents_chirp(imax: float, phi_deg: float, f0_hz: float,
-                           f1_hz: float, t_ramp_s: float) -> dict:
+                           f1_hz: float, t_ramp_s: float,
+                           t_soft: float = 0.0) -> dict:
     """变频起动（线性扫频 / V-f 起动）—— 让定子频率从 f0 爬到 f1 再保持。
 
     为什么最终是这条路（2026-11-24 两次真机否证）
@@ -153,8 +173,10 @@ def compute_currents_chirp(imax: float, phi_deg: float, f0_hz: float,
 
     参数：f0=2 Hz（30 rpm，起转）、f1=100 Hz（1500 rpm 同步速）、
     t_ramp=0.12 s 爬坡 + 余下 0.08 s 稳态，正好覆盖 0.2 s 窗口。
+    t_soft>0 时额外叠加电流软启动（见 `_soft_factor`），使转矩从 0 起。
     """
     k = (f1_hz - f0_hz) / t_ramp_s
+    soft = _soft_factor(t_soft)
 
     def expr(ph_deg: float) -> str:
         rad = math.radians(ph_deg)
@@ -165,8 +187,8 @@ def compute_currents_chirp(imax: float, phi_deg: float, f0_hz: float,
         else:
             tail = "+%.9f" % rad
         # 2*pi*(f0*Time + k*min(Time,T)^2/2)
-        return ("-%.6f*sin(2*pi*(%.6f*Time+%.6f*min(Time,%.6f)*min(Time,%.6f))%s)"
-                % (imax, f0_hz, 0.5 * k, t_ramp_s, t_ramp_s, tail))
+        return ("-%.6f*%ssin(2*pi*(%.6f*Time+%.6f*min(Time,%.6f)*min(Time,%.6f))%s)"
+                % (imax, soft, f0_hz, 0.5 * k, t_ramp_s, t_ramp_s, tail))
 
     return {"A": expr(phi_deg), "B": expr(phi_deg - 120.0),
             "C": expr(phi_deg + 120.0)}
@@ -365,6 +387,9 @@ def main(argv=None) -> int:
     ap.add_argument("--f0", type=float, default=2.0, help="变频起始频率 Hz（默认 2）")
     ap.add_argument("--f1", type=float, default=F_ELEC, help="变频终止频率 Hz（默认 100）")
     ap.add_argument("--ramp", type=float, default=0.12, help="频率爬坡时长 s（默认 0.12）")
+    ap.add_argument("--soft-start", type=float, default=0.0, dest="soft_start",
+                    help="电流软启动时长 s（默认 0=理想电流源，转矩 t=0 即额定）；"
+                         "设 0.02 则电流从 0 斜坡升起，转矩随之从 0 升到额定")
     ap.add_argument("--run", action="store_true", help="生成后调用 ansysedt 真机求解")
     args = ap.parse_args(argv)
 
@@ -379,7 +404,8 @@ def main(argv=None) -> int:
         # 极对数 = 极数 // 2（8 极 → 4 对），电角 = 4 × 机械角
         currents = compute_currents_closed_loop(imax, phi_abs, cfg.poles // 2)
     elif args.mode == "chirp":
-        currents = compute_currents_chirp(imax, phi_abs, args.f0, args.f1, args.ramp)
+        currents = compute_currents_chirp(imax, phi_abs, args.f0, args.f1, args.ramp,
+                                         t_soft=args.soft_start)
     else:
         currents = ipm_m3_load.compute_currents(imax, phi_abs, -1)
 
@@ -416,8 +442,10 @@ def main(argv=None) -> int:
     t_acc = args.j * OMEGA_M_SYNC / max(imax * 1.0, 1e-9)   # 量级参考，非预测值
 
     _DRIVE_DESC = {
-        "chirp": "变频起动 %g→%g Hz / %g s 爬坡后保持（等价变频器 V/f，纯时间函数）"
-                 % (args.f0, args.f1, args.ramp),
+        "chirp": "变频起动 %g→%g Hz / %g s 爬坡后保持（等价变频器 V/f，纯时间函数）%s"
+                 % (args.f0, args.f1, args.ramp,
+                    "；电流软启动 %g s（转矩从 0 起）" % args.soft_start
+                    if args.soft_start > 0 else ""),
         "open": "固定 %g Hz 开环（PMSM 无阻尼笼，已真机证否：转子起不来）" % F_ELEC,
         "closed": "位置反馈 i=−Imax·sin(p·Position+φ)（已真机证否：Position 不进表达式）",
     }
