@@ -818,3 +818,170 @@ FlexNet Licensing error:-8,544
 **根因判断（assumption=待验证）**：FlexNet -8,544 的官方语义是 license key 与 license 数据不一致（文件被改动/与 server 不匹配）。本机能打开 GUI 与本错误不矛盾——GUI 可能走缓存或另一 license 口径，未经本轮验证。验证方法：在本机运行 ANSYS License Manager 的 `lmstat -a -c 1055@localhost` 检查 `motorcad` feature 状态，再由管理员重新获取/替换 license 文件。**本轮不修改任何 license 文件、注册表或环境变量**（破坏性操作需明确授权）。
 
 **交付边界**：只落 `probe_connection.py` [KEEP] 与本条账本；`TEMP/diag_license.py`、`TEMP/probe_fail.log` [TEMP] 不入库；`.venv` 由 `.gitignore` 排除。P1（8 工具 MCP + dry_run + 进程锁）、P2（IPM .mot 真机 + E6/E8）**未执行**，`docs/ENGINEERING_ACCEPTANCE.md` 的 E6/E8 状态一字未改。
+
+---
+
+## 2026-11-26（SPM 第一优先）— I31/I32/I33：贴片平行充磁几何定源 + 拓扑消歧
+
+| ID | 严重度 | 领域 | 问题 | 证据 | 验收 | 状态 | 下一步 |
+|---|---|---|---|---|---|---|---|
+| **I31** | major | SPM 几何口径 | `SPM_DESIGN.md` §2 写"Band=43.7825 / AirgapRing 厚 2.7175"，把贴片占据的 2.38mm 重复扣成气隙；若采用则 Band 切过磁钢 (43.445–45.825)，几何不成立 | `spm_build.py` `SPMConfig.spm_iron_r` / `spm_snapshot`；`m1_spm_g03_build_check.json` 实测气隙 0.675、Band 46.1625、环 98.2489 | 磁钢外表面 r=45.825（=原 IPM 转子 OD 半径），气隙 0.675、Band 46.1625 与 IPM 逐字相同 | **已处置（assumption=待验证）**：采用物理自洽值，SPM_DESIGN.md 待回填；FEA 气隙探针 gap_mag.csv 复核 Bg | 周检复核 SPM_DESIGN.md §2 的 43.7825 口径，改为 46.1625 |
+| **I32** | blocker（已解） | SPM 拓扑 | 贴片内表面与铁芯外表面相邻时，Maxwell `Analyze` 报 `Parts "PM_01..08" and "RotorOuter" intersect`（`ValidateDesign` 不报）；M1/M1_clean/M1_g02 三次 401 点入口均 4s 快速 FAIL | `spm_diag_analyze.log` / `spm_diag_g02.log` 完整 message；`spm_diag_g03.log` 显示 `Normal completion` | 短窗口 4 步 Analyze `Normal completion`、无 intersect | **已修复**：对铁芯做 `Subtract(PM, KeepOriginals=True)` 显式建拓扑（沿用 IPM baseline 做法），并留 0.02mm 装配胶缝（铁芯 r=43.425、磁钢内 r=43.445）。胶缝 assumption=待验证 | 401 点实测后回填 I32 验收；胶缝对 Bg 影响待敏感性复核 |
+| **I33** | minor | 工具链 / 网格统计 | 未求解的全新 SPM 工程上 `GenerateMesh("Setup1")->0` 但 `ExportMeshStats` 只导表头（无单元行）；IPM 历史成功案例均是已求解工程导出 | `meshstats_m1_spm.txt`（2 次）、`meshstats_spm_retry.txt`（双 GenerateMesh+Save 仍空）；`mesh_m1_spm.json` TOTAL_ELEMENTS=0、OVERALL_PASS=False | 求解完成后对 `SPM_8p48s_M2_g03.aedt` 补导真实统计 | **记录为 unavailable + 原因，不编数**；空 JSON 保留作证据，判据未改 | M2 401 点成功后补剖分统计 JSON；周检确认 §8.4 顺序对未求解工程的例外 |
+
+### I32 诊断链（关键，避免重复踩坑）
+
+- 现象：`ipm_build` 同构脚本建出的 SPM M1，`ValidateDesign` 返回 `VALIDATE_OK`，但 M2 求解 `Analyze("Setup1")` 4.2–4.3s 抛 `call failed`，CSV 空、`.asol` 仅 1729 B。
+- 排查顺序：① 疑 mesh 缓存污染 → 干净重建 `M1_clean.aedt`，同样 FAIL ⇒ 排除；② 疑材料/矫顽力未落盘 → `grep .aedt` 确认 8 块 NdFe35 均含 `Magnitude='-890000A_per_meter'`、BH 66 点落盘 ⇒ 排除；③ 抓 `oDesktop.GetMessages` → **8 条 `Parts "PM_0x" and "RotorOuter" intersect`**，根因确定。
+- 修复：0.02mm 装配胶缝（验证无效，仍报）+ 对铁芯 `Subtract(PM, KeepOriginals=True)`（有效）。`spm_diag_g03.log`：`Normal completion of simulation on server`。
+- 教训：`ValidateDesign OK` **不等于**求解器无 intersect；新拓扑必须做一次短窗口 Analyze 判"能解"，不能只看建模日志。已写入护栏测试 `test_spm_build.py`。
+
+
+
+### I31 续：SPM M1/M2 401 点实测（2026-11-26，第一优先 S2）
+
+- **M2 空载 401 点**（`SPM_8p48s_M1_g03.aedt` → `SPM_8p48s_M2_g03.aedt`）：
+  `ANALYZE_OK 1277.0s`、CSV 402 行、`m2_noload_spm_g03.json`。
+  - 相 BEMF **273.4005 V**（判据 118–145，**FAIL**，×1.88 上限）；
+  - Bg **1.0114 T**（判据 0.70–0.90，**FAIL 超上限**）；极轴 Br 0.6699 T；
+  - 齿槽 **1.1764 N·m PASS**、线 THD **7.3508% PASS**、三相不平衡 0.0009% PASS、
+    齿身 1.5890 / 轭 1.2824 T PASS。
+  - 解析交叉 E=248.405 V 与实测差 +10.06%（Bg 高、饱和Starts），标 assumption=待验证。
+- **根因判断（FEA 证据，非编数）**：SPM 贴片无 IPM 隔磁桥漏磁通道，Bg 1.0114 比 IPM
+  实测 0.6189 高 63%，与分析预估 0.95 T 同向。BEMF 超窗是拓扑本质，不是管线错误：
+  gap/flux CSV 完整、三相平衡、THD 合规、齿槽合规。
+- **处置**：FAIL 留档，判据未改、数据未删。Imax=13.856 A 固定不变（任务书硬约束），
+  不按 BEMF 反推电流凑数。M3 负载 401 点测 T_avg 后，按任务书单变量扫
+  t_pm=2.0/2.38/2.8（实际需据 T_avg 决定扫描区间）；若减薄仍不能同时满足
+  BEMF≤145 与 T_avg≥22.5，则该拓扑在本绕组/电流口径下不可达，如实记 FAIL 交周检，
+  **不改判据**。
+
+
+
+### I31 续：SPM M3 负载 401 点实测 + S4 厚度单变量决策（2026-11-26）
+
+- **M3 负载（t_pm=2.38, Imax=13.856A, φ_abs=90°）401 点**：
+  `ANALYZE_OK 1296.1s`、`Normal completion`、CSV 402 行、`spm_m3_t238_check.json`。
+  - **T_avg=50.2821 N·m**（判据 22.5–27.5，**FAIL**，×2.01）；
+  - 峰峰 **8.531% PASS**、主谐波 h=12 **3.606% PASS**、跳变 **1.621% PASS**、
+    负载 BEMF 基波 394.38 V（相对空载 +2.73%）。
+  - 平直三项全 PASS，说明**贴片拓扑的平直性成立，唯幅值超 2×**。
+- **S4 决策（assumption=待验证，自主选档）**：任务书预案扫 t_pm=2.0/2.38/2.8，
+  但实测 T_avg 50.28 表明需减薄约一半才能落窗。线性外推
+  `T∝t_pm`（SPM 无桥、Bg 随 t 近线性）：50.28 × 1.30/2.38 ≈ **27.46 N·m**，
+  取 **t_pm=1.30 mm**（core_od=89.05）作为首个单变量点，落窗上沿留余量。
+  **不改电流**（Imax 仍 13.856 A，判据可比性）。若仍 >27.5 则下一步 1.15mm；
+  若 <22.5 则退 1.45mm。每步 401 点，FAIL 留档。
+  风险：1.30mm 贴片偏薄，退磁/机械强度留 E6 待验证；Bg/BEMF 会同步下降（利好 BEMF 超窗）。
+
+
+
+### I31 续：S4 厚度单变量第 1 点 t_pm=1.30（2026-11-26）
+
+- **M3（t_pm=1.30, core_od=89.05, Imax=13.856A）401 点**：`ANALYZE_OK 1134.1s`、
+  `Normal completion`、CSV 402 行、`spm_m3_t130_check.json`。
+  - **T_avg=42.0246 N·m**（判据 22.5–27.5，**FAIL**，较 t=2.38 的 50.2821 降 16.4%）；
+  - 峰峰 **9.110% PASS**、主谐波 **3.798% PASS**、跳变 **1.705% PASS**；
+  - 负载 BEMF 基波 348.42 V（相对 t=2.38 空栽 394.38 降 11.6%，方向正确）。
+- **外推失效诊断**：t 减 45%（2.38→1.30）T_avg 只降 16%，线性外推预测 27.46 落空。
+  物理解释：SPM 无隔磁桥，气隙磁密 Bg≈Br·t/(t+μr·g)，当 t≫μr·g≈0.709mm 时
+  1.30mm 已近饱和区，继续减薄到气隙同量级才有显著下降。
+  处置：再测极端点 t=0.65mm（core_od=90.35，与气隙 0.675 同量级）确认下限，
+  仍 FAIL 则判"本电流/气隙口径下拓扑不可达"，留档交周检，不改判据/电流。
+
+
+### I31 补记：SPM_DESIGN.md §9.2（11-26 15:28 用户追加 OD120 需求）沿用错误气隙口径
+
+`SPM_DESIGN.md` §9.2 网格预算行写"气隙厚从 2.7175 → 2.174 mm"（并发会话写入），
+仍是 I31 已证伪的口径——贴片占据空间被重复扣成气隙。真实气隙环厚 **0.3375 mm**
+（Band 46.1625 = 气隙中线，AirgapRing 46.5/46.1625），OD120 按比例应为
+**0.54 mm 气隙 → 环厚 0.27 mm**，Mesh 0.12mm ⇒ 2.25 层（与 §9.2 的"≈18 层"不同）。
+本轮不改他人章节（明日 OD120 任务第一优先）；此处留档，供 11-27 建 OD120 模型时修正，
+避免 43.7825/2.7175 错误口径被带进新几何导致 Band 切过贴片。
+
+
+### I33 补记：会话中断导致求解工程孤儿锁（2026-11-26 16:01）
+
+t_pm=0.65 的 M3 求解在会话中断时被杀，留下 `SPM_8p48s_M3_t065.aedt.lock` +
+`.Motor_Design.asol.semaphore` + `.Motor_Design.asol_priv.semaphore`（时间戳 16:01）。
+20:17 恢复任务后直接重跑，`OpenProject` 抛 `call failed`、日志止于 `OPEN_FAIL`，
+空耗 698.3s。确认无 ansysedt 进程后清理上述 3 个孤儿锁（未动无关 M4_soft 锁），
+重跑恢复正常。**教训**：会话中断后重跑求解前，先查 `.aedt.lock` / `*.semaphore`
+并确认无残留进程；这是 2026-11-23 已记录过的坑，本轮复发。
+
+
+### I33 补记 2：t=0.65 首次求解中断后结果目录污染（2026-11-26 20:30）
+
+t065 工程（16:01 被会话中断）清锁后重跑，`OpenProject` 成功但 `Analyze` 8.8s 报
+`Maxwell2d solver ... Internal Solver Error: 'Missing data to continue solution process!'`。
+判断为中断时写入的半截 `.aedtresults`（`.asol` 1643 B + `.asol_priv` 3336 B +
+`Motor_Design.results/`）被求解器读到，非几何问题（t=2.38/1.30 同拓扑成功）。
+处置：**不删失败、不改判据**；换工程名 `t065r` 干净重建再求解。
+原 `spm_m3_solve_t065.log` 保留 FAIL 证据。
+
+
+### I31 续：S4 厚度单变量三点曲线 + 第 4 点决策（2026-11-26 20:47）
+
+| t_pm (mm) | core_od | T_avg (N·m) | 峰峰 | 主谐波 | 判定 | 证据 |
+|---:|---:|---:|---:|---:|---|---|
+| 2.38 | 86.89 | 50.2821 | 8.531% | 3.606% | FAIL 超转矩 | `spm_m3_t238_check.json` |
+| 1.30 | 89.05 | 42.0246 | 9.110% | 3.798% | FAIL 超转矩 | `spm_m3_t130_check.json` |
+| 0.65 | 90.35 | **30.6432** | **10.328%** | 4.259% | FAIL 超转矩+峰峰 | `spm_m3_t065r_check.json` |
+
+- t=0.65 由干净工程 `t065r` 求解（`ANALYZE_OK 881.4s`，Normal completion）；原 t065
+  因会话中断污染 `.aedtresults`，清锁重跑仍报 solver internal error，失败留档（I33 补记 2）。
+- **趋势**：t 每减半，T_avg 降幅递减（50.28→42.02→30.64）；t=0.65 距上沿 27.5 仅 11%，
+  但峰峰首次破 10%（10.33%）。说明薄贴片区转矩与脉动同时恶化，存在可达窗口边界。
+- **第 4 点决策（assumption=待验证）**：t=0.50（core_od=90.65），线性外推 T≈27–28，
+  检验能否同时满足 T_avg∈[22.5,27.5] 与峰峰≤10%。若 FAIL 且峰峰继续恶化，
+  判"本电流/气隙口径下 SPM 贴片拓扑不可同时达标"，留档交周检，不改判据/电流。
+
+
+### I31 续：S4 第 4 点 t=0.50 落窗 + S5 FFT 诊断（2026-11-26 21:05）
+
+- **M3（t_pm=0.50, core_od=90.65, Imax=13.856A）401 点**：`ANALYZE_OK 962.3s`、
+  Normal completion、CSV 402 行、`spm_m3_t050_check.json`。
+  - **T_avg=26.3363 N·m ∈ [22.5,27.5] —— PASS（首次落窗）**；
+  - 主谐波 h=12 **4.500% PASS**、跳变 **2.637% PASS**、电流施加 PASS；
+  - **峰峰 10.965% > 10% FAIL**（唯一剩余失败项）。
+- **S5 FFT 诊断（先行，不直接调参）**：末周期 200 点 DFT，最强分量：
+  h=12 **1.1852 N·m (4.50%)**、h=24 0.3224 (1.22%)、h=36 0.1648 (0.63%)、
+  h=6 0.1449 (0.55%)、h=48 0.0343 (0.13%)。⇒ 峰峰由 **h=12 槽谐波族**主导
+  （48 槽 × 4 对极 → 槽通过频率 12 阶），与 IPM 无斜槽的 14% 同源。
+- **下一单变量决策（assumption=待验证）**：先试极弧 0.85→0.80（任务书 S5 候选、
+  改动最小、只动贴片张角），Imax 仍 13.856 A；若峰峰仍 >10% 再上 IPM 已验证的
+  斜槽 0.75 槽距（需新写 SPM 斜槽几何+磁化旋转，成本 3×401 点）。
+  无论哪条，T_avg 落窗的 t=0.50 是后续固定基线。
+
+
+### I31 续：S5 极弧单变量第 1 点 0.80 —— FAIL（2026-11-26 21:22）
+
+- **M3（t=0.50, 极弧 0.80, Imax=13.856A）401 点**：`ANALYZE_OK 863.9s`、Normal completion、
+  CSV 402 行、`spm_m3_t050a80_check.json`。
+  - T_avg **25.8114 PASS**（仍在窗）；但峰峰 **14.8767% FAIL**（极弧 0.85 时 10.965%）、
+    主谐波 h=12 **7.155% FAIL**（0.85 时 4.500%）、跳变 4.45% PASS。
+- **结论**：减小极弧使 h=12 槽谐波族**恶化**，方向错误。FAIL 留档、判据未改。
+- **下一步**：反向单变量极弧 **0.90**（增大极弧），若仍 FAIL 则极弧路线证否，
+  转 IPM 已验证的斜槽 0.75 槽距（需新写 SPM 斜槽几何+磁化方向旋转）。
+
+
+### I31 CLOSED：SPM 25 N·m 贴片平行充磁达成（2026-11-26 21:36）
+
+- **最终设计点**：t_pm=**0.50 mm**（core_od=90.65）、极弧 **0.90**、Imax 13.856 A 固定。
+- **M3 401 点**（`ANALYZE_OK 816.3s`、Normal completion、CSV 402 行）：
+  `spm_m3_t050a90_check.json` — **status=PASS**：
+  T_avg **26.6968 N·m**（窗内）、峰峰 **9.963% PASS**、主谐波 h=24 **3.037% PASS**、
+  跳变 **4.061% PASS**、电流施加 PASS。**25 N·m 目标达成**（偏差 +6.8%，在 ±10% 内）。
+- **极弧扫描**：0.85 → 峰峰 10.965% FAIL；0.80 → 14.876% FAIL（h=12 恶化）；
+  **0.90 → 9.963% PASS**。三者 T_avg 均在窗，唯极弧 0.90 压住 h=12 族。
+- **网格闭环**：`mesh_m2_spm_g03.json` TOTAL 56584、OVERALL_PASS True
+  （5 组 LengthOp 合规、Band ≤0.25、各对象组非零、气隙层数 ≥2）。I33 已闭环
+  （未求解工程导空表头，已求解工程正常；空 JSON `mesh_m1_spm.json` 保留 FAIL 证据）。
+- **验收**：492→504 pytest passed（含并发新增 12 例）、ruff 全绿、M1 几何自检全 PASS、
+  8 块极性与平行充磁矢量护栏 5 例通过。
+- **I31/I32/I33 状态**：I31 转矩目标 **CLOSED**；I32 拓扑 intersect **CLOSED**；
+  I33 网格统计 **CLOSED**。遗留非阻塞项见 SPM_DESIGN §7.3（空载 BEMF/Bg 超窗、
+  0.50mm 贴片退磁 E6、胶缝敏感性、OD120 口径修正）——不推翻本次达标结论。
+- **曲线证据**：`projects/results/ipm8p48s/spm_torque_scan.png`（3 档 t + 最终点）。
+
+**新增 KEEP**：`spm_build.py`、`spm_check.py`、`spm_m3_load.py`、`tests/test_spm_build.py`（5 例）、`m1_spm_build_check.json` / `m1_spm_g03_build_check.json` / `mesh_m1_spm.json`（FAIL 证据）。TEMP：`D:/ANSYS_Run/spm_*` 诊断脚本与日志不入库。**未做**：未改 IPM baseline、未改判据、未删任何 FAIL 记录、未改电流凑数。

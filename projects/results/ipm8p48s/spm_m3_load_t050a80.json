@@ -1,0 +1,37 @@
+{
+  "case": "t050a80",
+  "topology": "SPM_8p48s_surface_pm_parallel_mag",
+  "excitation": {
+    "current_A": 13.856,
+    "current_unit": "A_peak",
+    "phase_deg": 0.0,
+    "phase_abs_deg": 90.0,
+    "bemf_offset_deg": 90.0,
+    "sign": -1,
+    "frequency_hz": 100.0,
+    "source": "task_fixed_13.856A_no_bemf_refit"
+  },
+  "geometry": {
+    "core_od": 90.65,
+    "pm_t_mm": 0.5,
+    "pole_arc": 0.8,
+    "pm_outer_r": 45.825,
+    "airgap": 0.6749999999999972,
+    "band_r": 46.1625,
+    "polarity": [
+      "N",
+      "S",
+      "N",
+      "S",
+      "N",
+      "S",
+      "N",
+      "S"
+    ]
+  },
+  "p_mech_w": 3926.9908169872415,
+  "build_script": "D:/ANSYS_Run/spm_m3_build_t050a80.py",
+  "solve_script": "D:/ANSYS_Run/spm_m3_solve_t050a80.py",
+  "csvdir": "D:/ANSYS_Run/csv_spm_m3_t050a80",
+  "build_script_src": "spm_build.build_script"
+}

@@ -1,0 +1,137 @@
+{
+  "expect": {
+    "core_od": 86.89,
+    "pm_t": 2.3800000000000026,
+    "rotor_area": 5217.3391,
+    "ring_area": 98.2489,
+    "magnet_total": 566.929,
+    "polarity": "NSNSNSNS",
+    "band_r": 46.1625,
+    "gap": 0.6749999999999972
+  },
+  "measured": {
+    "sheets": 109,
+    "areas": {
+      "Region": 11849.8052,
+      "StatorOuter": 9021.5999,
+      "RotorOuter": 5217.0685,
+      "Band": 6694.6598,
+      "AirgapRing": 98.2489
+    },
+    "n_pm": 8,
+    "validate": "OK"
+  },
+  "checks": [
+    {
+      "name": "SHEETS = 5 + 8 + 96",
+      "value": 109,
+      "limit": 109,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 PM = 8",
+      "value": 8,
+      "limit": 8,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Coil = 96",
+      "value": 96,
+      "limit": 96,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Region = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 StatorOuter = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 RotorOuter = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 Band = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "前缀计数 AirgapRing = 1",
+      "value": 1,
+      "limit": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "转子铁芯面积 = π(r_core²−r_shaft²)（偏差%）",
+      "value": 0.00519,
+      "limit": 0.05,
+      "status": "PASS"
+    },
+    {
+      "name": "气隙环面积 = π(46.5²−46.1625²)（偏差%）",
+      "value": 1e-05,
+      "limit": 0.05,
+      "status": "PASS"
+    },
+    {
+      "name": "8 块贴片面积逐块一致（最大偏差%）",
+      "value": 0.0,
+      "limit": 0.5,
+      "status": "PASS"
+    },
+    {
+      "name": "极性表 N/S 交替",
+      "value": "NSNSNSNS",
+      "limit": "NSNSNSNS",
+      "status": "PASS"
+    },
+    {
+      "name": "平行充磁矢量 = sign·u(极轴)",
+      "value": true,
+      "limit": true,
+      "status": "PASS"
+    },
+    {
+      "name": "气隙 = 0.675 mm",
+      "value": 0.675,
+      "limit": 0.675,
+      "status": "PASS"
+    },
+    {
+      "name": "Band 半径 = 气隙中线 46.1625",
+      "value": 46.1625,
+      "limit": 46.1625,
+      "status": "PASS"
+    },
+    {
+      "name": "AEDT 设计校验无 intersect",
+      "value": "OK",
+      "limit": "OK",
+      "status": "PASS"
+    },
+    {
+      "name": "工程存盘",
+      "value": true,
+      "limit": true,
+      "status": "PASS"
+    },
+    {
+      "name": ".aedt 文件存在",
+      "value": true,
+      "limit": true,
+      "status": "PASS"
+    }
+  ],
+  "status": "PASS",
+  "log": "D:/ANSYS_Run/spm_m1_g03.log",
+  "aedt": "D:/ANSYS_Run/SPM_8p48s_M1_g03.aedt"
+}

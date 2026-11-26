@@ -1,0 +1,150 @@
+{
+  "case": "m1_spm",
+  "project": "SPM_8p48s_M1",
+  "design": "Motor_Design",
+  "setup": "Setup1",
+  "mesh_method": "AnsoftTAU",
+  "units": "SI_m_inferred_x1000_to_mm",
+  "units_assumption": {
+    "value": "统计长度按 SI(m) 读，×1000 转 mm；面积 ×1e6 转 mm²",
+    "status": "assumption=待验证",
+    "cross_check": "Band RMS 0.000656487 m -> 0.656 mm ≈ 气隙 0.675 mm（2.8%）；若按 mm 读则 0.15 µm 单元不可能",
+    "verify_method": "换已知几何（PM 厚 2.8 mm）比对 max edge 是否落 0.1–3 mm 量级"
+  },
+  "total_elements": 0,
+  "element_size_mm": {
+    "min_edge": null,
+    "max_edge": null,
+    "note": "min/max 取逐对象列极值；Band 的 max_edge 是周向长边，与气隙径向厚度无关"
+  },
+  "length_ops": {
+    "Mesh_Band": {
+      "enabled": true,
+      "max_length": "0.25mm",
+      "expected_max_length_mm": 0.25,
+      "objects": "Band"
+    },
+    "Mesh_Stator": {
+      "enabled": true,
+      "max_length": "0.9mm",
+      "expected_max_length_mm": 0.9,
+      "objects": "StatorOuter"
+    },
+    "Mesh_Rotor": {
+      "enabled": true,
+      "max_length": "1.2mm",
+      "expected_max_length_mm": 1.2,
+      "objects": "RotorOuter"
+    },
+    "Mesh_PM": {
+      "enabled": true,
+      "max_length": "0.5mm",
+      "expected_max_length_mm": 0.5,
+      "objects": "PM"
+    },
+    "Mesh_Airgap": {
+      "enabled": true,
+      "max_length": "0.15mm",
+      "expected_max_length_mm": 0.15,
+      "objects": "AirgapRing"
+    }
+  },
+  "per_object": [],
+  "mesh_generation_time_s": 12.198,
+  "verdict": {
+    "checks": {
+      "length_ops_enabled_and_match": {
+        "pass": true,
+        "detail": {
+          "Mesh_Band": {
+            "enabled": true,
+            "max_length_mm": 0.25,
+            "pass": true
+          },
+          "Mesh_Stator": {
+            "enabled": true,
+            "max_length_mm": 0.9,
+            "pass": true
+          },
+          "Mesh_Rotor": {
+            "enabled": true,
+            "max_length_mm": 1.2,
+            "pass": true
+          },
+          "Mesh_PM": {
+            "enabled": true,
+            "max_length_mm": 0.5,
+            "pass": true
+          },
+          "Mesh_Airgap": {
+            "enabled": true,
+            "max_length_mm": 0.15,
+            "pass": true
+          }
+        }
+      },
+      "band_max_length_le_0p25mm": {
+        "pass": true,
+        "max_length_mm": 0.25,
+        "limit_mm": 0.25
+      },
+      "all_object_groups_nonzero": {
+        "pass": false,
+        "detail": {
+          "Band": {
+            "num_objects": 0,
+            "num_elements": 0
+          },
+          "Stator": {
+            "num_objects": 0,
+            "num_elements": 0
+          },
+          "Rotor": {
+            "num_objects": 0,
+            "num_elements": 0
+          },
+          "PM": {
+            "num_objects": 0,
+            "num_elements": 0
+          },
+          "AirgapRing": {
+            "num_objects": 0,
+            "num_elements": 0
+          },
+          "Coil": {
+            "num_objects": 0,
+            "num_elements": 0
+          }
+        }
+      },
+      "airgap_ring_min_layers": {
+        "pass": false,
+        "thickness_mm": 0.3375,
+        "rms_edge_mm": null,
+        "layers": null,
+        "limit": 2.0,
+        "num_elements": 0,
+        "assumption": "rms_edge 作径向层厚代理（指导书 §3.4 口径），周向拉长使其保守偏低"
+      },
+      "quality_metrics": {
+        "status": "unavailable",
+        "reason": "2021.1 ExportMeshStats 仅导出 8 列单元统计（Num Elements/min/max/RMS edge/min/max/mean/stdev area），无 skewness/aspect/orthogonal；dir(oDesign) 仅 ApplyMeshOps/ExportMeshStats/GenerateMesh，无质量 getter（§18.3）"
+      },
+      "node_count": {
+        "status": "unavailable",
+        "reason": "ExportMeshStats 不导出节点数；2021.1 未发现可读节点统计的 API（§18.3）"
+      }
+    },
+    "overall_pass": false
+  },
+  "evidence": {
+    "api_doc": "docs/MAXWELL_INTERNALS.md §18",
+    "probe_logs": [
+      "D:/ANSYS_Run/probe_mesh_api.log",
+      "D:/ANSYS_Run/probe_mesh_api2.log",
+      "D:/ANSYS_Run/probe_mesh_api3.log"
+    ],
+    "meshstats_txt": "D:/ANSYS_Run/meshstats_m1_spm.txt",
+    "aedt": "D:/ANSYS_Run/SPM_8p48s_M1.aedt"
+  }
+}
