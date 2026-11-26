@@ -80,6 +80,21 @@
 | **P17** | minor | API/管线 | 生成器 `scripts/main.py::_gen_solver` 写 `"SaveFieldsType:=", "Every N Steps", "N:=", "2"`，但 21.1 落盘真值是 `'N Steps'='0'` —— `"N:="` 是**静默无效键**（不报错、不生效），实际只存末时刻场；旧注释却声称"隔步存场 N=2"，代码在自述一个不存在的行为 | `grep -o "'N Steps'='[0-9]*'" T4_g4b2.aedt` → `'0'`；同工程 `Time:=0.02s` 有数据、`0.0105s` 全部失败；`app_g4b_keytest.log` 6 个变体（含 A 无键、B/C/D `N Steps`、E `SaveFields`、F 旧 `N:`）**全部 raise** | 生成物不得含无效键；存场口径须与注释一致 | **closed** | 11-19 修：删除 `"N:="`、注释改写成实测真值；重生成 `maxwell_model/` 后 `--check` 8/8 无漂移；`tests/test_solver_save_fields.py` 7 例钉死"无效键不得回潮 + 存场开关必须在"。**未能测出正确键名**：已求解的工程上 `InsertSetup` 对所有数组都 raise（含历史上可用的旧数组），故只能在重解前设置；多快照存场留待 E8 铁损时开启，且必须重解确认 Standard 报告仍 401 行（`T4_g4b5` 的 N Steps=5 重解后 tq 只剩 1 行，原因未查清，作废） |
 | **P18** | major | 复核/解析 | 轭部解析磁密**偏乐观 21.0%**（解析 0.9351 T vs FEA 1.1843 T），齿部**偏保守 6.6%**（1.0552 vs 0.9896）。解析用 `Φ/2 / (16mm·L)` 的均匀轭模型，未计齿根扩散与轭内缘聚磁，而轭磁密最大值恰在最小半径（r=60.0） | `fea/g4_flux_summary.json` → `analytic.corrected_at_fea_bg` vs `yoke.b_max` | 解析 yoke/tooth 与 FEA 偏差 ≤10%，或解析侧显式标注为"均值口径" | open | 修 `sim_analytical.py` 轭部模型（引入轭部磁密分布系数或改走磁路分段）；在此之前**禁止**用 0.9351 T 报轭磁密。SPM 已冻结为 baseline，随 IPM 复核复用同一脚本时一并修 |
 
+## 2026-11-26 15:35 — E6/E8 路线变更：Motor-CAD 弃用，改 Maxwell 原生 + 分批时段
+
+Motor-CAD 2025.2.1 的 `motorcad` feature checkout 报 FlexNet -8,544（license 文件为第三方 Team SolidSQUAD-SSQ 签发，非 ANSYS 官方），P0 连接验证 BLOCKED（IPM 账本 I30）。**不修破解 license，不碰任何 license 文件**。E6/E8/热网络改走 Maxwell 原生链路。
+
+| 项 | 决策 | 证据 |
+|---|---|---|
+| 能力层 | `projects/e8e6/e8e6_bridge.py`（KEEP）+ `tests/test_e8e6_bridge.py`（12 例） | 12/12 PASS；全量 504 passed |
+| E8 gate | `core_loss_coefficients("M270_35A")` 返回 `MISSING` —— 材料只有 permeability/conductivity，无 Kh/Kc/Ke | `maxwell_model/materials.py:59-69`；测试 `test_real_mode_core_loss_gate_on_this_machine` 钉死 |
+| E8 批次 | 定时任务 `c280d576`（11-27 08:00）：先做铁耗系数定源，gate=PRESENT 才跑真机 FEA，否则记 BLOCKED 等厂家数据 | automation list |
+| E6 批次 | 定时任务 `af283519`（11-27 11:00）：150°C 三相短路 FEA；温度系数外推标 `assumption=待验证` | automation list |
+| Motor-CAD 任务 | `92f05bc4` 改为 PAUSED，不再触发 | automation list |
+| 判据 | 未改：η ≥93.8%/93.0%、B_min ≥0.30/0.20 T、SF ≥2.5/2.0、绕组 ≤155°C、磁钢 ≤120°C | `e8e6_bridge.py` 常量 + 测试 `test_criteria_match_acceptance_doc` 钉死 |
+
+两个批次与每日 14:30 迭代错峰，均带 `tasklist | grep -i ansysedt` 并发检查；**只有真机 FEA 数据才允许改 `ENGINEERING_ACCEPTANCE.md` 的 E6/E8 状态**。
+
 ## 优先级规则
 
 1. `blocker` 先于 `major`，`major` 先于 `minor`；同级别按“影响工程交付”排序。
