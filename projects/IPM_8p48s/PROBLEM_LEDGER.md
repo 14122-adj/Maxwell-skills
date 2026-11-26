@@ -776,3 +776,45 @@ M4 第二优先对"振荡是否自然衰减"这个问题**未获得答案**，
 看是否存在"窗口长度阈值"；若 0.3 s 也崩，则是机械瞬态长窗口求解器问题，
 转用外部后处理外推或直接接受 0.2 s 基线。此项**不阻塞**第一优先的
 25 N·m 平直目标（斜槽 0.75 已 PASS，与 M4 无关）。
+
+---
+
+## 2026-11-26 — Motor-CAD MCP P0 连接验证：I30 BLOCKED（工具链，非电机设计）
+
+| ID | 严重度 | 领域 | 问题 | 证据 | 验收 | 状态 | 下一步 |
+|---|---|---|---|---|---|---|---|
+| **I30** | **blocker** | 工具链 / Motor-CAD MCP | P0 最小连接验证失败：exe 路径可由 `set_motorcad_exe()` 绕过，但 `get_variable("Version")` 被 FlexNet 拦截（error -8,544，license key 与数据不一致），拿不到版本号，无法判定 E8/E6/热网络链路可用 | `projects/motorcad_mcp/probe_connection.py`（KEEP，退出码 1）；`projects/motorcad_mcp/TEMP/probe_fail.log`（TEMP，56 行完整原文）；`F:\ANSYS Motor CAD\AnsysMotorCAD\Shared Files\ActiveX.bat` 第 1 行 | `MotorCAD()` + `set_variable` + `get_variable("Version")` 全 PASS 且打印 `PROBE_OK` | **BLOCKED**（2026-11-26，P0 30 分钟上限内穷尽 4 条路径） | 需授权修复本机 ANSYS License（key 与 license server 不一致）。修复后重跑探针，PASS 才进 P1/P2。**本轮按协议停止，未写 MCP server、未跑真机、未改 E6/E8 状态** |
+
+### I30 诊断链（全部为实测，非推断）
+
+**环境事实**：
+- PyMotorCAD `0.8.8` 已装入项目级 venv（`projects/motorcad_mcp/.venv`），未装全局依赖；venv Python 实测 `3.13.14`（指定路径 3.13.12 目录下）。
+- 8 个目标 API 方法经 introspect 全部存在：`get_variable` / `set_variable` / `load_template` / `save_to_file` / `do_magnetic_calculation` / `do_steady_state_analysis` / `get_magnetic_graph_point` / `get_node_temperature`。
+- `MOTORCAD_ACTIVEX` 环境变量指向 `F:\ANSYS Motor CAD\AnsysMotorCAD\Shared Files\ActiveX.bat`，其第 1 行为 `call "C:\Program Files\AnsysMotorCAD\v252\Motor-CAD_2025_2_1.exe" /SCRIPTING` —— **安装残留旧路径，本机不存在**，这是 PyMotorCAD 默认 `MotorCAD()` 的首个失败点。
+- 真实 exe 从用户指定快捷方式 `D:\桌面\Ansys Motor-CAD 2025.2.1.lnk` 的 Shell Link `LocalBasePath` 字段解出：`F:\ANSYS Motor CAD\AnsysMotorCAD\v252\Motor-CAD_2025_2_1.exe`（33,639,424 B，实测存在）。**未扫描安装包目录**。
+
+**已尝试路径（4 条，均 FAIL）**：
+
+| # | 路径 | 结果 |
+|---|---|---|
+| 1 | `pymotorcad.MotorCAD()` 默认（batch 文件路径） | `MotorCADError: File does not exist: C:\Program Files\AnsysMotorCAD\v252\...` |
+| 2 | `set_motorcad_exe(真实路径)` + `MotorCAD()` | 实例启动、`set_variable("MessageDisplayState", 2)` 成功；`get_variable("Version")` 抛 FlexNet -8,544 |
+| 3 | `MotorCAD(use_blackbox_licence=True)` | `feature: motorcad_blackbox` 同样 -8,544 |
+| 4 | `MotorCAD(use_blackbox_licence=False)` | `feature: motorcad` 同样 -8,544 |
+
+**完整报错原文（`TEMP/probe_fail.log`，核心段）**：
+
+```
+ansys.motorcad.core.rpc_client_core.MotorCADError: Unable to check out feature: motorcad
+ANSYS LICENSE MANAGER ERROR
+Invalid (inconsistent) license key.
+ The license key and data for the feature do not match.
+ This usually happens when a license file has been altered.
+Feature:       motorcad
+License path:  1055@localhost;
+FlexNet Licensing error:-8,544
+```
+
+**根因判断（assumption=待验证）**：FlexNet -8,544 的官方语义是 license key 与 license 数据不一致（文件被改动/与 server 不匹配）。本机能打开 GUI 与本错误不矛盾——GUI 可能走缓存或另一 license 口径，未经本轮验证。验证方法：在本机运行 ANSYS License Manager 的 `lmstat -a -c 1055@localhost` 检查 `motorcad` feature 状态，再由管理员重新获取/替换 license 文件。**本轮不修改任何 license 文件、注册表或环境变量**（破坏性操作需明确授权）。
+
+**交付边界**：只落 `probe_connection.py` [KEEP] 与本条账本；`TEMP/diag_license.py`、`TEMP/probe_fail.log` [TEMP] 不入库；`.venv` 由 `.gitignore` 排除。P1（8 工具 MCP + dry_run + 进程锁）、P2（IPM .mot 真机 + E6/E8）**未执行**，`docs/ENGINEERING_ACCEPTANCE.md` 的 E6/E8 状态一字未改。
