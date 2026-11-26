@@ -1,0 +1,69 @@
+{
+  "case": "spm_steady",
+  "stage": "SPM M4 转矩从零起动（稳态+软启动）",
+  "topology": "SPM_8p48s_surface_pm_parallel_mag",
+  "geometry": {
+    "core_od": 90.65,
+    "pole_arc": 0.9,
+    "pm_t_mm": 0.5,
+    "airgap": 0.6749999999999972,
+    "polarity": [
+      "N",
+      "S",
+      "N",
+      "S",
+      "N",
+      "S",
+      "N",
+      "S"
+    ]
+  },
+  "excitation": {
+    "current_A": 13.856,
+    "current_unit": "A_peak",
+    "phase_abs_deg": 90.0,
+    "frequency_hz": 100.0,
+    "current_sign": -1,
+    "soft_start_s": 0.02,
+    "source": "spm_final_design_fixed_13.856A",
+    "expressions": {
+      "A": "-13.856000*min(Time/0.020000,1)*sin(628.318531*Time+1.570796327)",
+      "B": "-13.856000*min(Time/0.020000,1)*sin(628.318531*Time-0.523598776)",
+      "C": "-13.856000*min(Time/0.020000,1)*sin(628.318531*Time+3.665191429)"
+    },
+    "mode": "steady_soft_start",
+    "note": "恒转速1500rpm+固定100Hz+电流软启动 ⇒ 转矩0→25后保持"
+  },
+  "motion": {
+    "consider_mechanical_transient": false,
+    "note": "稳态口径，转速钉死，不积分 J·dω/dt"
+  },
+  "timing": {
+    "stop_time": "0.2s",
+    "time_step": "0.0005s",
+    "n_steps": 400,
+    "n_points": 401,
+    "save_fields_type": "None"
+  },
+  "build_script": "D:/ANSYS_Run/spm_m4_build_spm_steady.py",
+  "solve_script": "D:/ANSYS_Run/spm_m4_solve_spm_steady.py",
+  "aedt": "D:/ANSYS_Run/SPM_8p48s_M4_spm_steady.aedt",
+  "csvdir": "D:/ANSYS_Run/csv_spm_m4_spm_steady",
+  "generated": true,
+  "solved": true,
+  "solve": {
+    "analyze_ok_s": 848.8,
+    "status": "Normal completion",
+    "csv_points": 401,
+    "csvdir": "D:/ANSYS_Run/csv_spm_m4_spm_steady",
+    "results": {
+      "t_start_nm": -0.0035595,
+      "peak_nm": 27.5691,
+      "steady_nm": 26.7966,
+      "settle_ms": 19.5,
+      "speed_rpm": 1500.0,
+      "summary": "m4_start_summary_spm_steady.json",
+      "png": "spm_m4_start_curve.png"
+    }
+  }
+}

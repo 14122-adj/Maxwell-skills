@@ -1,0 +1,36 @@
+{
+  "case": "spm_steady",
+  "torque_unit": "NewtonMeter",
+  "torque_scale": 1.0,
+  "speed_unit": "rpm",
+  "time_unit": "ms",
+  "torque": {
+    "status": "OK",
+    "n": 401,
+    "t_span": [
+      0.0,
+      200.0
+    ],
+    "y_start": -0.00355952731600466,
+    "y_peak": 27.5691272182803,
+    "t_peak": 183.0,
+    "y_min": -0.00355952731600466,
+    "y_ss": 26.796639006167553,
+    "t_settle": 19.5
+  },
+  "speed": {
+    "status": "OK",
+    "n": 401,
+    "t_span": [
+      0.0,
+      200.0
+    ],
+    "y_start": 1500.0,
+    "y_peak": 1500.0,
+    "t_peak": 0.0,
+    "y_min": 1500.0,
+    "y_ss": 1500.0,
+    "t_settle": 0.0
+  },
+  "csvdir": "D:/ANSYS_Run/csv_spm_m4_spm_steady"
+}

@@ -984,4 +984,24 @@ t065 工程（16:01 被会话中断）清锁后重跑，`OpenProject` 成功但 
   0.50mm 贴片退磁 E6、胶缝敏感性、OD120 口径修正）——不推翻本次达标结论。
 - **曲线证据**：`projects/results/ipm8p48s/spm_torque_scan.png`（3 档 t + 最终点）。
 
+
+### SPM M4 从零起动曲线（2026-11-26 21:55）— 演示图达成
+
+- 用户要求"完成转矩目标后继续做从零开始的图像（之前做过的）" ⇒ 复用
+  `docs/DEMO_CASE_M4_TORQUE.md` §3 正解：稳态口径 + 电流软启动
+  `i=−13.856·min(t/0.02,1)·sin(628.3185·t+90°)`，转速钉死 1500 rpm。
+- 新建 `spm_m4_start.py` [KEEP]：唯一替换是建模用 `spm_build.build_script`、
+  几何取 SPM 最终设计点（core_od=90.65 / 极弧 0.90 / t_pm=0.50）；三条已证否
+  机械瞬态路线不提供。段2 求解脚本完全复用 IPM（已真机验证三量齐导）。
+- **M4 401 点实测**（`ANALYZE_OK 848.8s`、Normal completion、CSV 402 行）：
+  t=0 **−0.00356 N·m（≈0）**、19.5 ms 进入 95% 稳态带、峰值 27.569 N·m、
+  末段稳态 **26.797 N·m**（与 M3 T_avg 26.6968 差 0.4%）、转速恒定 1500 rpm。
+  证据：`spm_m4_start_spm_steady.json`、`m4_start_summary_spm_steady.json`、
+  `spm_m4_start_curve.png`。
+- 坑：`ipm_m4_plot.py` 原把摘要写到默认 `m4_start_summary_start.json`，
+  覆盖了 IPM 历史证据 —— 已 `git checkout` 恢复原文件，改用 `--case spm_steady`
+  写专属摘要。另给 plot 加 `--topology` 参数（默认 IPM 不变）修正图标题口径，
+  标题现为"SPM 8p48s 贴片平行充磁 — 恒转速稳态 + 电流软启动（401 点）"。
+- 504 pytest passed / ruff 绿。未改判据、未删任何 FAIL 记录。
+
 **新增 KEEP**：`spm_build.py`、`spm_check.py`、`spm_m3_load.py`、`tests/test_spm_build.py`（5 例）、`m1_spm_build_check.json` / `m1_spm_g03_build_check.json` / `mesh_m1_spm.json`（FAIL 证据）。TEMP：`D:/ANSYS_Run/spm_*` 诊断脚本与日志不入库。**未做**：未改 IPM baseline、未改判据、未删任何 FAIL 记录、未改电流凑数。

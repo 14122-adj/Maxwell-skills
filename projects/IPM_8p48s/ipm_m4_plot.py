@@ -114,6 +114,8 @@ def main(argv=None) -> int:
     ap.add_argument("--csvdir", default=None,
                     help="CSV 目录（默认 D:/ANSYS_Run/csv_ipm_m4_<case>）")
     ap.add_argument("--png", default=None)
+    ap.add_argument("--topology", default="IPM 8p48s",
+                    help="图标题前缀（默认 IPM 8p48s；SPM 用 'SPM 8p48s 贴片平行充磁'）")
     ap.add_argument("--no-plot", action="store_true")
     args = ap.parse_args(argv)
 
@@ -165,7 +167,8 @@ def main(argv=None) -> int:
         ax1.annotate("t=0: %.2f N·m" % st_tq["y_start"], (0, st_tq["y_start"]),
                      textcoords="offset points", xytext=(12, 14), fontsize=9, color="#c0392b")
         ax1.set_ylabel("转矩 (N·m)")
-        ax1.set_title("IPM 8p48s — %s（401 点 / 200 ms）" % _mode_label(args.case), fontsize=11)
+        ax1.set_title("%s — %s（%d 点）" %
+                      (args.topology, _mode_label(args.case), st_tq["n"]), fontsize=11)
         ax1.grid(alpha=0.25, lw=0.5)
         ax1.legend(loc="lower right", fontsize=9, frameon=False)
 
