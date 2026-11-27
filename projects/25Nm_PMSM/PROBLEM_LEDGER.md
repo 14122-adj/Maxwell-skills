@@ -65,7 +65,7 @@
 | **E3** | major | 材料 | `M270_35A` 目前线性 μ=1000；`NdFe35` 未按 100°C 修正 Br | `.aedt` 材料块 | 非线性 B-H；Br(100°C) 与 Hc 修正 | open | 导入 B-H 曲线/温度系数 |
 | **E4** | major | 能量 | 能量守恒未闭环 | — | P_in = P_out + ΣP_loss，偏差 <5% | open | 从 FEA 导出损耗/功率（负载功率平衡已 −0.62%，但未含铁耗/铜耗分项） |
 | **E5** | major | 热 | 热分析仍是 7 节点解析，未用 FEA 损耗复核 | `thermal_summary.json` | 热点 ≤155°C / 磁钢 ≤120°C | open | 用 FEA 损耗重跑热网络/FEA |
-| **E6** | major | 退磁 | 退磁仍是解析，未用 FEA 校核 | `sim_summary.json` | B_min ≥0.2 T，SF ≥2 | open | 150°C 三相短路 FEA |
+| **E6** | major | 退磁 | 退磁仍是解析，未用 FEA 校核 | `sim_summary.json` | B_min ≥0.2 T，SF ≥2 | **closed (PASS_MIN)** | 11-27 真机 150°C 三相短路 FEA：B_min **0.4222 T**、SF **2.1108**（目标 0.30/2.5，下限 0.20/2.0）⇒ 过下限未达目标；401 点、5 点试算判能解；证据 `projects/results/e8e6/e6_fea.json`、`field/`。温度系数外推标 assumption=待验证；末时刻快照局限在案 |
 | **E7** | major | 电磁 | 转矩脉动 32.39% ≥ 15% | `fea_results.json` | ≤15%（目标 ≤10%） | **closed** | 模板 M7 梨形槽 401 点：**14.688%**（≤15% 达标）；主因 600 Hz 齿槽残余（2.04 N·m 基波幅值）；**≤10% 目标未达**，转 G7 |
 | **E8** | major | 效率 | 效率 93.87% 为解析，FEA 损耗未复核 | `sim_summary.json` | ≥93.8% | **blocked** | 11-27 铁耗系数定源完成：库内有 M270-35A 牌号但不可导出 ⇒ 等用户提供 Kh/Kc/Ke。详见下方「2026-11-27 11:xx E8 铁耗系数定源」段。gate 未过，未跑 CoreLoss、未填经验值、未改判据 |
 | **E9** | major | 制造 | 槽满率/公差链/BOM 未做 | — | 满率 ≤0.78；g_min ≥0.50；BOM ±10% | open | S10 |
@@ -118,6 +118,37 @@ Motor-CAD 2025.2.1 的 `motorcad` feature checkout 报 FlexNet -8,544（license 
 3. 数据文件名、厂商、牌号批次、测试标准（IEC 60404-2 或等效）需一并给出，以便写 `materials.py` 时标注来源。
 
 > 注：GRANTA 条目名为 `Cogent Power - M270-35A, 50Hz`（50 Hz 数据），而本项目 `RATED_FREQUENCY_HZ` 为 100 Hz（`projects/25Nm_PMSM/pmsm_config.py:13`，8 极 1500 rpm，f=4×1500/60）；即便密文可解，50 Hz 单点也不足以定 Ke，仍需多频点曲线。此点作为附加证据，不改变 BLOCKED 结论。
+
+## 2026-11-27 11:xx — E6 退磁真机 FEA（定时任务 af283519；结论 PASS_MIN）
+
+并发闸口：`tasklist | grep -i ansysedt` = NO_ANSYSEDT_RUNNING（08:00 E8 批次已结束且
+BLOCKED，未跑真机），与 14:30 迭代错峰，单实例无并发。全程未碰 Motor-CAD / license 文件。
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| 温度外推（assumption=待验证） | ΔT=130K；Br(150)=Br20·[1+(−0.0012)·130]=**1.0381 T**；Hc(150)=890k·[1+(−0.006)·130]=**195800 A/m**；μr(150)=Br/(μ0·Hc)=**4.21915** | `e6_fea.json::temperature_extrapolation`；系数是 N35 常见值外推，**非本项目厂家数据**，需 datasheet 或 150°C 实测退磁曲线确认 |
+| 短路拓扑 | 三相 `Type="Voltage"` / `Voltage="0V"` + R=0.48Ω / L=0.0038H，电流由感应电压驱动 | `.aedt` 绕组块；原生 TrCrv 回路残差 max\|Ldi/dt+Ri+e\| ≤0.02 V（试算+全解均验证） |
+| 试算（5 点） | `ANALYZE_OK 16.4s`，三相 TrCrv 各 5 行，电流由 0 升至 ±0.375 A ⇒ 能解 | `D:/ANSYS_Run/app_e6_demag_trial.log`（TEMP） |
+| 全解（401 点） | `ANALYZE_OK 458.8s`，10 ms / 25 µs，motion setup 保留；三相隔 401 点电流 CSV | `app_e6_demag_full.log`；`projects/results/e8e6/field/current_{a,b,c}.csv` |
+| 短路电流峰值 | 11.24 A（C 相；8p12s 集中绕组三相不对称属正常）；H_demag=28.23 kA/m | `e6_fea.json::short_circuit` |
+| **B_min** | **0.4222 T** @ t=10 ms / θ=27° / r=46.1625 mm，121 点 | `field/gap_bx_010000us.csv` + `gap_by_...csv`；口径 min_t[max_θ\|Br\|] |
+| **SF** | **2.1108**（B_min/0.2T，与账本解析 SF=B_min/0.2 同源）；交叉 SF_Hc=6.94 | `e6_fea.json::safety_factor` |
+| 判据 | B_min ≥0.30/0.20 T，SF ≥2.5/2.0 ⇒ **PASS_MIN**（过下限、未达目标） | `E8E6Bridge(dry_run=False).check_demag(...,temperature_c=150,source="FEA")`；阈值未改 |
+| 热网络 G5 对照 | bridge.thermal_nodes()：绕组 89.47°C ≤155、磁钢 76.06°C ≤120 ⇒ PASS，source=ANALYTIC_LPTN_S4_LOSS | `e6_fea.json::thermal_crosscheck`；**未改** `thermal_summary.json` |
+
+遗留限制（如实留痕，不掩盖）：
+1. **末时刻快照**：21.1 `EditSetup` 的 `"N Steps"="10"` 被静默忽略（P17 同类），多时刻场 66 次导出
+   全失败，只有 t=0.010 s（1 个电周期末、转子机械角回 0°）场可查。B_min 严格性弱于全时程场扫描，
+   无法确认最恶劣去磁相位；与 G4-B 磁密三行同口径（末时刻快照），不在本次冒充全时程最小值。
+2. **温度系数待验证**：Br −0.12%/K、Hc −0.6%/K 为常见值外推，不是厂家数据；SF 对 Hc 敏感
+   （解析 0.4%/K 给 SF≈1.1，本次 0.6%/K 给真机 SF_Hc=6.94），牌号 datasheet 到位后须重跑。
+3. **端部电感口径**：2D 场已含槽内电感，0.0038 H 全额计入是 assumption=待验证；
+   实测端部电感若小于此值，短路电流与退磁裕度会变化。
+4. E6 由 `open` 直接置 `closed (PASS_MIN)`：达标下限但未达工程目标（SF 2.5），是否接受 PASS_MIN
+   作为最终关闭由周检裁定；本次不改判据、不删数据。
+
+新增文件 → 分类：`projects/e8e6/e6_demag_check.py`、`e6_demag_solver.py` [KEEP] 可复现链路；
+`projects/results/e8e6/e6_fea.json` + `field/*.csv` [KEEP] 验收证据；`D:/ANSYS_Run/e6_*` [TEMP] 不入库。
 
 ## 优先级规则
 

@@ -1,0 +1,115 @@
+{
+  "stage": "E6 150°C 三相短路退磁 FEA（真机 Maxwell 2D）",
+  "source": "FEA",
+  "temperature_c": 150.0,
+  "solver": {
+    "ansys_version": "AnsysEM 21.1",
+    "stop_time_s": 0.01,
+    "time_step_s": 2.5e-05,
+    "n_points": 401,
+    "full_401_points": true,
+    "trial_points": 5,
+    "aedt": "D:/ANSYS_Run/e6_demag_full.aedt",
+    "log": "D:/ANSYS_Run/app_e6_demag_full.log"
+  },
+  "temperature_extrapolation": {
+    "dT_K": 130.0,
+    "Br20_T": 1.23,
+    "Br150_T": 1.03812,
+    "Hc20_A_per_m": 890000.0,
+    "Hc150_A_per_m": 195800.0,
+    "mur20": 1.0997785406,
+    "mur150": 4.2191504012,
+    "formula_Br": "Br(T) = Br(20C) * (1 + (-0.0012)*(T-20))",
+    "formula_Hc": "Hc(T) = Hc(20C) * (1 + (-0.006)*(T-20))",
+    "formula_mur": "mur(T) = Br(T) / (mu0 * |Hc(T)|); Br = mu0*mur*|Hc|",
+    "assumption": "待验证：Br -0.12%/K、Hc -0.6%/K 为 N35 常见值外推，非本项目磁钢厂家数据；需采购牌号 datasheet 或 150°C 实测退磁曲线确认。"
+  },
+  "short_circuit": {
+    "topology": "three-phase short circuit (Voltage=0V, R+L)",
+    "winding_type": "Voltage",
+    "r_phase_ohm": 0.48,
+    "l_phase_h": 0.0038,
+    "turns_per_phase": 84,
+    "current_csv": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field/current_a.csv",
+    "current_csv_all_phases": {
+      "A": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field/current_a.csv",
+      "B": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field/current_b.csv",
+      "C": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field/current_c.csv",
+      "native_last10": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field/current_native_last10.csv"
+    },
+    "current_source": "REPORT Current(WindingX), 3 phases x 401 points; native TrCrv (last 10 steps) for circuit-closure check only",
+    "i_sc_peak_a": 11.239,
+    "h_demag_max_A_per_m": 28231.71,
+    "assumption": "待验证：端部电感按设计相电感 0.0038 H 全额计入；2D 场已含槽内电感，实际端部电感需按绕组端部几何实测/标定。"
+  },
+  "b_min": {
+    "value_T": 0.42216,
+    "definition": "min_t [ max_theta |Br(t,theta)| ] on r=46.1625 mm airgap circle",
+    "sample": {
+      "time_us": 10000,
+      "angle_deg": 27.0,
+      "radius_mm": 46.1625,
+      "br_signed_T": -0.42216
+    },
+    "n_times": 1,
+    "n_points_per_time": 121,
+    "per_time_peak": [
+      {
+        "time_us": 10000,
+        "peak_abs_br_T": 0.42216,
+        "peak_angle_deg": 27.0,
+        "br_signed_T": -0.42216,
+        "n_points": 121
+      }
+    ],
+    "field_csv_dir": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field",
+    "field_csv": {
+      "bx": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field/gap_bx_010000us.csv",
+      "by": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field/gap_by_010000us.csv",
+      "points": "D:/桌面/ANSYS MaxWell_skill/projects/results/e8e6/field/pts_gap.txt"
+    },
+    "field_limitation": "限制：21.1 的 EditSetup 'N Steps'='10' 被静默忽略（账本 P17），只有末时刻 t=0.010 s 场可导出，多时刻 66 次导出全失败。t=0.010 s 恰为 1 个电周期末、转子机械角回 0°，与 G4-B 末时刻快照同口径；但 B_min 严格性弱于全时程场扫描（无法确认最恶劣去磁相位），此处如实标注，不把单时刻场冒充全时程最小值。"
+  },
+  "safety_factor": {
+    "value": 2.1108,
+    "definition": "B_min / 0.20T (same basis as analytic ledger SF=B_min/0.2)",
+    "sf_Hc_crosscheck": 6.9355,
+    "sf_Hc_definition": "|Hc(150C)| / H_demag_max (FEA current driven)",
+    "analytic_bmin_reference_T": 1.002643,
+    "note": "解析参考仅作对照，不填 FEA 值；SF_Hc 为独立口径交叉校验，主判据走 bridge.check_demag(sf=value)。"
+  },
+  "demag_verdict": {
+    "b_min_t": 0.42216,
+    "sf": 2.1108,
+    "temperature_c": 150.0,
+    "source": "FEA",
+    "criterion": {
+      "b_min_target_t": 0.3,
+      "b_min_min_t": 0.2,
+      "sf_target": 2.5,
+      "sf_min": 2.0
+    },
+    "verdict": "PASS_MIN"
+  },
+  "thermal_crosscheck": {
+    "bridge_thermal": {
+      "winding_hotspot_c": 89.47,
+      "magnet_c": 76.06,
+      "source": "ANALYTIC_LPTN_S4_LOSS",
+      "criterion": {
+        "winding_hotspot_max_c": 155.0,
+        "magnet_max_c": 120.0
+      },
+      "verdict": "PASS"
+    },
+    "g5_criteria": {
+      "winding_hotspot_max_c": 155.0,
+      "magnet_max_c": 120.0
+    },
+    "note": "E6 FEA 为等温 150°C 工况，未做热-电耦合，未得到磁钢实际工作点温度；thermal_summary.json 仍为 7 节点 LPTN 解析值(绕组 89.47°C/磁钢 76.06°C，source=ANALYTIC_LPTN_S4_LOSS)，本项仅把 bridge.thermal_nodes() 的 G5 对照结论记入，不改原 thermal_summary.json，也不冒充 FEA 热结果。",
+    "verdict": "PASS"
+  },
+  "criteria_source": "e8e6_bridge.E8E6Bridge (ENGINEERING_ACCEPTANCE.md §2)",
+  "verdict": "PASS_MIN"
+}
