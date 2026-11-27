@@ -67,7 +67,7 @@
 | **E5** | major | 热 | 热分析仍是 7 节点解析，未用 FEA 损耗复核 | `thermal_summary.json` | 热点 ≤155°C / 磁钢 ≤120°C | open | 用 FEA 损耗重跑热网络/FEA |
 | **E6** | major | 退磁 | 退磁仍是解析，未用 FEA 校核 | `sim_summary.json` | B_min ≥0.2 T，SF ≥2 | open | 150°C 三相短路 FEA |
 | **E7** | major | 电磁 | 转矩脉动 32.39% ≥ 15% | `fea_results.json` | ≤15%（目标 ≤10%） | **closed** | 模板 M7 梨形槽 401 点：**14.688%**（≤15% 达标）；主因 600 Hz 齿槽残余（2.04 N·m 基波幅值）；**≤10% 目标未达**，转 G7 |
-| **E8** | major | 效率 | 效率 93.87% 为解析，FEA 损耗未复核 | `sim_summary.json` | ≥93.8% | open | 从 FEA 提取 P_cu/P_fe/PM。前置：`M270_35A` 无 Kh/Kc/Ke（材料里查过，grep 无命中），缺厂商标定曲线 ⇒ 补系数前**不许**用经验值跑 CoreLoss |
+| **E8** | major | 效率 | 效率 93.87% 为解析，FEA 损耗未复核 | `sim_summary.json` | ≥93.8% | **blocked** | 11-27 铁耗系数定源完成：库内有 M270-35A 牌号但不可导出 ⇒ 等用户提供 Kh/Kc/Ke。详见下方「2026-11-27 11:xx E8 铁耗系数定源」段。gate 未过，未跑 CoreLoss、未填经验值、未改判据 |
 | **E9** | major | 制造 | 槽满率/公差链/BOM 未做 | — | 满率 ≤0.78；g_min ≥0.50；BOM ±10% | open | S10 |
 | **E10** | minor | NVH | 力波/模态为解析，未用 FEA 校核 | `nvh_summary.json` | 工作区无同阶共振 | open | FEA 模态/力波 |
 | **E11** | minor | 标准 | 未对照 IEC 60034-1/2-1、F 级绝缘 | — | 报告列出标准条款/温升限值 | open | 补标准对照表 |
@@ -94,6 +94,30 @@ Motor-CAD 2025.2.1 的 `motorcad` feature checkout 报 FlexNet -8,544（license 
 | 判据 | 未改：η ≥93.8%/93.0%、B_min ≥0.30/0.20 T、SF ≥2.5/2.0、绕组 ≤155°C、磁钢 ≤120°C | `e8e6_bridge.py` 常量 + 测试 `test_criteria_match_acceptance_doc` 钉死 |
 
 两个批次与每日 14:30 迭代错峰，均带 `tasklist | grep -i ansysedt` 并发检查；**只有真机 FEA 数据才允许改 `ENGINEERING_ACCEPTANCE.md` 的 E6/E8 状态**。
+
+## 2026-11-27 11:xx — E8 铁耗系数定源（定时任务 c280d576；结论 BLOCKED）
+
+开工 gate：`E8E6Bridge(dry_run=False).core_loss_coefficients()` → `{'status': 'MISSING', 'coefficients': {'Kh': False, 'Kc': False, 'Ke': False}, 'source': 'projects/25Nm_PMSM/maxwell_model/materials.py'}`，三系数全缺。按账本约束「补系数前不许用经验值跑 CoreLoss」，本批次只做定源。并发检查：`tasklist | grep -i ansysedt` = NO_ANSYSDT（无占用）。
+
+定源检索（只读，未碰 Motor-CAD / 破解 license / 任何 license 文件）：
+
+| 检索对象 | 结果 | 证据 |
+|---|---|---|
+| `projects/25Nm_PMSM/maxwell_model/materials.py:59-69` | M270_35A 只有 `permeability=1000` / `conductivity=2e6`，Kh/Kc/Ke 无 | 文件直接读取 |
+| Maxwell 主材料库 `D:/Program Files/AnsysEM/AnsysEM21.1/Win64/syslib/Materials.amat` | 无 M270 / M270-35A 命中（`grep -i M270` 无结果） | 全库检索 |
+| GRANTA 扩展库 `syslib/GRANTA Producers Materials Data for Simulation.amat` | **有** `Cogent Power - M270-35A, 50Hz`，`$begin` 行 94813、`$end` 行 95446；条目 `IsEncrypted=true`，整段为 `CypherText` 密文 | `grep -in M270` 行 94813/95446；`sed` 读条目 |
+| 该 GRANTA 库加密性质 | 1937 条材料全部 `IsEncrypted=true`；全文件 `core_loss\|Kh\|Kc\|Ke` 明文命中 **0** | `grep -c IsEncrypted=true` = 1937；`grep -ic core_loss...` = 0 |
+| Maxwell 原生 API 读系统库材料属性 | 探测脚本 2 版（`D:/ANSYS_Run/probe_m270_coreloss*.py`，TEMP）：v1 API 签名错；v2 枚举加密库卡死 12 min → 主动终止。未取得系数 | 探测无结果文件；`GetPropertyValue` 需 3 参数 `(tab,material,prop)` |
+| 非 GRANTA 目录 / 用户材料库 `C:/Users/ASUS/AnsysEM` | 无 M270-35A 命中；无用户 `.amat` | 全盘 `grep -ril`、`.amat` 检索 |
+
+判定：库内**仅有加密牌号名**，无明文 core loss 曲线、无 Kh/Kc/Ke 可导出值。按任务规则「库里也没有（可导出系数）→ 写 BLOCKED + 需要的厂商标定数据」，E8 置 **blocked**。本批次未跑 CoreLoss、未跑真机 FEA、未填经验值、未改判据、未改 `ENGINEERING_ACCEPTANCE.md` 的 η 行。
+
+解锁所需厂商标定数据（缺一不可）：
+1. **M270-35A（Cogent Power / Thyssenkrupp 或实际采购钢厂）的 Steinmetz 三系数 Kh / Kc / Ke**，须注明单位口径（W/kg @ B[T]、f[Hz]）与拟合频率/磁密区间；或
+2. **同等效力原始标定**：B–P 损耗曲线族（P[W/kg] vs B[T]，至少 3 个频率点，如 50/100/200/400 Hz），由我方用 Steinmetz 回归拟合 Kh/Kc/Ke 并留拟合脚本与残差；曲线必须来自钢厂 datasheet / 第三方实测报告，不得用 ANSYS 通用经验值。
+3. 数据文件名、厂商、牌号批次、测试标准（IEC 60404-2 或等效）需一并给出，以便写 `materials.py` 时标注来源。
+
+> 注：GRANTA 条目名为 `Cogent Power - M270-35A, 50Hz`（50 Hz 数据），而本项目 `RATED_FREQUENCY_HZ` 为 100 Hz（`projects/25Nm_PMSM/pmsm_config.py:13`，8 极 1500 rpm，f=4×1500/60）；即便密文可解，50 Hz 单点也不足以定 Ke，仍需多频点曲线。此点作为附加证据，不改变 BLOCKED 结论。
 
 ## 优先级规则
 
