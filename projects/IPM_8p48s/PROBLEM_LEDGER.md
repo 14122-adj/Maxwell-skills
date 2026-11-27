@@ -1005,7 +1005,7 @@ t065 工程（16:01 被会话中断）清锁后重跑，`OpenProject` 成功但 
 - 504 pytest passed / ruff 绿。未改判据、未删任何 FAIL 记录。
 
 
-### I34（优化项，2026-11-26 23:47 用户反馈）— 转矩幅值精调到 25.0±0.5 N·m
+### I34（**CLOSED**，2026-11-26 23:47 用户反馈）— 转矩幅值精调到 25.0±0.5 N·m ✅ 2026-11-27 斜槽 0.75 达成
 
 - **用户反馈**：「转矩上还有点小瑕疵，不是很接近 25 N·m，这一点明天的任务里优化一下」。
 - **现状**：SPM 最终设计点 t_pm=0.50 / 极弧 0.90 / Imax 13.856 A 实测 T_avg=**26.6968 N·m**，
@@ -1023,3 +1023,44 @@ t065 工程（16:01 被会话中断）清锁后重跑，`OpenProject` 成功但 
 - **自动化 prompt 已同步**：保留 rrule 每日 14:30，只改任务正文。
 
 **新增 KEEP**：`spm_build.py`、`spm_check.py`、`spm_m3_load.py`、`tests/test_spm_build.py`（5 例）、`m1_spm_build_check.json` / `m1_spm_g03_build_check.json` / `mesh_m1_spm.json`（FAIL 证据）。TEMP：`D:/ANSYS_Run/spm_*` 诊断脚本与日志不入库。**未做**：未改 IPM baseline、未改判据、未删任何 FAIL 记录、未改电流凑数。
+
+
+#### 2026-11-27 每日 13:30 — I34 精调第 1 点：t_pm=0.45 / 极弧 0.90（FAIL 峰峰，留档）
+
+- 单变量：core_od=90.75（t_pm=0.450），极弧 0.90、Imax 13.856 A、φ_abs=90°、f=100Hz 全固定。
+  401 点 `ANALYZE_OK`/`Normal completion`，求解 981.0 s，BUILD/SOLVE rc=0。
+  CSV `tq_load.csv` 402 行、表头 `[NewtonMeter]`（scale=1）。
+- **独立重算 `ipm_m3_check.py` → `spm_m3_t045a90_check.json`（status=FAIL）**：
+  T_avg **24.9991 N·m**（精确命中 25.0±0.5，PASS）、峰峰 **2.5325 N·m = 10.1304%**
+  **>10% FAIL（超 0.1304 pt）**、主谐波 h=24 0.7819 N·m=3.128% PASS、
+  跳变 1.0438 N·m=4.175% PASS、电流 13.856 A 真施加 PASS。负载 BEMF 基波 291.0078 V@140.36°。
+- **FFT 定阶次（末周期 200 点，t 单位 ms 校正后）**：h=24 3.128%（主导）、h=12 1.788%、
+  h=36 0.977%、h=6 0.461%、h=48 0.174% ⇒ 48 槽/8 极槽谐波族，与 11-26 t=0.50 诊断同族。
+- **处置**：T_avg 已达标，禁止改电流或 t_pm 凑峰峰。按 I34 约束走极弧单变量补救
+  （极弧 0.90→0.92），已发起 t045a92 401 点。**t045a90 的 FAIL 记录不删、判据未改**。
+- 证据：`spm_m3_load_t045a90.json`、`spm_m3_t045a90_check.json`、
+  `D:/ANSYS_Run/csv_spm_m3_t045a90/`（TEMP）、`spm_m3_solve_t045a90.log`（TEMP）。
+
+
+#### 2026-11-27 — I34 CLOSED：斜槽 0.75 达成 25.0004 N·m / 峰峰 3.6022%（四项 PASS）
+
+第 2 点（极弧 0.92，t=0.45）：T_avg 25.1007、峰峰 **10.8601% FAIL（比 0.90 恶化 0.73 pt）**
+⇒ 极弧 0.90 确认为最优点，弃极弧路线（证据 `spm_m3_t045a92_check.json`，FAIL 留档）。
+
+第 3 点（斜槽 0.75，t=0.45/极弧 0.90）：新建 `spm_skew_slices.py`（KEEP），
+`spm_build.spm_magnets` 加 `cfg.rotor_init_deg` 使贴片几何与平行充磁矢量同步转
+（+2 护栏测试，0° 恒等逐位复现）。3 片机械角 −2.8125/0/+2.8125°（γ=0.75×7.5°=5.625°），
+每片电流 φ_abs 补 Δ_elec=Δ_mech×4（IPM D5 已验证口径），各 401 点
+`ANALYZE_OK`/`Normal completion` rc=0，单片 T_avg 25.0091/24.9991/24.9930、
+单片峰峰 10.1249/10.1304/10.1225%（均未单独过线），逐点平均后：
+**T_avg 25.0004 N·m PASS、峰峰 0.9006 N·m=3.6022% PASS、
+主谐波 h=24 1.0432% PASS、跳变 1.6277% PASS** —— 四项全过，
+`assumption=待验证` 项（3 切片近似上限口径）沿用 IPM D5 同口径。
+直流转矩不降（25.0004 vs 24.9991，+0.005%），h=24 槽谐波被相位互补从 3.128% 压到 1.0432%。
+
+**新基线**：t_pm=0.45（core_od 90.75）/ 极弧 0.90 / 斜槽 0.75 / Imax 13.856 A 固定。
+判据 22.5–27.5 / ≤10% / ≤5% 全程未改；t045a90、t045a92 的 FAIL 原样保留。
+证据 `spm_m3_skew_spm_t045_skew075.json`（KEEP）；`D:/ANSYS_Run/csv_spm_m3_spm_t045_skew075_s*/`
+与求解日志为 TEMP。全量 pytest **506 passed**（504→506，+2 护栏）。
+**遗留**：起动曲线 `spm_m4_start_curve.png` 仍是旧 t=0.50 口径，待按新基线重出；
+OD120 缩放版需从 t=0.45×0.8=0.36 起步走同一精调，不照抄旧 1.904mm 表。

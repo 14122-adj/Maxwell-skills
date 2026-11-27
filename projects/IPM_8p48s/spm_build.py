@@ -103,7 +103,10 @@ def spm_magnets(cfg: SPMConfig) -> list:
     """返回 8 块弧形贴片：多边形点、平行充磁矢量、极性、面积。
 
     磁钢外表面严格贴在 r = rotor_od/2 = 45.825（= 气隙内边界），
-    内表面贴铁芯 r = spm_core_od/2 = 43.445。极弧角 = pm_pole_arc × 极距。
+    内表面贴铁芯 r = spm_core_od/2。极弧角 = pm_pole_arc × 极距。
+    D5 斜槽（2026-11-27 I34）：整组转子绕 Z 转 cfg.rotor_init_deg 机械角，
+    几何与平行充磁矢量同步旋转（与 ipm_geom.derive_rotor 同口径，
+    rotor_init_deg=0 时逐位复现原几何）。
     """
     r_in = cfg.spm_core_od / 2.0
     r_out = cfg.rotor_od / 2.0
@@ -111,7 +114,7 @@ def spm_magnets(cfg: SPMConfig) -> list:
     arc_span = cfg.pm_pole_arc * pole_pitch
     out = []
     for k in range(cfg.poles):
-        center = k * pole_pitch
+        center = k * pole_pitch + cfg.rotor_init_deg
         a0 = center - arc_span / 2.0
         sign = 1.0 if k % 2 == 0 else -1.0     # 偶数极 N，奇数极 S
         ang = math.radians(center)

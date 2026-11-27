@@ -119,6 +119,19 @@ Motor-CAD 2025.2.1 的 `motorcad` feature checkout 报 FlexNet -8,544（license 
 
 > 注：GRANTA 条目名为 `Cogent Power - M270-35A, 50Hz`（50 Hz 数据），而本项目 `RATED_FREQUENCY_HZ` 为 100 Hz（`projects/25Nm_PMSM/pmsm_config.py:13`，8 极 1500 rpm，f=4×1500/60）；即便密文可解，50 Hz 单点也不足以定 Ke，仍需多频点曲线。此点作为附加证据，不改变 BLOCKED 结论。
 
+## 2026-11-27 13:30 — E8 铁耗系数来源复查（每日 13:30 迭代内，结论维持 BLOCKED）
+
+开工 gate 复跑：`E8E6Bridge(dry_run=False).core_loss_coefficients()` → `MISSING`（Kh/Kc/Ke 全缺，source=`projects/25Nm_PMSM/maxwell_model/materials.py`）。按约束**不填经验值、不跑 CoreLoss、不改 η 判据、不改 ENGINEERING_ACCEPTANCE.md**。
+
+一次来源复查（只读，与 11:xx 定源范围一致）：
+| 对象 | 本日复查结果 |
+|---|---|
+| `projects/25Nm_PMSM/maxwell_model/materials.py` | mtime 仍 2026-11-19 23:33，L59-69 仅 permeability/conductivity，无 Kh/Kc/Ke |
+| `syslib/GRANTA Producers Materials Data for Simulation.amat` | M270-35A 条目仍在但加密；`grep -ic ' Kh:\| Kc:\| Ke:\|core_loss'` = **0**，无明文可导出系数 |
+| 其它 syslib `.amat` | 仍无 M270-35A 命中 |
+
+判定：与 11-27 11:xx 定源一致，**E8 维持 blocked**；解锁条件不变（需厂商 Bh/B-P 多频点曲线或 Steinmetz 三系数 + 单位口径）。本日不耗真机预算，回第一优先转矩精调。
+
 ## 2026-11-27 11:xx — E6 退磁真机 FEA（定时任务 af283519；结论 PASS_MIN）
 
 并发闸口：`tasklist | grep -i ansysedt` = NO_ANSYSEDT_RUNNING（08:00 E8 批次已结束且

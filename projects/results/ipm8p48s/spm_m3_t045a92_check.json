@@ -1,0 +1,121 @@
+{
+  "stage": "M3' 401 点负载（I18 电流 + I19 平直）",
+  "torque": {
+    "t_avg_nm": 25.100721,
+    "pp_nm": 2.725956,
+    "pp_pct": 10.8601,
+    "main_harmonic_order": 24,
+    "main_harmonic_nm": 0.783679,
+    "main_harmonic_pct": 3.1221,
+    "jump_max_nm": 1.021931,
+    "jump_max_pct": 4.0713,
+    "window_samples": 200,
+    "total_rows": 401,
+    "torque_unit": "NewtonMeter",
+    "torque_scale": 1.0,
+    "spectrum_top5": [
+      [
+        24,
+        0.783679
+      ],
+      [
+        12,
+        0.68344
+      ],
+      [
+        48,
+        0.110543
+      ],
+      [
+        6,
+        0.106136
+      ],
+      [
+        36,
+        0.105842
+      ]
+    ]
+  },
+  "excitation": {
+    "current_A": 13.856,
+    "current_unit": "A_peak",
+    "phase_deg": 0.0,
+    "phase_abs_deg": 90.0,
+    "bemf_offset_deg": 90.0,
+    "sign": -1,
+    "frequency_hz": 100.0,
+    "source": "task_fixed_13.856A_no_bemf_refit"
+  },
+  "bemf_load": {
+    "sources": {
+      "A": "d(FluxLinkage(WindingA))/dt",
+      "B": "d(FluxLinkage(WindingB))/dt",
+      "C": "d(FluxLinkage(WindingC))/dt"
+    },
+    "phase": {
+      "A": {
+        "fundamental_amp_v": 291.4837,
+        "rms_v": 207.1843,
+        "phase_deg": 140.2704,
+        "n_samples": 201
+      },
+      "B": {
+        "fundamental_amp_v": 291.102,
+        "rms_v": 206.9169,
+        "phase_deg": 20.4162,
+        "n_samples": 201
+      },
+      "C": {
+        "fundamental_amp_v": 292.6794,
+        "rms_v": 207.9893,
+        "phase_deg": -99.5688,
+        "n_samples": 201
+      }
+    },
+    "note": "I21: 负载 BEMF = d(FluxLinkage)/dt，第二电周期基波 DFT",
+    "fundamental_amp_mean_v": 291.755
+  },
+  "checks": [
+    {
+      "name": "T_avg ∈ 22.5–27.5 N·m",
+      "value": 25.1007,
+      "limit": [
+        22.5,
+        27.5
+      ],
+      "op": "in",
+      "status": "PASS"
+    },
+    {
+      "name": "峰峰值 ≤ 10% T_avg",
+      "value": 10.8601,
+      "limit": 10.0,
+      "op": "<=",
+      "status": "FAIL"
+    },
+    {
+      "name": "主谐波幅值 ≤ 5% T_avg",
+      "value": 3.1221,
+      "limit": 5.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "单点跳变 ≤ 15% T_avg",
+      "value": 4.0713,
+      "limit": 15.0,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "负载 excitation.current_A > 0（真施加电流）",
+      "value": 13.856,
+      "limit": 0,
+      "op": ">",
+      "status": "PASS"
+    }
+  ],
+  "status": "FAIL",
+  "source_json": "projects/results/ipm8p48s/spm_m3_load_t045a92.json",
+  "csvdir": "D:/ANSYS_Run/csv_spm_m3_t045a92"
+}

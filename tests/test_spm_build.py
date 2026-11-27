@@ -94,3 +94,39 @@ def test_spm_core_od_single_variable_scan():
         assert snap["airgap"] == pytest.approx(0.675, abs=1e-9)
         assert snap["band_r"] == pytest.approx(46.1625, abs=1e-9)
         assert snap["ring_area"] == pytest.approx(98.248892, rel=1e-5)
+
+
+def test_spm_rotor_init_deg_identity():
+    """rotor_init_deg=0 必须与默认几何逐位一致（D5 斜槽恒等护栏）。"""
+    base = spm_build.SPMConfig()
+    from dataclasses import replace
+    rotated = replace(base, rotor_init_deg=0.0)
+    a = spm_build.spm_magnets(base)
+    b = spm_build.spm_magnets(rotated)
+    for ma, mb in zip(a, b):
+        assert ma["pts"] == mb["pts"]
+        assert ma["gx"] == mb["gx"] and ma["gy"] == mb["gy"]
+        assert ma["center_deg"] == mb["center_deg"]
+
+
+def test_spm_rotor_init_deg_rotates_geometry_and_vectors():
+    """旋转角 Δ_mech：极轴与平行充磁矢量同步转 Δ，极性/半径/气隙不变。"""
+    import math as _m
+    from dataclasses import replace
+    cfg = spm_build.SPMConfig()
+    delta = 2.8125   # 0.75 × 7.5° 槽距的一半
+    rc = replace(cfg, rotor_init_deg=delta)
+    for m0, m1 in zip(spm_build.spm_magnets(cfg), spm_build.spm_magnets(rc)):
+        assert m1["center_deg"] == pytest.approx(m0["center_deg"] + delta, abs=1e-9)
+        a0 = _m.radians(m0["center_deg"])
+        a1 = _m.radians(m1["center_deg"])
+        s = 1.0 if m0["sign"] > 0 else -1.0
+        assert m1["gx"] == pytest.approx(s * _m.cos(a1), abs=1e-9)
+        assert m1["gy"] == pytest.approx(s * _m.sin(a1), abs=1e-9)
+        assert m1["sign"] == m0["sign"]
+        assert math.hypot(m1["gx"], m1["gy"]) == pytest.approx(1.0, abs=1e-9)
+        for (x0, y0), (x1, y1) in zip(m0["pts"], m1["pts"]):
+            assert math.hypot(x1, y1) == pytest.approx(math.hypot(x0, y0), abs=1e-9)
+    snap = spm_build.spm_snapshot(rc)
+    assert snap["airgap"] == pytest.approx(0.675, abs=1e-9)
+    assert snap["band_r"] == pytest.approx(46.1625, abs=1e-9)
