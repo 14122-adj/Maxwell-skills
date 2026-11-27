@@ -1,0 +1,72 @@
+{
+  "case": "spm_t065c8_skew075",
+  "topology": "SPM_8p48s_surface_pm_parallel_mag",
+  "skew_slot": 0.75,
+  "rotor_init_deg_mech": [
+    -2.8125,
+    0.0,
+    2.8125
+  ],
+  "gamma_elec_deg": 22.5,
+  "core_od": 90.35,
+  "pole_arc": 0.9,
+  "pm_t": 0.6500000000000057,
+  "cps": 8,
+  "turns_per_phase": 128,
+  "imax": 13.978,
+  "phi_rel_deg": 0.0,
+  "slices": [
+    {
+      "idx": 0,
+      "angle_deg": -2.8125,
+      "csvdir": "D:/ANSYS_Run/csv_spm_m3_spm_t065c8_skew075_s0",
+      "aedt": "D:/ANSYS_Run/SPM_8p48s_M3_spm_t065c8_skew075_s0.aedt"
+    },
+    {
+      "idx": 1,
+      "angle_deg": 0.0,
+      "csvdir": "D:/ANSYS_Run/csv_spm_m3_spm_t065c8_skew075_s1",
+      "aedt": "D:/ANSYS_Run/SPM_8p48s_M3_spm_t065c8_skew075_s1.aedt"
+    },
+    {
+      "idx": 2,
+      "angle_deg": 2.8125,
+      "csvdir": "D:/ANSYS_Run/csv_spm_m3_spm_t065c8_skew075_s2",
+      "aedt": "D:/ANSYS_Run/SPM_8p48s_M3_spm_t065c8_skew075_s2.aedt"
+    }
+  ],
+  "method": "3-slice FEA, phase-compensated pointwise average",
+  "torque": {
+    "t_avg_nm": 25.1711,
+    "pp_nm": 0.8128,
+    "pp_pct": 3.2292,
+    "main_harmonic_order": 24,
+    "main_harmonic_nm": 0.249,
+    "main_harmonic_pct": 0.9894,
+    "jump_max_nm": 0.3698,
+    "jump_max_pct": 1.4692,
+    "checks": [
+      {
+        "name": "T_avg ∈ 22.5–27.5",
+        "value": 25.1711,
+        "status": "PASS"
+      },
+      {
+        "name": "pp ≤ 10% T_avg",
+        "value": 3.2292,
+        "status": "PASS"
+      },
+      {
+        "name": "主谐波 ≤ 5% T_avg",
+        "value": 0.9894,
+        "status": "PASS"
+      },
+      {
+        "name": "跳变 ≤ 15% T_avg",
+        "value": 1.4692,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS"
+  }
+}

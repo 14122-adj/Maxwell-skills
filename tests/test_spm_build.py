@@ -130,3 +130,26 @@ def test_spm_rotor_init_deg_rotates_geometry_and_vectors():
     snap = spm_build.spm_snapshot(rc)
     assert snap["airgap"] == pytest.approx(0.675, abs=1e-9)
     assert snap["band_r"] == pytest.approx(46.1625, abs=1e-9)
+
+
+def test_spm_cps_knob_writes_conductor_number_only():
+    """I35 降匝数单变量：cps 只改 Conductor number，几何/气隙/Band 逐字不变。"""
+    from dataclasses import replace
+    base = spm_build.SPMConfig()
+    c8 = replace(base, spm_core_od=90.35, pm_pole_arc=0.90,
+                 conductors_per_slot=8)
+    text = spm_build.build_script(c8, log_path="D:/ANSYS_Run/spm_c8.log")
+    compile(text, "<spm_c8>", "exec")
+    assert "CPS = 8" in text
+    assert "CPS = 10" not in text
+    # 几何与气隙/Band 不受匝数影响
+    snap = spm_build.spm_snapshot(c8)
+    assert snap["pm_t"] == pytest.approx(0.65, abs=1e-9)
+    assert snap["airgap"] == pytest.approx(0.675, abs=1e-9)
+    assert snap["band_r"] == pytest.approx(46.1625, abs=1e-9)
+    # 与 cps=10 同几何对比：除 CPS 行外生成脚本逐字一致
+    c10 = replace(c8, conductors_per_slot=10)
+    text10 = spm_build.build_script(c10, log_path="D:/ANSYS_Run/spm_c8.log")
+    a = [line for line in text.splitlines() if not line.startswith("CPS =")]
+    b = [line for line in text10.splitlines() if not line.startswith("CPS =")]
+    assert a == b

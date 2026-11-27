@@ -45,6 +45,8 @@ def main(argv=None) -> int:
                     help="转子铁芯 OD(mm)，默认 86.89（t_pm=2.38）；厚度单变量时改此值")
     ap.add_argument("--pole-arc", type=float, default=None,
                     help="极弧系数（默认 0.85）；S5 峰峰优化单变量 0.80/0.85/0.90")
+    ap.add_argument("--cps", type=int, default=None,
+                    help="每槽导体数（默认 10）；I35 加厚磁钢时降匝数 10→8 抑制 BEMF")
     ap.add_argument("--run", action="store_true")
     args = ap.parse_args(argv)
 
@@ -55,6 +57,8 @@ def main(argv=None) -> int:
         cfg.spm_core_od = args.core_od
     if args.pole_arc is not None:
         cfg.pm_pole_arc = args.pole_arc
+    if args.cps is not None:
+        cfg.conductors_per_slot = args.cps
     snap = spm_build.spm_snapshot(cfg)
 
     aedt_out = "%s/SPM_8p48s_M3_%s.aedt" % (RUN_DIR, args.case)
@@ -84,6 +88,8 @@ def main(argv=None) -> int:
                                 source="task_fixed_13.856A_no_bemf_refit"),
                 geometry=dict(core_od=cfg.spm_core_od, pm_t_mm=round(snap["pm_t"], 4),
                               pole_arc=cfg.pm_pole_arc,
+                              conductors_per_slot=cfg.conductors_per_slot,
+                              turns_per_phase=cfg.poles * 2 * cfg.conductors_per_slot,
                               pm_outer_r=snap["pm_outer_r"], airgap=snap["airgap"],
                               band_r=snap["band_r"], polarity=snap["polarity"]),
                 p_mech_w=ipm_m3_load.P_MECH, build_script=build_py,

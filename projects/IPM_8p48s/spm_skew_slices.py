@@ -81,6 +81,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--core-od", type=float, default=90.75)
     ap.add_argument("--pole-arc", type=float, default=0.90)
+    ap.add_argument("--cps", type=int, default=10,
+                    help="每槽导体数（默认 10）；I35 加厚磁钢时降匝数 10→8 抑制 BEMF")
     ap.add_argument("--imax", type=float, default=13.856)
     ap.add_argument("--phi-rel", type=float, default=0.0)
     ap.add_argument("--skew", type=float, default=0.75)
@@ -90,7 +92,8 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     cfg = replace(spm_build.SPMConfig(), spm_core_od=args.core_od,
-                  pm_pole_arc=args.pole_arc)
+                  pm_pole_arc=args.pole_arc,
+                  conductors_per_slot=args.cps)
     snap = spm_build.spm_snapshot(cfg)
     angles = ipm_skew_slices.slice_angles(args.skew)
     base_abs = ipm_m3_load.BEMF_OFFSET_DEG + args.phi_rel
@@ -125,6 +128,7 @@ def main(argv=None) -> int:
                    skew_slot=args.skew, rotor_init_deg_mech=angles,
                    gamma_elec_deg=args.skew * 360.0 / 48.0 * POLE_PAIRS,
                    core_od=args.core_od, pole_arc=args.pole_arc, pm_t=snap["pm_t"],
+                   cps=args.cps, turns_per_phase=cfg.poles * 2 * args.cps,
                    imax=args.imax, phi_rel_deg=args.phi_rel,
                    slices=[dict(idx=s["idx"], angle_deg=s["angle_deg"],
                                 csvdir=s["csvdir"], aedt=s["aedt"]) for s in slices],

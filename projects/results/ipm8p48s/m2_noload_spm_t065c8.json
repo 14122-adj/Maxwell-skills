@@ -1,0 +1,28 @@
+{
+  "case": "spm_t065c8_noload",
+  "cps": 8,
+  "core_od": 90.35,
+  "pm_t": 0.65,
+  "phase": {
+    "A": {
+      "rms": 135.12027740818164,
+      "peak": 167.331001922653,
+      "thd_pct": 15.224282861867701
+    },
+    "B": {
+      "rms": 135.12290628496928,
+      "peak": 167.2760875933385,
+      "thd_pct": 15.222872376166489
+    },
+    "C": {
+      "rms": 135.12225816824758,
+      "peak": 167.27533699162112,
+      "thd_pct": 15.223621380126566
+    }
+  },
+  "phase_rms_mean": 135.1218139537995,
+  "verdict_118_145": "PASS",
+  "verdict_380v": "PASS",
+  "evidence": "D:/ANSYS_Run/csv_spm_m2_t065c8/flux_{a,b,c}.csv",
+  "note": "空载 BEMF，复用 ingest_fea.load_phase_bemf（已验证）；未导 gap_mag.csv，Bg/齿槽未重算"
+}

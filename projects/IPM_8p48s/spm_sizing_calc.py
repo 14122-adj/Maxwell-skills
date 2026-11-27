@@ -115,6 +115,8 @@ def current_for_target(t: float, a: float, b: float) -> float:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--thickness", type=float, default=None, help="只算单点")
+    ap.add_argument("--cps", type=int, default=10,
+                    help="每槽导体数（默认 10）；降匝数使 BEMF∝N、I∝1/N")
     args = ap.parse_args(argv)
 
     a, b = fit_log_model()
@@ -133,15 +135,18 @@ def main(argv=None) -> int:
     candidates = [0.45, 0.65, 0.90, 1.20] if args.thickness is None else [args.thickness]
     print("%-8s %-11s %-11s %-11s %-10s %-10s" %
           ("t_pm", "core_OD", "I@25Nm", "BEMF_est", "118-145V", "380V余量"))
+    print("cps=%d（N_ph 相对基线 ×%.2f）：电流按 1/N 放大、BEMF 按 N 缩放" %
+          (args.cps, args.cps / 10.0))
     for t in candidates:
-        i_new = current_for_target(t, a, b)
-        emf = bemf_est(t)
+        i_new = current_for_target(t, a, b) * 10.0 / args.cps
+        emf = bemf_est(t) * args.cps / 10.0
         verdict = "PASS" if BEMF_WINDOW[0] <= emf <= BEMF_WINDOW[1] else "FAIL"
         margin = SVPWM_380_RMS / emf
         print("%-8.2f %-11.2f %-11.3f %-11.2f %-10s %-10.3f" %
               (t, core_od_for(t), i_new, emf, verdict, margin))
     print()
-    print("assumption=待验证：T(t) 对数拟合、Bg 解析+单点校准、BEMF 线性外推均非 FEA 结论；")
+    print("assumption=待验证：T(t) 对数拟合、Bg 解析+单点校准、BEMF 线性外推、"
+          "匝数线性缩放均非 FEA 结论；")
     print("380V 余量 = SVPWM 相 RMS 上限 %.2f V / BEMF_est。" % SVPWM_380_RMS)
     return 0
 
