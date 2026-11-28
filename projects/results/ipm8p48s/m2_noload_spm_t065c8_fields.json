@@ -1,0 +1,122 @@
+{
+  "case": "spm_t065c8_noload_field_probe",
+  "stage": "M2 空载场探针补导（已求解工程，未重解 401 点）",
+  "geometry": {
+    "core_od": 90.35,
+    "pm_t": 0.65,
+    "cps": 8,
+    "poles": 8,
+    "slots": 48,
+    "pole_arc": 0.9,
+    "band_r": 46.1625,
+    "airgap": 0.675
+  },
+  "probe": {
+    "t_last_s": "0.02s",
+    "gap_r_mm": 46.3025,
+    "n_gap": 181,
+    "n_tooth": 46,
+    "n_yoke": 91,
+    "coord_unit": "m（导入后 ×1000→mm）"
+  },
+  "bemf": {
+    "phase_rms_mean": 135.1218139537995,
+    "line_thd_max": 3.324772693368394
+  },
+  "torque": {
+    "unit": "mNewtonMeter",
+    "scale": 0.001,
+    "pp_nm": 1.625391049303699,
+    "max_nm": 0.8134568366443651,
+    "min_nm": -0.811934212659334,
+    "cogging_pct": 6.501564197214796,
+    "window_samples": 201
+  },
+  "flux_density": {
+    "gap": {
+      "n_points": 181,
+      "b_max": 0.6041070108712753,
+      "angle_at_peak_deg": 0.8749999999874916,
+      "r_at_peak_mm": 46.30250000037395,
+      "b_min": 0.005363603801140063,
+      "Br_max": 0.6015295304710443,
+      "Br_max_angle_deg": 0.8749999999874916,
+      "Bt_max": 0.1409926806386345,
+      "Bt_max_angle_deg": 0.4999999999922513,
+      "Br_at_pole_axis": 0.4004468717856515,
+      "Br_mean_one_slot_pitch": 0.5428089054502887,
+      "verdict": "FAIL"
+    },
+    "tooth": {
+      "n_points": 46,
+      "b_max": 0.9407165160386702,
+      "r_at_peak_mm": 53.111111110775525,
+      "r_span_mm": [
+        47.99999999954493,
+        58.00000000015749
+      ],
+      "verdict": "PASS"
+    },
+    "yoke": {
+      "n_points": 91,
+      "b_max": 1.120386066781175,
+      "angle_at_peak_deg": 22.249999999592156,
+      "r_mm": 60.99999999974506,
+      "verdict": "PASS"
+    }
+  },
+  "analytic_crosscheck": {
+    "bg_used_T": 0.6015295304710443,
+    "phi1_Wb": 0.002237689853352285,
+    "kw1": 0.933013,
+    "n_ph": 128,
+    "e_analytic_v": 118.73053582026876,
+    "delta_pct": 13.80544442109099
+  },
+  "checks": [
+    {
+      "name": "Bg ∈ 0.70–0.90 T",
+      "value": 0.6041070108712753,
+      "limit": [
+        0.7,
+        0.9
+      ],
+      "op": "in",
+      "status": "FAIL"
+    },
+    {
+      "name": "齿槽峰峰值 ≤ 5% (1.25 N·m)",
+      "value": 1.625391049303699,
+      "limit": 5.0,
+      "op": "<=",
+      "status": "FAIL"
+    },
+    {
+      "name": "B_tooth ≤ 1.65 T",
+      "value": 0.9407165160386702,
+      "limit": 1.65,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "B_yoke ≤ 1.50 T",
+      "value": 1.120386066781175,
+      "limit": 1.5,
+      "op": "<=",
+      "status": "PASS"
+    },
+    {
+      "name": "相 BEMF RMS ∈ 118–145 V（交叉校验）",
+      "value": 135.1218139537995,
+      "limit": [
+        118.0,
+        145.0
+      ],
+      "op": "in",
+      "status": "PASS"
+    }
+  ],
+  "status": "FAIL",
+  "evidence": "D:/ANSYS_Run/csv_spm_m2_t065c8/{gap_mag,gap_bx,gap_by,tooth_mag,yoke_mag,tq_load,flux_*}.csv",
+  "note": "不重解 401 点；gap 场仅末时刻 t=0.02s 快照（P17 口径），判据未改、FAIL 未删"
+}

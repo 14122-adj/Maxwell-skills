@@ -1,0 +1,36 @@
+{
+  "case": "spm_t065c8_steady",
+  "torque_unit": "NewtonMeter",
+  "torque_scale": 1.0,
+  "speed_unit": "rpm",
+  "time_unit": "ms",
+  "torque": {
+    "status": "OK",
+    "n": 401,
+    "t_span": [
+      0.0,
+      200.0
+    ],
+    "y_start": 0.00111341819455962,
+    "y_peak": 26.0974847255906,
+    "t_peak": 183.0,
+    "y_min": 0.00111341819455962,
+    "y_ss": 25.22762621435861,
+    "t_settle": 20.0
+  },
+  "speed": {
+    "status": "OK",
+    "n": 401,
+    "t_span": [
+      0.0,
+      200.0
+    ],
+    "y_start": 1500.0,
+    "y_peak": 1500.0,
+    "t_peak": 0.0,
+    "y_min": 1500.0,
+    "y_ss": 1500.0,
+    "t_settle": 0.0
+  },
+  "csvdir": "D:/ANSYS_Run/csv_spm_m4_spm_t065c8_steady"
+}

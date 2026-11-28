@@ -1005,7 +1005,7 @@ t065 工程（16:01 被会话中断）清锁后重跑，`OpenProject` 成功但 
 - 504 pytest passed / ruff 绿。未改判据、未删任何 FAIL 记录。
 
 
-### I35（优化项，2026-11-27 16:32 用户指令）— 增加磁钢厚度 + 重算电流（空载/负载双验证）
+### I35（**CLOSED**，2026-11-28 正式确认）— 增加磁钢厚度 + 重算电流（空载/负载双验证）✅ t=0.65/cps=8/I=13.978 A
 
 - **用户指令**：「下一步增加厚度，0.45mm 太薄了，可以更改电流，空载和负载验证一下，重新计算合适的电流和厚度，写进每日任务计划书，明天按时执行」。
 - **动机**：当前 t/g=0.667、t/τ_pole=1.25%，贴片过薄；机械强度与抗退磁裕度未验证（E6 的 SF=2.11 是 IPM V 型磁钢，不能外推到 0.45mm 贴片）。
@@ -1060,6 +1060,72 @@ t065 工程（16:01 被会话中断）清锁后重跑，`OpenProject` 成功但 
   全量 **507 passed** / ruff 绿。**判据未改、FAIL 未删、未碰 OD120/E8**。
 - 判据未改、FAIL 未删；新基线是否替换 t=0.45 由明日（11-28 13:30）正式执行后裁定，
   本轮为今晚加跑的探索验证，已先行写账本留痕。
+
+#### 2026-11-28 13:30 — I35 正式确认：复核证据 + SPM_DESIGN §7.6 回写，I35 CLOSED
+
+- **复核（只读，未重跑今晚已完成的空载+负载斜槽）**：
+  `spm_m3_skew_spm_t065c8_skew075.json` → T_avg **25.1711** / pp **3.2292%** /
+  主谐波 h=24 **0.9894%** / 跳变 **1.4692%**，checks 四项全 PASS、cps=8/N_ph=128、
+  Imax=13.978、core_od=90.35、极弧 0.90；`m2_noload_spm_t065c8.json` →
+  相 BEMF RMS **135.1218 V**（A/B/C 135.1203/135.1229/135.1223），
+  `verdict_118_145=PASS`、`verdict_380v=PASS`，note 明写 Bg/齿槽未重算。
+- **正式回写**：`SPM_DESIGN.md` 新增 §7.6（新基线 t=0.65/cps=8/I=13.978 A，
+  含新旧对照表、证据索引、遗留项）；旧 t=0.45/cps=10 基线 §7.5 原样保留为历史。
+  I35 状态 OPEN → **CLOSED**。判据 22.5–27.5 / ≤10% / ≤5% / ≤15% 未动，FAIL 未删。
+- **开工 gate**：HEAD==origin/main==76cfae7；无 ansysedt 进程；
+  E8 gate 复跑仍 MISSING（账本 E8 已记 11-28 复查）。
+- **遗留转本日后续**：空载 Bg/齿槽补导场探针、M4 起动曲线按新基线重出（见 11-28 续段）。
+
+#### 2026-11-28 13:40 — I35 遗留补验：空载场探针补导（未重解 401 点），Bg/齿槽 FAIL 留档
+
+- **缺口根因**：11-27 晚空载求解脚本 `spm_m2_solve_t065c8.py` 只导 flux/tq，未导
+  `gap_mag.csv/gap_bx.csv/gap_by.csv/tooth_mag.csv/yoke_mag.csv`；工程 `.aedtresults` 完整
+  （`ANALYZE_OK 1011.0s`，末时刻 t=0.02s 有场），无需重解 401 点。
+- **管线**：新建 `spm_m2_field_probe.py`（KEEP）：打开已求解 `SPM_8p48s_M2_t065c8.aedt`，
+  用 FieldsReporter 在 t=0.02s 补导 5 组探针（gap 181 点 r=46.3025mm / tooth 46 点 /
+  yoke 91 点 / gap_bx,by 各 181 点），坐标单位**米**（mm 全 NaN），3.6s rc=0。
+  首跑因 `oF.ClearAll()` 在 2021.1 的 ADispatchWrapper 上不存在而全 FAIL，按
+  `ipm_m2_noload.py` 范式加 try/except 后二次 rc=0 —— **失败记录与修复写在此，判据未改**。
+- **独立重算**（`spm_m2_field_probe.py --check` → `m2_noload_spm_t065c8_fields.json`，KEEP）：
+  | 判据 | 实测 | 结果 | 对照 |
+  |---|---:|---|---|
+  | Bg ∈0.70–0.90 T | **0.6041** | **FAIL** | 旧 t=0.45 空载 Bg 0.6189 同族 FAIL；加厚未改善，非本轮引入 |
+  | 齿槽 pp ≤1.25 N·m | **1.6254**（6.50%） | **FAIL** | 旧 t=0.45 为 1.1302 PASS；t=0.65 加厚上升 +43.8% |
+  | B_tooth ≤1.65 T | 0.9407 | PASS | — |
+  | B_yoke ≤1.50 T | 1.1204 | PASS | — |
+  | 相 BEMF RMS 118–145 V | 135.1218 | PASS | 与 `m2_noload_spm_t065c8.json` 逐位一致 |
+- **口径**：Bg/齿槽为**无斜槽单片**末时刻快照（P17 口径，场仅 t=0.02s 一帧），斜槽 0.75
+  的 3 片平均对齿槽的抑制不在本口径内；解析交叉校验（Br_max 0.6015T、N_ph=128）得 118.73V，
+  与 FEA 135.12V 差 13.8% ⇒ 解析只作交叉校验、不填 FEA（反自演硬规则）。
+- **处置**：Bg/齿槽 FAIL **原样留档、判据未改、不拿旧几何数字冒充新几何性能**；
+  不阻塞 I35 转矩四项 PASS 的闭环（判据集不同：22.5–27.5/峰峰/主谐波/跳变）。
+  加厚磁钢改善机械/退磁裕度的同时使齿槽上升，是下一轮 Optimize 的已知代价，
+  本轮只报数不修参数（单变量纪律：本日已做厚度+匝数两项，不再动第三变量）。
+- 新增 KEEP：`spm_m2_field_probe.py`、`tests/test_spm_build.py` +1 例（M4 cps 护栏，
+  tmp_path 反斜杠改正斜杠避免 `\T` 非法转义）、`m2_noload_spm_t065c8_fields.json`。
+  场探针 CSV 在 `D:/ANSYS_Run/csv_spm_m2_t065c8/`（TEMP，不入库）。全量 pytest/ruff 见当日闭环段。
+- **未跟踪废料处置**：`projects/results/ipm8p48s/m2_noload_spm_t065c8_bemf.json` 是 11-27
+  晚试算的**错误口径**（RMS 135120 V，单位放大 1000×，`verdict=FAIL`），已被
+  `m2_noload_spm_t065c8.json`（135.1218 V PASS）取代。按「不删文件」约束**保留未跟踪、
+  不 add、不引用**，后续禁止拿它当 BEMF 证据。`m4_start_soft.json`（11-25 旧）同样未 add。
+
+#### 2026-11-28 14:01 — M4 起动曲线按新基线重出（单片口径，未含斜槽）
+
+- **管线**：`spm_m4_start.py` 加 `--cps`（默认 None 向后兼容，cps=8 落 meta 几何+source），
+  +1 护栏测试（meta cps=8/turns=128/source=spm_t065c8_new_baseline_I35+生成脚本 CPS=8；
+  tmp_path 反斜杠改正斜杠避免 `\T` 非法转义）。
+- **真机**：`--core-od 90.35 --pole-arc 0.90 --cps 8 --imax 13.978 --case spm_t065c8_steady --run`，
+  BUILD 31.4s `VALIDATE_OK`/`SAVED_OK`、SOLVE **1217.2s** `ANALYZE_OK`/`Normal completion`、
+  401 点三量齐导（tq N·m / speed rpm / position deg），rc=0，无孤儿锁。
+- **独立摘要**（`ipm_m4_plot.py` → `m4_start_summary_spm_t065c8_steady.json`）：
+  t=0 **0.001 N·m**、首次进入 95% 稳态带 **20.0 ms**、峰值 **26.097 N·m @183ms**、
+  末段稳态（后 20%）**25.228 N·m**、转速恒 1500 rpm。图 `spm_m4_start_curve_t065c8.png`。
+  meta `spm_m4_start_spm_t065c8_steady.json` 回写 `solved=true`。
+- **口径**：稳态+软启动（`i=−13.978·min(t/0.02,1)·sin(628.3185t+90°)`），恒转速 1500 rpm，
+  **单片 t=0.65 几何、未含斜槽 3 切片**（与 M3 斜槽新基线不同工况，PROJECT_SPEC §7 口径：
+  M4 不参与 25N·m/峰峰判据）。未碰三条证否路线（固定 100Hz 开环 / Moving1.Position 反馈 / 改 J）。
+- **闭环**：全量 pytest **509 passed**（507→509，+2 护栏）、ruff 绿。只 add KEEP，
+  commit/push，HEAD==origin/main 见当日执行记录。
 
 ### I34（**CLOSED**，2026-11-26 23:47 用户反馈）— 转矩幅值精调到 25.0±0.5 N·m ✅ 2026-11-27 斜槽 0.75 达成
 

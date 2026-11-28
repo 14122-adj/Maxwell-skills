@@ -58,6 +58,8 @@ def main(argv=None) -> int:
     ap.add_argument("--case", default="spm_steady")
     ap.add_argument("--core-od", type=float, default=90.65, help="转子铁芯 OD（t_pm=0.50）")
     ap.add_argument("--pole-arc", type=float, default=0.90)
+    ap.add_argument("--cps", type=int, default=None,
+                    help="每槽导体数（默认 SPMConfig 10）；I35 新基线 cps=8 / 128 匝")
     ap.add_argument("--run", action="store_true")
     args = ap.parse_args(argv)
 
@@ -68,6 +70,8 @@ def main(argv=None) -> int:
     cfg = spm_build.SPMConfig()
     cfg.spm_core_od = args.core_od
     cfg.pm_pole_arc = args.pole_arc
+    if args.cps is not None:
+        cfg.conductors_per_slot = args.cps
     snap = spm_build.spm_snapshot(cfg)
 
     aedt_out = "%s/SPM_8p48s_M4_%s.aedt" % (RUN_DIR, args.case)
@@ -99,11 +103,14 @@ def main(argv=None) -> int:
                 topology="SPM_8p48s_surface_pm_parallel_mag",
                 geometry=dict(core_od=cfg.spm_core_od, pole_arc=cfg.pm_pole_arc,
                               pm_t_mm=round(snap["pm_t"], 4), airgap=snap["airgap"],
+                              cps=cfg.conductors_per_slot,
+                              turns_per_phase=cfg.poles * 2 * cfg.conductors_per_slot,
                               polarity=snap["polarity"]),
                 excitation=dict(current_A=args.imax, current_unit="A_peak",
                                 phase_abs_deg=phi_abs, frequency_hz=F_ELEC,
                                 current_sign=-1, soft_start_s=args.soft_start,
-                                source="spm_final_design_fixed_13.856A",
+                                source="spm_t065c8_new_baseline_I35" if args.cps == 8
+                                else "spm_final_design_fixed_13.856A",
                                 expressions=currents,
                                 mode="steady_soft_start",
                                 note="恒转速1500rpm+固定100Hz+电流软启动 ⇒ 转矩0→25后保持"),
@@ -120,8 +127,9 @@ def main(argv=None) -> int:
         json.dump(meta, fh, ensure_ascii=False, indent=2)
 
     print("SPM M4 从零起动曲线（稳态+软启动）")
-    print("  几何 : core_od=%.3f 极弧=%.2f t_pm=%.3f 气隙=%.4f 极性=%s" %
-          (cfg.spm_core_od, cfg.pm_pole_arc, snap["pm_t"], snap["airgap"], "".join(snap["polarity"])))
+    print("  几何 : core_od=%.3f 极弧=%.2f t_pm=%.3f 气隙=%.4f cps=%d 极性=%s" %
+          (cfg.spm_core_od, cfg.pm_pole_arc, snap["pm_t"], snap["airgap"],
+           cfg.conductors_per_slot, "".join(snap["polarity"])))
     print("  电流 : Imax=%.3f A φ_abs=%.1f° f=%.1fHz T_soft=%.3fs" %
           (args.imax, phi_abs, F_ELEC, args.soft_start))
     print("  表达式: %s" % currents["A"])

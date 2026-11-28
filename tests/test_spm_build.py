@@ -153,3 +153,56 @@ def test_spm_cps_knob_writes_conductor_number_only():
     a = [line for line in text.splitlines() if not line.startswith("CPS =")]
     b = [line for line in text10.splitlines() if not line.startswith("CPS =")]
     assert a == b
+
+
+def test_spm_m4_cps_knob_meta_and_source(tmp_path, monkeypatch):
+    """I35 新基线：M4 起动脉冲图的 --cps 必须落进 meta 几何+source。"""
+    import spm_m4_start
+
+    # 生成脚本把路径拼进双引号字面量，Windows 反斜杠会产生 \T 非法转义
+    tmp_fwd = str(tmp_path).replace("\\", "/")
+    monkeypatch.setattr(spm_m4_start, "RUN_DIR", tmp_fwd)
+    monkeypatch.setattr(spm_m4_start, "RESULTS", tmp_fwd)
+    rc = spm_m4_start.main([
+        "--core-od", "90.35", "--pole-arc", "0.90", "--cps", "8",
+        "--imax", "13.978", "--case", "cps8_guard",
+    ])
+    assert rc == 0
+    import json
+
+    meta = json.loads((tmp_path / "spm_m4_start_cps8_guard.json").read_text(encoding="utf-8"))
+    assert meta["geometry"]["cps"] == 8
+    assert meta["geometry"]["turns_per_phase"] == 128
+    assert meta["geometry"]["core_od"] == pytest.approx(90.35)
+    assert meta["excitation"]["current_A"] == pytest.approx(13.978)
+    assert meta["excitation"]["source"] == "spm_t065c8_new_baseline_I35"
+    build_py = tmp_path / "spm_m4_build_cps8_guard.py"
+    assert "CPS = 8" in build_py.read_text(encoding="utf-8")
+
+
+def test_spm_m2_field_probe_guard(tmp_path):
+    """I35 遗留补验：ClearAll 必须 try/except（2021.1 无该方法，首跑全 FAIL）；坐标为米。"""
+    import ipm_geom
+    import ipm_m2_noload as m2n
+    import spm_m2_field_probe as fp
+
+    pts = m2n.write_point_files(ipm_geom.IPMConfig(), str(tmp_path / "pts"))
+    assert set(pts) == {"gap", "tooth", "yoke"}
+    assert pts["gap"][1] == 181
+    gap_path = pts["gap"][0]
+    with open(gap_path, encoding="ascii") as fh:
+        first = fh.readline().split()
+    # 点文件单位米：x≈0.046 m，若写成 mm 会是 46；判据用数量级避免写死极角
+    assert 0.01 < abs(float(first[0])) < 0.05
+    assert abs(float(first[1])) < 1e-9
+
+    text = fp.build_script(pts, aedt_in="D:/ANSYS_Run/x.aedt",
+                           csvdir="D:/ANSYS_Run/csv_x", log_path="D:/ANSYS_Run/x.log")
+    compile(text, "<field_probe>", "exec")
+    lines = text.splitlines()
+    # ClearAll 前一行必须是 try:，后两行 except/pass（首跑因裸调用 AttributeError 全 FAIL）
+    i = next(i for i, ln in enumerate(lines) if "ClearAll()" in ln)
+    assert lines[i - 1].strip() == "try:"
+    assert "except Exception:" in lines[i + 1]
+    assert lines[i + 2].strip() == "pass"
+    assert "'Setup1 : Transient'" in text
