@@ -67,7 +67,7 @@
 | **E5** | major | 热 | 热分析仍是 7 节点解析，未用 FEA 损耗复核 | `thermal_summary.json` | 热点 ≤155°C / 磁钢 ≤120°C | open | 用 FEA 损耗重跑热网络/FEA |
 | **E6** | major | 退磁 | 退磁仍是解析，未用 FEA 校核 | `sim_summary.json` | B_min ≥0.2 T，SF ≥2 | **closed (PASS_MIN)** | 11-27 真机 150°C 三相短路 FEA：B_min **0.4222 T**、SF **2.1108**（目标 0.30/2.5，下限 0.20/2.0）⇒ 过下限未达目标；401 点、5 点试算判能解；证据 `projects/results/e8e6/e6_fea.json`、`field/`。温度系数外推标 assumption=待验证；末时刻快照局限在案 |
 | **E7** | major | 电磁 | 转矩脉动 32.39% ≥ 15% | `fea_results.json` | ≤15%（目标 ≤10%） | **closed** | 模板 M7 梨形槽 401 点：**14.688%**（≤15% 达标）；主因 600 Hz 齿槽残余（2.04 N·m 基波幅值）；**≤10% 目标未达**，转 G7 |
-| **E8** | major | 效率 | 效率 93.87% 为解析，FEA 损耗未复核 | `sim_summary.json` | ≥93.8% | **blocked** | 11-27 铁耗系数定源完成：库内有 M270-35A 牌号但不可导出 ⇒ 等用户提供 Kh/Kc/Ke。详见下方「2026-11-27 11:xx E8 铁耗系数定源」段。gate 未过，未跑 CoreLoss、未填经验值、未改判据 |
+| **E8** | major | 效率 | 效率 93.87% 为解析，FEA 损耗未复核 | `sim_summary.json` | ≥93.8% | **blocked** | 11-28 gate 复跑仍 MISSING、材料库复查无明文系数 ⇒ 维持 blocked，等用户提供 Kh/Kc/Ke。详见下方「2026-11-28 13:xx E8 gate 复跑」段。gate 未过，未跑 CoreLoss、未跑真机 FEA、未填经验值、未改判据、未改 ENGINEERING_ACCEPTANCE.md |
 | **E9** | major | 制造 | 槽满率/公差链/BOM 未做 | — | 满率 ≤0.78；g_min ≥0.50；BOM ±10% | open | S10 |
 | **E10** | minor | NVH | 力波/模态为解析，未用 FEA 校核 | `nvh_summary.json` | 工作区无同阶共振 | open | FEA 模态/力波 |
 | **E11** | minor | 标准 | 未对照 IEC 60034-1/2-1、F 级绝缘 | — | 报告列出标准条款/温升限值 | open | 补标准对照表 |
@@ -131,6 +131,36 @@ Motor-CAD 2025.2.1 的 `motorcad` feature checkout 报 FlexNet -8,544（license 
 | 其它 syslib `.amat` | 仍无 M270-35A 命中 |
 
 判定：与 11-27 11:xx 定源一致，**E8 维持 blocked**；解锁条件不变（需厂商 Bh/B-P 多频点曲线或 Steinmetz 三系数 + 单位口径）。本日不耗真机预算，回第一优先转矩精调。
+
+## 2026-11-28 13:xx — E8 gate 复跑（定时任务 c280d576；结论维持 BLOCKED）
+
+开工硬 gate：`E8E6Bridge(dry_run=False).core_loss_coefficients()` → `{'material': 'M270_35A', 'status': 'MISSING', 'coefficients': {'Kh': False, 'Kc': False, 'Ke': False}, 'source': 'projects/25Nm_PMSM/maxwell_model/materials.py'}`。三系数仍全缺 ⇒ 本批次**只做定源**，不进入真机 FEA。
+
+并发闸口：`tasklist | grep -i ansysedt` = NO_ANSYSDT_RUNNING（无 Maxwell 占用，无并发风险；因 gate 未过也不用真机）。
+
+复查（按 11-27 记忆约定，不做全盘重检 / 不重跑卡死的 Maxwell API 探测，仅轻量确认）：
+
+| 对象 | 2026-11-28 复查结果 | 证据 |
+|---|---|---|
+| `projects/25Nm_PMSM/maxwell_model/materials.py:59-69` | M270_35A 仍只有 permeability=1000 / conductivity=2000000，无 Kh/Kc/Ke | 文件直读 L59-69 |
+| Maxwell 主库 `syslib/Materials.amat` | `grep -ic M270` = **0** | 全库检索 |
+| GRANTA 扩展库 `syslib/GRANTA Producers Materials Data for Simulation.amat` | M270 命中均为密文片段（行 7315/63075/63401…）；`IsEncrypted=true` = **1937** 条；明文 ` Kh:/ Kc:/ Ke:/core_loss` 命中 = **0** | `grep -in`、`grep -c` |
+
+判定：gate=MISSING 且库内无可导出系数（与 11-27 定源一致），**E8 维持 blocked**。本批次未跑 CoreLoss、未跑真机 FEA、未填经验值、未改判据、未改 `ENGINEERING_ACCEPTANCE.md` 的 η 行、未碰 Motor-CAD / 破解 license / 任何 license 文件。解锁条件不变（见 11-27 11:xx 段「解锁所需厂商标定数据」三条，缺一不可）。
+
+本批次文件变更：仅 `projects/25Nm_PMSM/PROBLEM_LEDGER.md`（E8 行状态说明 + 本段）[KEEP]，无新增临时/证据文件。
+
+## 2026-11-28 13:30 — E8 铁耗系数来源复查（每日 13:30 迭代内，结论维持 BLOCKED）
+
+开工 gate 复跑：`E8E6Bridge(dry_run=False).core_loss_coefficients()` → `{'status':'MISSING','coefficients':{'Kh':False,'Kc':False,'Ke':False},'source':'projects/25Nm_PMSM/maxwell_model/materials.py'}`。按约束**不填经验值、不跑 CoreLoss、不改 η 判据、不改 ENGINEERING_ACCEPTANCE.md**。
+
+一次来源复查（只读，范围同 11-27）：
+| 对象 | 本日复查结果 |
+|---|---|
+| `projects/25Nm_PMSM/maxwell_model/materials.py` | mtime 仍 2026-11-19 23:33:18，Kh/Kc/Ke/core_loss 明文 grep 命中 **0** |
+| `syslib/GRANTA Producers Materials Data for Simulation.amat` | 文件仍在（23.6 MB / mtime 2020-08-27），`IsEncrypted=true` 计数 1937，`grep -ic ' Kh:\| Kc:\| Ke:\|core_loss'` = **0**，无明文可导出系数 |
+
+判定：连续第 2 日 MISSING，**E8 维持 blocked**，解锁条件不变。未耗真机预算，回第一优先（t=0.65/cps=8 新基线确认 + 双验证遗留项）。全程未碰 Motor-CAD / license 文件。
 
 ## 2026-11-27 11:xx — E6 退磁真机 FEA（定时任务 af283519；结论 PASS_MIN）
 
