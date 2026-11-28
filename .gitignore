@@ -59,3 +59,25 @@ projects/25Nm_PMSM/maxwell_model_e1*/
 # 只改 solver.py 的 TimeStep（StopTime 不变）⇒ 不入库；801 行 CSV 归档到
 # projects/results/fea/e2_t25/。
 projects/25Nm_PMSM/maxwell_model_e2*/
+
+# ===== agent 运行时记忆（.workbuddy/）=====
+# WorkBuddy agent 的会话记忆日志（每日 memory/*.md 与 automations/<uuid>/memory.md），
+# 不是项目交付物；按 FILE_LIFECYCLE §2.2 归 TEMP（agent 生成、不入库）。
+# 值得长期保留的工程决策已沉淀到 KEEP：projects/*/PROBLEM_LEDGER.md、
+# docs/WEEKLY_AUDIT_*.md、docs/CLEANUP_REPORT_*.md，故日志本体不再重复入库。
+.workbuddy/
+
+# ===== 错误口径 / 已废弃的未跟踪 JSON（保留文件，但不入库）=====
+# 按「不删文件」约束保留在磁盘，PROBLEM_LEDGER I37(11-28) 已判定，禁止引用：
+#   m2_noload_spm_t065c8_bemf.json  RMS 135120 V（单位放大 1000x，verdict=FAIL），
+#                                   已被 m2_noload_spm_t065c8.json（BEMF 135.1218 V PASS）取代
+#   m4_start_soft.json              11-25 旧起动曲线（solved=False），已被
+#                                   m4_start_summary_spm_t065c8_steady.json 取代
+# 只排除这两个文件；同目录 102 个已跟踪 KEEP 证据 JSON 照常入库（禁止按目录整体排除）。
+projects/results/ipm8p48s/m2_noload_spm_t065c8_bemf.json
+projects/results/ipm8p48s/m4_start_soft.json
+
+# ===== 敏感文件：ANSYS license / lmcksum 抓取输出 =====
+# 根目录文件名 `100` 是 lmcksum 输出重定向残留，含 license 条目、ISSUER 与 SIGN2 签名，
+# 属于凭证材料，禁止入库。
+/100
